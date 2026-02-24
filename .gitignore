@@ -1,0 +1,62 @@
+# Xcode
+#
+# gitignore contributors: scroll through to find your relevant foods, and then copy the sections you need.
+
+build/
+DerivedData/
+*.ideruntestresult
+*.xcresult
+*.xcuserstate
+project.xcworkspace/xcuserdata/
+project.xcworkspace/xcshareddata/swiftpm/config.json
+*.xcuserdata
+*.xccheckout
+*.mov
+*.pfx
+*.pdf
+*.doc
+*.docx
+*.swp
+*.lock
+*~.nib
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+!default.mode1v3
+!default.mode2v3
+!default.perspectivev3
+xcuserdata/
+
+# Swift Package Manager
+#
+# Add this line if you want to avoid checking in source code from Swift Package Manager dependencies.
+# .build/
+
+# Carthage
+#
+# Add this line if you want to avoid checking in source code from Carthage dependencies.
+# Carthage/Checkouts/
+# Carthage/Build/
+
+# AccuRev
+.accurev.session
+
+# Fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots
+fastlane/test_output
+
+# Code Signing
+*.jks
+*.p12
+*.key
+*.mobileprovision
+*.provisionprofile
+
+# macOS
+.DS_Store
+*.icloud
+
+# XCGenearted
+Essays.xcodeproj/
