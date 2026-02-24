@@ -60,7 +60,7 @@ jobs:
     name: Build and Release
     needs: check-version
     if: needs.check-version.outputs.should_release == 'true'
-    runs-on: macos-15
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
 
