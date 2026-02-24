@@ -1,0 +1,41 @@
+name: Essays
+options:
+  bundleIdPrefix: com.essays.app
+  deploymentTarget:
+    macOS: "26.0"
+  xcodeVersion: "16.0"
+  generateEmptyDirectories: true
+  defaultConfig: Release
+
+configs:
+  Debug:
+    type: debug
+    SWIFT_OPTIMIZATION_LEVEL: -Onone
+  Release:
+    type: release
+    SWIFT_OPTIMIZATION_LEVEL: -O
+
+targets:
+  Essays:
+    type: application
+    platform: macOS
+    sources:
+      - path: .
+        excludes:
+          - "**/.DS_Store"
+          - "EssaysTests/**"
+          - "project.yml"
+    settings:
+      base:
+        INFOPLIST_FILE: Info.plist
+        PRODUCT_BUNDLE_IDENTIFIER: com.essays.app
+        PRODUCT_NAME: Essays
+        COMBINE_HIDPI_IMAGES: true
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ENABLE_HARDENED_RUNTIME: true
+        CODE_SIGN_ENTITLEMENTS: Resources/Essays.entitlements
+    entitlements:
+      path: Resources/Essays.entitlements
+      properties:
+        com.apple.security.app-sandbox: false
+        com.apple.security.network.client: true
