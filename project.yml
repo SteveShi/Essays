@@ -25,6 +25,10 @@ targets:
           - "**/.DS_Store"
           - "EssaysTests/**"
           - "project.yml"
+          - ".git/**"
+          - ".github/**"
+          - "warnings.log"
+          - "build/**"
     settings:
       base:
         INFOPLIST_FILE: Info.plist

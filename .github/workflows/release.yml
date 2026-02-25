@@ -81,7 +81,6 @@ jobs:
             -configuration Release \
             -archivePath build/Essays.xcarchive \
             -derivedDataPath build/DerivedData \
-            MACOSX_DEPLOYMENT_TARGET=15.0 \
             ARCHS=arm64 \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO
