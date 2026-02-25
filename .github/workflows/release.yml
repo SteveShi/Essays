@@ -67,8 +67,8 @@ jobs:
         with:
           xcode-version: latest-stable
 
-      - name: Install XcodeGen
-        run: brew install xcodegen
+      - name: Install Tooling
+        run: brew install xcodegen create-dmg
 
       - name: Generate Xcode Project
         run: xcodegen generate
@@ -105,6 +105,18 @@ jobs:
           cp -R build/Essays.xcarchive/Products/Applications/Essays.app build/Export/
           cd build/Export
           zip -r ../../Essays.zip Essays.app
+          
+          # Create DMG
+          create-dmg \
+            --volname "Essays" \
+            --window-pos 200 120 \
+            --window-size 600 400 \
+            --icon-size 100 \
+            --icon "Essays.app" 175 190 \
+            --hide-extension "Essays.app" \
+            --app-drop-link 425 190 \
+            "../../Essays.dmg" \
+            "Essays.app"
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
@@ -112,6 +124,8 @@ jobs:
           tag_name: v${{ needs.check-version.outputs.version }}
           name: v${{ needs.check-version.outputs.version }}
           body: ${{ needs.check-version.outputs.changelog }}
-          files: Essays.zip
+          files: |
+            Essays.zip
+            Essays.dmg
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
