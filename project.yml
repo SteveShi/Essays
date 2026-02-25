@@ -29,11 +29,18 @@ targets:
           - ".github/**"
           - "warnings.log"
           - "build/**"
+          - "*.py"
+          - "*.swift"
+          - "!**/*.swift" # Ensure we don't exclude actual source files, but top-level helper scripts
+          - "draw_icon.swift"
+          - "base_icon.png"
     settings:
       base:
         INFOPLIST_FILE: Info.plist
         PRODUCT_BUNDLE_IDENTIFIER: com.essays.app
         PRODUCT_NAME: Essays
+        MARKETING_VERSION: "1.0.0"
+        CURRENT_PROJECT_VERSION: "100"
         COMBINE_HIDPI_IMAGES: true
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ENABLE_HARDENED_RUNTIME: true
