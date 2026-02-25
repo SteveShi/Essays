@@ -10,6 +10,7 @@ struct Memo: Identifiable, Hashable {
     let pinned: Bool
     let tags: [String]
     let resources: [Resource]
+    let location: Location?
     
     init(
         name: String = "",
@@ -20,7 +21,8 @@ struct Memo: Identifiable, Hashable {
         visibility: MemoVisibility = .private,
         pinned: Bool = false,
         tags: [String] = [],
-        resources: [Resource] = []
+        resources: [Resource]? = [],
+        location: Location? = nil
     ) {
         self.name = name.isEmpty ? "memos/\(id)" : name
         self.id = id
@@ -30,7 +32,8 @@ struct Memo: Identifiable, Hashable {
         self.visibility = visibility
         self.pinned = pinned
         self.tags = tags
-        self.resources = resources
+        self.resources = resources ?? []
+        self.location = location
     }
 }
 
@@ -72,7 +75,13 @@ struct Resource: Codable, Identifiable, Hashable {
     }
     
     var thumbnailURL: String? {
-        externalLink
+        if let link = externalLink, !link.isEmpty {
+            return link
+        }
+        // Fallback to internal file path: /file/resources/uid/filename
+        // We'll need to prepend the server URL in the UI layer or here if we have context.
+        // For now, return the internal path and handle it in the UI.
+        return "/file/\(name)"
     }
 }
 

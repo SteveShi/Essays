@@ -474,7 +474,14 @@ struct MemoCard: View {
             HStack(spacing: 8) {
                 ForEach(memo.resources.prefix(4)) { resource in
                     if resource.isImage {
-                        AsyncImage(url: URL(string: resource.externalLink ?? "")) { image in
+                        let resourceURL: URL? = {
+                            if let link = resource.externalLink, !link.isEmpty {
+                                return URL(string: link)
+                            }
+                            return URL(string: appState.serverURL + "/file/" + resource.name)
+                        }()
+
+                        AsyncImage(url: resourceURL) { image in
                             image
                                 .resizable()
                                 .aspectRatio(contentMode: .fill)
@@ -517,6 +524,20 @@ struct MemoCard: View {
             Text("·")
                 .font(LiquidGlassTheme.typography.caption)
                 .foregroundColor(LiquidGlassTheme.colors.tertiaryText)
+            
+            if let location = memo.location {
+                HStack(spacing: 4) {
+                    Image(systemName: "mappin.and.ellipse")
+                        .font(.system(size: 10))
+                    Text(String(format: "%.4f, %.4f", location.latitude, location.longitude))
+                        .font(LiquidGlassTheme.typography.caption)
+                }
+                .foregroundColor(LiquidGlassTheme.colors.secondaryText)
+
+                Text("·")
+                    .font(LiquidGlassTheme.typography.caption)
+                    .foregroundColor(LiquidGlassTheme.colors.tertiaryText)
+            }
 
             Text(memo.createdAt.formatted(date: .omitted, time: .shortened))
                 .font(LiquidGlassTheme.typography.caption)

@@ -109,7 +109,8 @@ actor MemosAPIClient {
         let visibility: String
         let pinned: Bool?
         let tags: [String]?
-        let attachments: [Resource]?
+        let resources: [Resource]?
+        let location: Location?
         
         var extractedId: Int {
             if let idString = name.split(separator: "/").last, let id = Int(idString) {
@@ -199,13 +200,15 @@ actor MemosAPIClient {
                 visibility: visibility,
                 pinned: data.pinned ?? false,
                 tags: data.tags ?? [],
-                resources: data.attachments ?? []
+                resources: data.resources ?? [],
+                location: data.location
             )
         }
     }
     
     func createMemo(
-        content: String, visibility: MemoVisibility = .private, resourceNames: [String] = []
+        content: String, visibility: MemoVisibility = .private,
+        resourceNames: [String] = [], location: Location? = nil
     ) async throws -> Memo {
         guard let url = buildURL("/api/v1/memos") else {
             throw MemosAPIError.invalidURL
@@ -218,6 +221,13 @@ actor MemosAPIClient {
         
         if !resourceNames.isEmpty {
             body["resources"] = resourceNames.map { ["name": $0] }
+        }
+        
+        if let location = location {
+            body["location"] = [
+                "latitude": location.latitude,
+                "longitude": location.longitude,
+            ]
         }
 
         let request = buildRequest(url: url, method: "POST", body: try? JSONSerialization.data(withJSONObject: body))
@@ -234,13 +244,14 @@ actor MemosAPIClient {
             visibility: memoVisibility,
             pinned: data.pinned ?? false,
             tags: data.tags ?? [],
-            resources: data.attachments ?? []
+            resources: data.resources ?? [],
+            location: data.location
         )
     }
     
     func updateMemo(
         id: Int, content: String, visibility: MemoVisibility? = nil, pinned: Bool? = nil,
-        resourceNames: [String]? = nil
+        resourceNames: [String]? = nil, location: Location? = nil
     ) async throws -> Memo {
         guard var urlComponents = URLComponents(string: "\(baseURL)/api/v1/memos/\(id)") else {
             throw MemosAPIError.invalidURL
@@ -262,6 +273,14 @@ actor MemosAPIClient {
             updateMasks.append("resources")
         }
         
+        if let location = location {
+            body["location"] = [
+                "latitude": location.latitude,
+                "longitude": location.longitude,
+            ]
+            updateMasks.append("location")
+        }
+
         urlComponents.queryItems = [URLQueryItem(name: "updateMask", value: updateMasks.joined(separator: ","))]
         
         guard let url = urlComponents.url else {
@@ -282,7 +301,8 @@ actor MemosAPIClient {
             visibility: memoVisibility,
             pinned: data.pinned ?? false,
             tags: data.tags ?? [],
-            resources: data.attachments ?? []
+            resources: data.resources ?? [],
+            location: data.location
         )
     }
     
@@ -327,7 +347,8 @@ actor MemosAPIClient {
             visibility: visibility,
             pinned: data.pinned ?? false,
             tags: data.tags ?? [],
-            resources: data.attachments ?? []
+            resources: data.resources ?? [],
+            location: data.location
         )
     }
     
@@ -338,12 +359,18 @@ actor MemosAPIClient {
     }
     
     func uploadAttachment(data: Data, filename: String, mimeType: String) async throws -> Resource {
-        guard let url = buildURL("/api/v1/attachments") else {
+        guard let url = buildURL("/api/v1/resources") else {
             throw MemosAPIError.invalidURL
         }
         
-        var request = buildRequest(url: url, method: "POST")
-        let boundary = UUID().uuidString
+        // Manual request building to avoid buildRequest's default JSON header
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        if !_accessToken.isEmpty {
+            request.setValue("Bearer \(_accessToken)", forHTTPHeaderField: "Authorization")
+        }
+
+        let boundary = "Boundary-\(UUID().uuidString)"
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         
         var body = Data()

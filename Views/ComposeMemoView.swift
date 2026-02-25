@@ -1,4 +1,5 @@
 import SwiftUI
+import CoreLocation
 
 struct ComposeMemoView: View {
     @EnvironmentObject var appState: AppState
@@ -12,6 +13,7 @@ struct ComposeMemoView: View {
     @State private var errorMessage: String?
     @FocusState private var isContentFocused: Bool
     
+    @State private var currentLocation: Location?
     @State private var uploadedResources: [Resource] = []
     @State private var isUploading = false
     @State private var suggestedTags: [String] = []
@@ -230,6 +232,18 @@ struct ComposeMemoView: View {
                 .help(String(localized: "Code Block", comment: "Help tooltip for code block button"))
                 
                 Button {
+                    insertMemoLink()
+                } label: {
+                    Image(systemName: "link.badge.plus")
+                        .font(.system(size: 14, weight: .medium))
+                }
+                .buttonStyle(.plain)
+                .foregroundColor(LiquidGlassTheme.colors.secondaryText)
+                .help(
+                    String(
+                        localized: "Link to Memo", comment: "Help tooltip for memo linking button"))
+
+                Button {
                     selectImages()
                 } label: {
                     Group {
@@ -287,38 +301,88 @@ struct ComposeMemoView: View {
     }
     
     private var uploadPreview: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(uploadedResources) { resource in
-                    ZStack(alignment: .topTrailing) {
-                        AsyncImage(url: URL(string: resource.externalLink ?? "")) { image in
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                        } placeholder: {
-                            Rectangle()
-                                .fill(LiquidGlassTheme.colors.tertiaryBackground)
-                        }
-                        .frame(width: 80, height: 80)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
+        VStack(alignment: .leading, spacing: 0) {
+            if let location = currentLocation {
+                HStack(spacing: 4) {
+                    Image(systemName: "mappin.and.ellipse")
+                        .font(.system(size: 10))
+                    Text(String(format: "%.4f, %.4f", location.latitude, location.longitude))
+                        .font(LiquidGlassTheme.typography.caption)
+                    Button {
+                        currentLocation = nil
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 10))
+                    }
+                    .buttonStyle(.plain)
+                }
+                .foregroundColor(LiquidGlassTheme.colors.secondaryText)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 8)
+            }
 
-                        Button {
-                            uploadedResources.removeAll { $0.id == resource.id }
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .symbolRenderingMode(.palette)
-                                .foregroundStyle(.white, .black.opacity(0.6))
+            Divider()
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(uploadedResources) { resource in
+                        ZStack(alignment: .topTrailing) {
+                            AsyncImage(url: URL(string: resource.externalLink ?? "")) { image in
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                            } placeholder: {
+                                Rectangle()
+                                    .fill(LiquidGlassTheme.colors.tertiaryBackground)
+                            }
+                            .frame(width: 80, height: 80)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                            Button {
+                                uploadedResources.removeAll { $0.id == resource.id }
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .symbolRenderingMode(.palette)
+                                    .foregroundStyle(.white, .black.opacity(0.6))
+                            }
+                            .buttonStyle(.plain)
+                            .padding(4)
                         }
-                        .buttonStyle(.plain)
-                        .padding(4)
                     }
                 }
+                .padding(12)
             }
-            .padding(12)
+            .background(LiquidGlassTheme.colors.secondaryBackground.opacity(0.5))
         }
-        .background(LiquidGlassTheme.colors.secondaryBackground.opacity(0.5))
+        .onAppear {
+            if editingMemo == nil {
+                fetchLocation()
+            } else {
+                currentLocation = editingMemo?.location
+            }
+        }
     }
 
+    private func fetchLocation() {
+        let manager = CLLocationManager()
+        if manager.authorizationStatus == .notDetermined {
+            manager.requestWhenInUseAuthorization()
+        }
+
+        if let location = manager.location {
+            currentLocation = Location(
+                latitude: location.coordinate.latitude,
+                longitude: location.coordinate.longitude
+            )
+        }
+    }
+
+    private func insertMemoLink() {
+        // Simple placeholder for memo linking. In a real app, this might show a picker.
+        // For now, we'll insert a template.
+        content += " [Memo](@memos/)"
+    }
+    
     private func selectImages() {
         let panel = NSOpenPanel()
         panel.allowsMultipleSelection = true
@@ -361,7 +425,8 @@ struct ComposeMemoView: View {
                     id: memo.id,
                     content: content,
                     visibility: visibility,
-                    resourceNames: resourceNames
+                    resourceNames: resourceNames,
+                    location: currentLocation
                 )
                 
                 if let index = appState.memos.firstIndex(where: { $0.id == memo.id }) {
@@ -371,7 +436,8 @@ struct ComposeMemoView: View {
                 let newMemo = try await MemosAPIClient.shared.createMemo(
                     content: content,
                     visibility: visibility,
-                    resourceNames: resourceNames
+                    resourceNames: resourceNames,
+                    location: currentLocation
                 )
                 appState.memos.insert(newMemo, at: 0)
             }
