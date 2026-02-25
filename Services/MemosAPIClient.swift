@@ -47,24 +47,9 @@ actor MemosAPIClient {
         return request
     }
     
-    private func performRequest<T: Decodable>(_ request: URLRequest) async throws -> T {
-        let (data, response) = try await session.data(for: request)
-        
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw MemosAPIError.invalidResponse
-        }
-        
-        guard (200...299).contains(httpResponse.statusCode) else {
-            if httpResponse.statusCode == 401 {
-                throw MemosAPIError.unauthorized
-            }
-            if let errorString = String(data: data, encoding: .utf8) {
-                throw MemosAPIError.serverError(errorString)
-            }
-            throw MemosAPIError.httpError(httpResponse.statusCode)
-        }
-        
+    private func makeDecoder() -> JSONDecoder {
         let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
         decoder.dateDecodingStrategy = .custom { decoder in
             let container = try decoder.singleValueContainer()
             let dateString = try container.decode(String.self)
@@ -85,9 +70,28 @@ actor MemosAPIClient {
             
             throw DecodingError.dataCorruptedError(in: container, debugDescription: "Cannot decode date: \(dateString)")
         }
+        return decoder
+    }
+
+    private func performRequest<T: Decodable>(_ request: URLRequest) async throws -> T {
+        let (data, response) = try await session.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw MemosAPIError.invalidResponse
+        }
+
+        guard (200...299).contains(httpResponse.statusCode) else {
+            if httpResponse.statusCode == 401 {
+                throw MemosAPIError.unauthorized
+            }
+            if let errorString = String(data: data, encoding: .utf8) {
+                throw MemosAPIError.serverError(errorString)
+            }
+            throw MemosAPIError.httpError(httpResponse.statusCode)
+        }
         
         do {
-            return try decoder.decode(T.self, from: data)
+            return try makeDecoder().decode(T.self, from: data)
         } catch {
             print("Decoding error: \(error)")
             if let jsonString = String(data: data, encoding: .utf8) {
@@ -109,8 +113,9 @@ actor MemosAPIClient {
         let visibility: String
         let pinned: Bool?
         let tags: [String]?
-        let resources: [Resource]?
+        let attachments: [Attachment]?
         let location: Location?
+        let relations: [Relation]?
         
         var extractedId: Int {
             if let idString = name.split(separator: "/").last, let id = Int(idString) {
@@ -155,10 +160,7 @@ actor MemosAPIClient {
             throw MemosAPIError.httpError(httpResponse.statusCode)
         }
         
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        
-        let user = try decoder.decode(User.self, from: data)
+        let user = try makeDecoder().decode(User.self, from: data)
         
         if let accessTokenValue = httpResponse.value(forHTTPHeaderField: "Authorization") {
             self._accessToken = accessTokenValue
@@ -182,9 +184,18 @@ actor MemosAPIClient {
     }
     
     func fetchMemos() async throws -> [Memo] {
-        guard let url = buildURL("/api/v1/memos") else {
+        guard var urlComponents = URLComponents(string: "\(baseURL)/api/v1/memos") else {
             throw MemosAPIError.invalidURL
         }
+        
+        urlComponents.queryItems = [
+            URLQueryItem(name: "view", value: "VIEW_FULL")
+        ]
+
+        guard let url = urlComponents.url else {
+            throw MemosAPIError.invalidURL
+        }
+
         let request = buildRequest(url: url)
         
         let response: MemoResponse = try await performRequest(request)
@@ -200,27 +211,30 @@ actor MemosAPIClient {
                 visibility: visibility,
                 pinned: data.pinned ?? false,
                 tags: data.tags ?? [],
-                resources: data.resources ?? [],
-                location: data.location
+                attachments: data.attachments ?? [],
+                location: data.location,
+                relations: data.relations ?? []
             )
         }
     }
     
     func createMemo(
-        content: String, visibility: MemoVisibility = .private,
-        resourceNames: [String] = [], location: Location? = nil
+        content: String, visibility: MemoVisibility? = nil, pinned: Bool? = nil,
+        attachmentNames: [String]? = nil, location: Location? = nil
     ) async throws -> Memo {
         guard let url = buildURL("/api/v1/memos") else {
             throw MemosAPIError.invalidURL
         }
         
-        var body: [String: Any] = [
-            "content": content,
-            "visibility": visibility.rawValue
-        ]
-        
-        if !resourceNames.isEmpty {
-            body["resources"] = resourceNames.map { ["name": $0] }
+        var body: [String: Any] = ["content": content]
+        if let visibility = visibility {
+            body["visibility"] = visibility.rawValue
+        }
+        if let pinned = pinned {
+            body["pinned"] = pinned
+        }
+        if let attachmentNames = attachmentNames {
+            body["attachments"] = attachmentNames.map { ["name": $0] }
         }
         
         if let location = location {
@@ -244,14 +258,15 @@ actor MemosAPIClient {
             visibility: memoVisibility,
             pinned: data.pinned ?? false,
             tags: data.tags ?? [],
-            resources: data.resources ?? [],
-            location: data.location
+            attachments: data.attachments ?? [],
+            location: data.location,
+            relations: data.relations ?? []
         )
     }
     
     func updateMemo(
         id: Int, content: String, visibility: MemoVisibility? = nil, pinned: Bool? = nil,
-        resourceNames: [String]? = nil, location: Location? = nil
+        attachmentNames: [String]? = nil, location: Location? = nil
     ) async throws -> Memo {
         guard var urlComponents = URLComponents(string: "\(baseURL)/api/v1/memos/\(id)") else {
             throw MemosAPIError.invalidURL
@@ -268,9 +283,9 @@ actor MemosAPIClient {
             body["pinned"] = pinned
             updateMasks.append("pinned")
         }
-        if let resourceNames = resourceNames {
-            body["resources"] = resourceNames.map { ["name": $0] }
-            updateMasks.append("resources")
+        if let attachmentNames = attachmentNames {
+            body["attachments"] = attachmentNames.map { ["name": $0] }
+            updateMasks.append("attachments")
         }
         
         if let location = location {
@@ -301,8 +316,9 @@ actor MemosAPIClient {
             visibility: memoVisibility,
             pinned: data.pinned ?? false,
             tags: data.tags ?? [],
-            resources: data.resources ?? [],
-            location: data.location
+            attachments: data.attachments ?? [],
+            location: data.location,
+            relations: data.relations ?? []
         )
     }
     
@@ -347,8 +363,9 @@ actor MemosAPIClient {
             visibility: visibility,
             pinned: data.pinned ?? false,
             tags: data.tags ?? [],
-            resources: data.resources ?? [],
-            location: data.location
+            attachments: data.attachments ?? [],
+            location: data.location,
+            relations: data.relations ?? []
         )
     }
     
@@ -358,29 +375,20 @@ actor MemosAPIClient {
         return []
     }
     
-    func uploadAttachment(data: Data, filename: String, mimeType: String) async throws -> Resource {
-        guard let url = buildURL("/api/v1/resources") else {
+    func uploadAttachment(data: Data, filename: String, mimeType: String) async throws -> Attachment
+    {
+        guard let url = buildURL("/api/v1/attachments") else {
             throw MemosAPIError.invalidURL
         }
         
-        // Manual request building to avoid buildRequest's default JSON header
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        if !_accessToken.isEmpty {
-            request.setValue("Bearer \(_accessToken)", forHTTPHeaderField: "Authorization")
-        }
-
-        let boundary = "Boundary-\(UUID().uuidString)"
-        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        let body: [String: Any] = [
+            "filename": filename,
+            "content": data.base64EncodedString(),
+        ]
         
-        var body = Data()
-        body.append("--\(boundary)\r\n".data(using: .utf8)!)
-        body.append("Content-Disposition: form-data; name=\"file\"; filename=\"\(filename)\"\r\n".data(using: .utf8)!)
-        body.append("Content-Type: \(mimeType)\r\n\r\n".data(using: .utf8)!)
-        body.append(data)
-        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
-        
-        request.httpBody = body
+        // buildRequest automatically adds the Bearer token and Application/JSON headers
+        let request = buildRequest(
+            url: url, method: "POST", body: try? JSONSerialization.data(withJSONObject: body))
         
         return try await performRequest(request)
     }

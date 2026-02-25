@@ -14,10 +14,16 @@ struct ComposeMemoView: View {
     @FocusState private var isContentFocused: Bool
     
     @State private var currentLocation: Location?
-    @State private var uploadedResources: [Resource] = []
+    @State private var uploadedAttachments: [Attachment] = []
     @State private var isUploading = false
+    @State private var attachmentNames: [String] = []
     @State private var suggestedTags: [String] = []
     
+    @StateObject private var locationManager = LocationManager()
+
+    @State private var showMemoPicker = false
+    @State private var showCamera = false
+
     var body: some View {
         VStack(spacing: 0) {
             headerView
@@ -28,7 +34,7 @@ struct ComposeMemoView: View {
             
             Divider()
             
-            if !uploadedResources.isEmpty {
+            if !uploadedAttachments.isEmpty {
                 uploadPreview
                 Divider()
             }
@@ -45,6 +51,11 @@ struct ComposeMemoView: View {
         }
         .onChange(of: content) { _, newValue in
             updateSuggestedTags(from: newValue)
+        }
+        .sheet(isPresented: $showCamera) {
+            CameraCaptureView { data in
+                uploadPhoto(data: data)
+            }
         }
     }
     
@@ -232,7 +243,7 @@ struct ComposeMemoView: View {
                 .help(String(localized: "Code Block", comment: "Help tooltip for code block button"))
                 
                 Button {
-                    insertMemoLink()
+                    showMemoPicker = true
                 } label: {
                     Image(systemName: "link.badge.plus")
                         .font(.system(size: 14, weight: .medium))
@@ -241,7 +252,45 @@ struct ComposeMemoView: View {
                 .foregroundColor(LiquidGlassTheme.colors.secondaryText)
                 .help(
                     String(
-                        localized: "Link to Memo", comment: "Help tooltip for memo linking button"))
+                        localized: "Link to Memo", comment: "Help tooltip for memo linking button")
+                )
+                .popover(isPresented: $showMemoPicker) {
+                    MemoPicker(onSelect: { memo in
+                        content += " [Memo](\(memo.name))"
+                        showMemoPicker = false
+                    })
+                    .frame(width: 300, height: 400)
+                }
+
+                Button {
+                    locationManager.requestLocation()
+                } label: {
+                    if locationManager.isFetching {
+                        ProgressView()
+                            .scaleEffect(0.5)
+                            .frame(width: 12, height: 12)
+                    } else {
+                        Image(systemName: "mappin.and.ellipse")
+                            .font(.system(size: 12, weight: .medium))
+                    }
+                }
+                .buttonStyle(.plain)
+                .foregroundColor(
+                    currentLocation != nil
+                        ? LiquidGlassTheme.colors.accent : LiquidGlassTheme.colors.secondaryText
+                )
+                .help(
+                    String(localized: "Add Location", comment: "Help tooltip for location button"))
+
+                Button {
+                    showCamera = true
+                } label: {
+                    Image(systemName: "camera")
+                        .font(.system(size: 14, weight: .medium))
+                }
+                .buttonStyle(.plain)
+                .foregroundColor(LiquidGlassTheme.colors.secondaryText)
+                .help(String(localized: "Take Photo", comment: "Help tooltip for camera button"))
 
                 Button {
                     selectImages()
@@ -325,9 +374,18 @@ struct ComposeMemoView: View {
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
-                    ForEach(uploadedResources) { resource in
+                    ForEach(uploadedAttachments) { attachment in
                         ZStack(alignment: .topTrailing) {
-                            AsyncImage(url: URL(string: resource.externalLink ?? "")) { image in
+                            let attachmentURL: URL? = {
+                                if let link = attachment.externalLink, !link.isEmpty {
+                                    return URL(string: link)
+                                }
+                                let baseURL = appState.serverURL.trimmingCharacters(
+                                    in: .init(charactersIn: "/"))
+                                return URL(string: baseURL + "/file/" + attachment.name)
+                            }()
+
+                            AuthAsyncImage(url: attachmentURL) { image in
                                 image
                                     .resizable()
                                     .aspectRatio(contentMode: .fill)
@@ -339,7 +397,7 @@ struct ComposeMemoView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 8))
 
                             Button {
-                                uploadedResources.removeAll { $0.id == resource.id }
+                                uploadedAttachments.removeAll { $0.id == attachment.id }
                             } label: {
                                 Image(systemName: "xmark.circle.fill")
                                     .symbolRenderingMode(.palette)
@@ -356,33 +414,20 @@ struct ComposeMemoView: View {
         }
         .onAppear {
             if editingMemo == nil {
-                fetchLocation()
+                locationManager.requestLocation()
             } else {
                 currentLocation = editingMemo?.location
             }
         }
-    }
-
-    private func fetchLocation() {
-        let manager = CLLocationManager()
-        if manager.authorizationStatus == .notDetermined {
-            manager.requestWhenInUseAuthorization()
+        .onChange(of: locationManager.location) { newLocation in
+            if newLocation != nil {
+                currentLocation = newLocation
+            }
         }
-
-        if let location = manager.location {
-            currentLocation = Location(
-                latitude: location.coordinate.latitude,
-                longitude: location.coordinate.longitude
-            )
-        }
-    }
-
-    private func insertMemoLink() {
-        // Simple placeholder for memo linking. In a real app, this might show a picker.
-        // For now, we'll insert a template.
-        content += " [Memo](@memos/)"
     }
     
+    // Removed broken fetchLocation() inline implementation
+
     private func selectImages() {
         let panel = NSOpenPanel()
         panel.allowsMultipleSelection = true
@@ -397,12 +442,12 @@ struct ComposeMemoView: View {
                     do {
                         let data = try Data(contentsOf: url)
                         let filename = url.lastPathComponent
-                        let resource = try await MemosAPIClient.shared.uploadAttachment(
+                        let attachment = try await MemosAPIClient.shared.uploadAttachment(
                             data: data,
                             filename: filename,
-                            mimeType: "image/png"  // Fallback, could be more dynamic
+                            mimeType: "image/png"
                         )
-                        uploadedResources.append(resource)
+                        uploadedAttachments.append(attachment)
                     } catch {
                         errorMessage = error.localizedDescription
                     }
@@ -412,12 +457,29 @@ struct ComposeMemoView: View {
         }
     }
 
+    private func uploadPhoto(data: Data) {
+        isUploading = true
+        Task {
+            do {
+                let attachment = try await MemosAPIClient.shared.uploadAttachment(
+                    data: data,
+                    filename: "photo_\(Int(Date().timeIntervalSince1970)).jpg",
+                    mimeType: "image/jpeg"
+                )
+                uploadedAttachments.append(attachment)
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+            isUploading = false
+        }
+    }
+
     private func saveMemo() async {
         isSaving = true
         errorMessage = nil
         defer { isSaving = false }
         
-        let resourceNames = uploadedResources.map { $0.name }
+        let attachmentNames = uploadedAttachments.map { $0.name }
 
         do {
             if let memo = editingMemo {
@@ -425,7 +487,7 @@ struct ComposeMemoView: View {
                     id: memo.id,
                     content: content,
                     visibility: visibility,
-                    resourceNames: resourceNames,
+                    attachmentNames: attachmentNames,
                     location: currentLocation
                 )
                 
@@ -436,7 +498,7 @@ struct ComposeMemoView: View {
                 let newMemo = try await MemosAPIClient.shared.createMemo(
                     content: content,
                     visibility: visibility,
-                    resourceNames: resourceNames,
+                    attachmentNames: attachmentNames,
                     location: currentLocation
                 )
                 appState.memos.insert(newMemo, at: 0)
@@ -446,5 +508,43 @@ struct ComposeMemoView: View {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+}
+
+struct MemoPicker: View {
+    @EnvironmentObject var appState: AppState
+    var onSelect: (Memo) -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Text(String(localized: "Recent Memos", comment: "Title for recent memos picker"))
+                .font(.headline)
+                .padding()
+
+            Divider()
+
+            List {
+                ForEach(appState.memos.prefix(20)) { memo in
+                    Button {
+                        onSelect(memo)
+                    } label: {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(memo.content)
+                                .font(.system(size: 12))
+                                .lineLimit(2)
+                                .foregroundColor(LiquidGlassTheme.colors.text)
+
+                            Text(memo.createdAt.formatted(date: .abbreviated, time: .shortened))
+                                .font(.system(size: 10))
+                                .foregroundColor(LiquidGlassTheme.colors.secondaryText)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.vertical, 4)
+                }
+            }
+            .listStyle(.plain)
+        }
+        .background(LiquidGlassTheme.colors.secondaryBackground)
     }
 }

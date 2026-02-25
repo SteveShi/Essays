@@ -177,9 +177,19 @@ struct MarkdownView: View {
                 .foregroundColor(LiquidGlassTheme.colors.text)
         
         case .link(let url):
-            Link(segment.content, destination: URL(string: url) ?? URL(string: "about:blank")!)
-                .font(.system(size: fontSize, design: .rounded))
-                .foregroundColor(LiquidGlassTheme.colors.accent)
+            if url.contains("@memos/") {
+                Text(segment.content)
+                    .font(.system(size: fontSize, design: .rounded))
+                    .foregroundColor(LiquidGlassTheme.colors.accent)
+                    .underline()
+                    .onTapGesture {
+                        // Optional: trigger navigation if we have access to AppState
+                    }
+            } else {
+                Link(segment.content, destination: URL(string: url) ?? URL(string: "about:blank")!)
+                    .font(.system(size: fontSize, design: .rounded))
+                    .foregroundColor(LiquidGlassTheme.colors.accent)
+            }
         
         case .tag:
             Text(segment.content)

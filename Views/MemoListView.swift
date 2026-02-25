@@ -1,4 +1,5 @@
 import SwiftUI
+import CoreLocation
 
 struct MemoListView: View {
     @EnvironmentObject var appState: AppState
@@ -9,7 +10,15 @@ struct MemoListView: View {
     @State private var quickCaptureText: String = ""
     @State private var quickCaptureVisibility: MemoVisibility = .private
     @State private var isQuickCaptureSaving = false
+    @State private var quickCaptureAttachments: [Attachment] = []
+    @State private var quickCaptureLocation: Location? = nil
+    @State private var showQuickMemoPicker = false
+    @State private var showQuickCamera = false
+    @State private var isQuickUploading = false
     @AppStorage("enableAIFeatures") private var enableAIFeatures = true
+    
+    @StateObject private var locationManager = LocationManager()
+    @State private var hoveredMemoId: String? = nil
 
     private var timelineGroups: [(date: Date, memos: [Memo])] {
         let calendar = Calendar.current
@@ -136,7 +145,128 @@ struct MemoListView: View {
                     .textFieldStyle(.plain)
                     .font(LiquidGlassTheme.typography.body)
 
-                HStack(spacing: 10) {
+                if !quickCaptureAttachments.isEmpty || quickCaptureLocation != nil {
+                    HStack(spacing: 8) {
+                        if let location = quickCaptureLocation {
+                            HStack(spacing: 4) {
+                                Image(systemName: "mappin.and.ellipse")
+                                    .font(.system(size: 10))
+                                Text(
+                                    String(
+                                        format: "%.4f, %.4f", location.latitude, location.longitude)
+                                )
+                                .font(LiquidGlassTheme.typography.caption)
+                                Button {
+                                    quickCaptureLocation = nil
+                                } label: {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .font(.system(size: 10))
+                                }
+                                .buttonStyle(.plain)
+                            }
+                            .foregroundColor(LiquidGlassTheme.colors.secondaryText)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Capsule().fill(LiquidGlassTheme.colors.tertiaryBackground))
+                        }
+
+                        ForEach(quickCaptureAttachments) { attachment in
+                            ZStack(alignment: .topTrailing) {
+                                let attachmentURL: URL? = {
+                                    if let link = attachment.externalLink, !link.isEmpty {
+                                        return URL(string: link)
+                                    }
+                                    let baseURL = appState.serverURL.trimmingCharacters(
+                                        in: .init(charactersIn: "/"))
+                                    return URL(string: baseURL + "/file/" + attachment.name)
+                                }()
+
+                                AuthAsyncImage(url: attachmentURL) { image in
+                                    image
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fill)
+                                } placeholder: {
+                                    Rectangle()
+                                        .fill(LiquidGlassTheme.colors.tertiaryBackground)
+                                }
+                                .frame(width: 60, height: 60)
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                                Button {
+                                    quickCaptureAttachments.removeAll { $0.id == attachment.id }
+                                } label: {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .font(.system(size: 8))
+                                        .foregroundColor(.white)
+                                }
+                                .buttonStyle(.plain)
+                                .offset(x: 4, y: -4)
+                            }
+                        }
+                    }
+                    .padding(.top, 4)
+                }
+
+                HStack(spacing: 12) {
+                    Menu {
+                        Button {
+                            showQuickCamera = true
+                        } label: {
+                            Label(
+                                String(localized: "Take Photo", comment: "Take photo menu item"),
+                                systemImage: "camera")
+                        }
+
+                        Button {
+                            selectQuickImages()
+                        } label: {
+                            Label(
+                                String(localized: "Upload", comment: "Upload menu item"),
+                                systemImage: "doc")
+                        }
+
+                        Button {
+                            showQuickMemoPicker = true
+                        } label: {
+                            Label(
+                                String(localized: "Link Memo", comment: "Link memo menu item"),
+                                systemImage: "link")
+                        }
+
+                        Button {
+                            locationManager.requestLocation()
+                        } label: {
+                            if locationManager.isFetching {
+                                Label(
+                                    String(
+                                        localized: "Fetching Location...",
+                                        comment: "Location fetching menu item"),
+                                    systemImage: "location.fill"
+                                )
+                            } else {
+                                Label(
+                                    String(localized: "Location", comment: "Location menu item"),
+                                    systemImage: "mappin.and.ellipse")
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "plus")
+                            .font(.system(size: 14, weight: .semibold))
+                            .frame(width: 28, height: 28)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(LiquidGlassTheme.colors.tertiaryBackground)
+                            )
+                    }
+                    .menuStyle(.borderlessButton)
+                    .popover(isPresented: $showQuickMemoPicker) {
+                        MemoPicker(onSelect: { memo in
+                            quickCaptureText += " [Memo](\(memo.name))"
+                            showQuickMemoPicker = false
+                        })
+                        .frame(width: 300, height: 400)
+                    }
+
                     Menu {
                         ForEach(MemoVisibility.allCases, id: \.self) { vis in
                             Button {
@@ -146,9 +276,12 @@ struct MemoListView: View {
                             }
                         }
                     } label: {
-                        Label(quickCaptureVisibility.displayName, systemImage: quickCaptureVisibility.icon)
-                            .font(LiquidGlassTheme.typography.caption)
-                            .foregroundColor(LiquidGlassTheme.colors.secondaryText)
+                        HStack(spacing: 4) {
+                            Image(systemName: quickCaptureVisibility.icon)
+                            Text(quickCaptureVisibility.displayName)
+                        }
+                        .font(LiquidGlassTheme.typography.caption)
+                        .foregroundColor(LiquidGlassTheme.colors.secondaryText)
                     }
                     .menuStyle(.borderlessButton)
 
@@ -165,7 +298,10 @@ struct MemoListView: View {
                                     .controlSize(.small)
                                     .frame(width: 70, height: 28)
                             } else {
-                                Text(String(localized: "Capture", comment: "Button text for quick capture save"))
+                                Text(
+                                    String(
+                                        localized: "Save",
+                                        comment: "Button text for quick capture save"))
                                     .font(.system(size: 13, weight: .medium))
                                     .foregroundColor(.white)
                                     .frame(height: 28)
@@ -197,6 +333,13 @@ struct MemoListView: View {
                         .stroke(LiquidGlassTheme.colors.border.opacity(0.4), lineWidth: 0.5)
                 )
             )
+        }
+        .onChange(of: locationManager.location) { newLocation in
+            if newLocation != nil {
+                withAnimation(LiquidGlassTheme.animation.spring) {
+                    quickCaptureLocation = newLocation
+                }
+            }
         }
     }
 
@@ -275,17 +418,71 @@ struct MemoListView: View {
         isQuickCaptureSaving = true
         defer { isQuickCaptureSaving = false }
 
+        let attachmentNames = quickCaptureAttachments.map { $0.name }
+
         do {
             let memo = try await MemosAPIClient.shared.createMemo(
                 content: trimmed,
-                visibility: quickCaptureVisibility
+                visibility: quickCaptureVisibility,
+                attachmentNames: attachmentNames,
+                location: quickCaptureLocation
             )
             appState.memos.insert(memo, at: 0)
             quickCaptureText = ""
+            quickCaptureAttachments = []
+            quickCaptureLocation = nil
         } catch {
             appState.errorMessage = error.localizedDescription
         }
     }
+
+
+
+    private func selectQuickImages() {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = true
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+        panel.allowedContentTypes = [.image]
+
+        if panel.runModal() == .OK {
+            isQuickUploading = true
+            Task {
+                for url in panel.urls {
+                    do {
+                        let data = try Data(contentsOf: url)
+                        let filename = url.lastPathComponent
+                        let attachment = try await MemosAPIClient.shared.uploadAttachment(
+                            data: data,
+                            filename: filename,
+                            mimeType: "image/jpeg"
+                        )
+                        quickCaptureAttachments.append(attachment)
+                    } catch {
+                        appState.errorMessage = error.localizedDescription
+                    }
+                }
+                isQuickUploading = false
+            }
+        }
+    }
+    private func uploadQuickPhoto(data: Data) {
+        isQuickUploading = true
+        Task {
+            do {
+                let attachment = try await MemosAPIClient.shared.uploadAttachment(
+                    data: data,
+                    filename: "photo_\(Int(Date().timeIntervalSince1970)).jpg",
+                    mimeType: "image/jpeg"
+                )
+                quickCaptureAttachments.append(attachment)
+            } catch {
+                appState.errorMessage = error.localizedDescription
+            }
+            isQuickUploading = false
+        }
+    }
+
     private func refreshMemos() async {
         appState.isLoading = true
         defer { appState.isLoading = false }
@@ -347,21 +544,27 @@ struct MemoCard: View {
 
             if !memo.content.isEmpty {
                 MarkdownView(content: memo.content, fontSize: 13)
-                    .lineLimit(8)
+                    .lineLimit(10)
+                    .foregroundColor(LiquidGlassTheme.colors.text)
             }
 
             if !memo.tags.isEmpty {
                 tagsView
             }
 
-            if !memo.resources.isEmpty {
-                resourcesView
+            if !memo.attachments.isEmpty {
+                attachmentsView
             }
 
-            footerView
+            if let location = memo.location {
+                locationView(location)
+            }
+
+            if !memo.relations.isEmpty {
+                relationsView
+            }
         }
         .padding(16)
-        .frame(minHeight: 110, alignment: .topLeading)
         .background(
             ZStack {
                 RoundedRectangle(cornerRadius: 14)
@@ -371,7 +574,9 @@ struct MemoCard: View {
                         ? LiquidGlassTheme.colors.cardBackground.opacity(0.8)
                         : LiquidGlassTheme.colors.cardBackground.opacity(0.55))
             }
-            .shadow(color: .black.opacity(isHovered ? 0.1 : 0.05), radius: isHovered ? 16 : 10, x: 0, y: isHovered ? 6 : 3)
+            .shadow(
+                color: .black.opacity(isHovered ? 0.12 : 0.05), radius: isHovered ? 16 : 10, x: 0,
+                y: isHovered ? 6 : 3)
             .overlay(
                 RoundedRectangle(cornerRadius: 14)
                     .stroke(
@@ -388,62 +593,57 @@ struct MemoCard: View {
                 showActions = hovering
             }
         }
-        .contextMenu {
-            Button {
-                Task {
-                    await togglePin()
-                }
-            } label: {
-                Label(
-                    memo.pinned ? String(localized: "Unpin", comment: "Action to unpin memo") : String(localized: "Pin", comment: "Action to pin memo"),
-                    systemImage: memo.pinned ? "pin.slash" : "pin"
-                )
-            }
-
-            Button {
-                copyContent()
-            } label: {
-                Label(String(localized: "Copy Content", comment: "Action to copy memo content"), systemImage: "doc.on.doc")
-            }
-
-            Divider()
-
-            Button(role: .destructive) {
-                Task {
-                    await deleteMemo()
-                }
-            } label: {
-                Label(String(localized: "Delete", comment: "Action to delete memo"), systemImage: "trash")
-            }
-        }
     }
 
     private var headerView: some View {
-        HStack(spacing: 8) {
+        HStack(alignment: .center, spacing: 8) {
+            Text(memo.relativeCreatedAtDescription)
+                .font(LiquidGlassTheme.typography.caption)
+                .foregroundColor(LiquidGlassTheme.colors.tertiaryText)
+
             if memo.pinned {
                 Image(systemName: "pin.fill")
-                    .font(.system(size: 10, weight: .medium))
+                    .font(.system(size: 10))
                     .foregroundColor(.yellow)
             }
 
             Image(systemName: memo.visibility.icon)
-                .font(.system(size: 10, weight: .medium))
+                .font(.system(size: 10))
                 .foregroundColor(LiquidGlassTheme.colors.tertiaryText)
 
             Spacer()
 
-            if showActions {
+            Menu {
                 Button {
-                    Task {
-                        await togglePin()
-                    }
+                    Task { await togglePin() }
                 } label: {
-                    Image(systemName: memo.pinned ? "pin.slash" : "pin")
-                        .font(.system(size: 11, weight: .medium))
+                    Label(
+                        memo.pinned ? "Unpin" : "Pin",
+                        systemImage: memo.pinned ? "pin.slash" : "pin")
                 }
-                .buttonStyle(.plain)
-                .foregroundColor(LiquidGlassTheme.colors.secondaryText)
+                
+                Button {
+                    copyContent()
+                } label: {
+                    Label("Copy Content", systemImage: "doc.on.doc")
+                }
+
+                Divider()
+
+                Button(role: .destructive) {
+                    Task { await deleteMemo() }
+                } label: {
+                    Label("Delete", systemImage: "trash")
+                }
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundColor(LiquidGlassTheme.colors.tertiaryText)
+                    .frame(width: 24, height: 24)
+                    .contentShape(Rectangle())
             }
+            .menuStyle(.borderlessButton)
+            .opacity(isHovered ? 1 : 0.6)
         }
     }
 
@@ -469,82 +669,164 @@ struct MemoCard: View {
         }
     }
 
-    private var resourcesView: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(memo.resources.prefix(4)) { resource in
-                    if resource.isImage {
-                        let resourceURL: URL? = {
-                            if let link = resource.externalLink, !link.isEmpty {
-                                return URL(string: link)
+    private var attachmentsView: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: "paperclip")
+                    .font(.system(size: 11))
+                Text(
+                    String(
+                        localized: "Attachments (\(memo.attachments.count))",
+                        comment: "Label for attachments section")
+                )
+                .font(LiquidGlassTheme.typography.caption)
+            }
+            .foregroundColor(LiquidGlassTheme.colors.secondaryText)
+            .padding(.horizontal, 10)
+            .padding(.top, 8)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(memo.attachments) { attachment in
+                        if attachment.isImage {
+                            let attachmentURL: URL? = {
+                                if let link = attachment.externalLink, !link.isEmpty {
+                                    return URL(string: link)
+                                }
+                                let baseURL = appState.serverURL.trimmingCharacters(
+                                    in: .init(charactersIn: "/"))
+                                return URL(string: baseURL + "/file/" + attachment.name)
+                            }()
+
+                            AuthAsyncImage(url: attachmentURL) { image in
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                            } placeholder: {
+                                Rectangle()
+                                    .fill(LiquidGlassTheme.colors.tertiaryBackground)
                             }
-                            return URL(string: appState.serverURL + "/file/" + resource.name)
-                        }()
-
-                        AsyncImage(url: resourceURL) { image in
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                        } placeholder: {
-                            Rectangle()
-                                .fill(LiquidGlassTheme.colors.tertiaryBackground)
-                                .overlay(
-                                    ProgressView()
-                                        .controlSize(.small)
-                                )
+                            .frame(width: 120, height: 120)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                        } else {
+                            HStack(spacing: 8) {
+                                Image(systemName: "doc.fill")
+                                    .font(.system(size: 14))
+                                Text(attachment.filename)
+                                    .font(LiquidGlassTheme.typography.caption)
+                                    .lineLimit(1)
+                            }
+                            .padding(10)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(LiquidGlassTheme.colors.tertiaryBackground)
+                            )
                         }
-                        .frame(width: 60, height: 60)
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
-                    } else {
-                        HStack(spacing: 6) {
-                            Image(systemName: "doc")
-                                .font(.system(size: 12))
-
-                            Text(resource.name)
-                                .font(LiquidGlassTheme.typography.caption)
-                                .lineLimit(1)
-                        }
-                        .padding(8)
-                        .background(
-                            RoundedRectangle(cornerRadius: 6)
-                                .fill(LiquidGlassTheme.colors.tertiaryBackground)
-                        )
                     }
                 }
+                .padding(.horizontal, 10)
+                .padding(.bottom, 10)
+            }
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.black.opacity(0.15))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(LiquidGlassTheme.colors.border.opacity(0.2), lineWidth: 0.5)
+                )
+        )
+    }
+
+    private func locationView(_ location: Location) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: "mappin.and.ellipse")
+                .font(.system(size: 10, weight: .semibold))
+
+            Text(
+                "[\(String(format: "%.2f°", location.latitude)), \(String(format: "%.2f°", location.longitude))]"
+            )
+            .font(LiquidGlassTheme.typography.monoCaption)
+            .padding(.horizontal, 4)
+            .background(
+                RoundedRectangle(cornerRadius: 4).fill(LiquidGlassTheme.colors.tertiaryBackground))
+
+            Text(String(localized: "Location recorded", comment: "Location label"))
+                .font(LiquidGlassTheme.typography.caption)
+        }
+        .foregroundColor(LiquidGlassTheme.colors.secondaryText)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color.black.opacity(0.1))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(LiquidGlassTheme.colors.border.opacity(0.15), lineWidth: 0.5)
+                )
+        )
+    }
+
+    private var relationsView: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            let outgoing = memo.relations.filter { $0.memo == memo.name }
+            let incoming = memo.relations.filter { $0.relatedMemo == memo.name }
+
+            if !outgoing.isEmpty {
+                relationBlock(
+                    title: String(localized: "References", comment: "Reference section"),
+                    icon: "link", items: outgoing)
+            }
+
+            if !incoming.isEmpty {
+                relationBlock(
+                    title: String(localized: "Referenced By", comment: "Referenced by section"),
+                    icon: "arrow.uturn.left", items: incoming)
             }
         }
     }
 
-    private var footerView: some View {
-        HStack(spacing: 6) {
-            Text(memo.relativeCreatedAtDescription)
-                .font(LiquidGlassTheme.typography.caption)
-                .foregroundColor(LiquidGlassTheme.colors.tertiaryText)
-
-            Text("·")
-                .font(LiquidGlassTheme.typography.caption)
-                .foregroundColor(LiquidGlassTheme.colors.tertiaryText)
-            
-            if let location = memo.location {
-                HStack(spacing: 4) {
-                    Image(systemName: "mappin.and.ellipse")
-                        .font(.system(size: 10))
-                    Text(String(format: "%.4f, %.4f", location.latitude, location.longitude))
-                        .font(LiquidGlassTheme.typography.caption)
-                }
-                .foregroundColor(LiquidGlassTheme.colors.secondaryText)
-
-                Text("·")
+    private func relationBlock(title: String, icon: String, items: [Relation]) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.system(size: 10))
+                Text("\(title) (\(items.count))")
                     .font(LiquidGlassTheme.typography.caption)
-                    .foregroundColor(LiquidGlassTheme.colors.tertiaryText)
             }
+            .foregroundColor(LiquidGlassTheme.colors.tertiaryText)
+            .padding(.horizontal, 10)
+            .padding(.top, 6)
 
-            Text(memo.createdAt.formatted(date: .omitted, time: .shortened))
-                .font(LiquidGlassTheme.typography.caption)
-                .foregroundColor(LiquidGlassTheme.colors.tertiaryText)
-
-            Spacer()
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(items, id: \.self) { relation in
+                    let targetName =
+                        relation.memo == memo.name ? relation.relatedMemo : relation.memo
+                    HStack {
+                        Image(systemName: "doc.text")
+                            .font(.system(size: 10))
+                        Text(targetName)
+                            .font(LiquidGlassTheme.typography.caption)
+                            .lineLimit(1)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        RoundedRectangle(cornerRadius: 4).fill(
+                            LiquidGlassTheme.colors.tertiaryBackground))
+                }
+            }
+            .padding(.horizontal, 10)
+            .padding(.bottom, 10)
         }
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(Color.black.opacity(0.1))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(LiquidGlassTheme.colors.border.opacity(0.15), lineWidth: 0.5)
+                )
+        )
     }
 
     private func togglePin() async {

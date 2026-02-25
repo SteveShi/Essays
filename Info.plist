@@ -28,6 +28,8 @@
     <string></string>
     <key>NSPrincipalClass</key>
     <string>NSApplication</string>
+    <key>NSCameraUsageDescription</key>
+    <string>We need camera access to let you take photos and attach them to your memos.</string>
     <key>NSAppTransportSecurity</key>
     <dict>
         <key>NSAllowsArbitraryLoads</key>

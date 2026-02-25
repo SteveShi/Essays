@@ -1,6 +1,6 @@
 import Foundation
 
-struct Memo: Identifiable, Hashable {
+struct Memo: Identifiable, Hashable, Equatable {
     let name: String          // Full resource name, e.g. "memos/123" or "memos/uid"
     let id: Int               // Extracted numeric ID from name for legacy compat
     let content: String
@@ -9,8 +9,9 @@ struct Memo: Identifiable, Hashable {
     let visibility: MemoVisibility
     let pinned: Bool
     let tags: [String]
-    let resources: [Resource]
+    let attachments: [Attachment]
     let location: Location?
+    let relations: [Relation]
     
     init(
         name: String = "",
@@ -21,8 +22,9 @@ struct Memo: Identifiable, Hashable {
         visibility: MemoVisibility = .private,
         pinned: Bool = false,
         tags: [String] = [],
-        resources: [Resource]? = [],
-        location: Location? = nil
+        attachments: [Attachment]? = [],
+        location: Location? = nil,
+        relations: [Relation] = []
     ) {
         self.name = name.isEmpty ? "memos/\(id)" : name
         self.id = id
@@ -32,8 +34,32 @@ struct Memo: Identifiable, Hashable {
         self.visibility = visibility
         self.pinned = pinned
         self.tags = tags
-        self.resources = resources ?? []
+        self.attachments = attachments ?? []
         self.location = location
+        self.relations = relations
+    }
+}
+
+struct Relation: Codable, Hashable, Equatable {
+    let memo: String  // The memo that has the relation
+    let relatedMemo: String  // The memo that is related
+    let type: RelationType
+
+    enum RelationType: String, Codable {
+        case reference = "REFERENCE"
+        case comment = "COMMENT"
+        case unspecified = "RELATION_TYPE_UNSPECIFIED"
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.singleValueContainer()
+            let label = try container.decode(String.self)
+            self = RelationType(rawValue: label) ?? .unspecified
+        }
+
+        func encode(to encoder: Encoder) throws {
+            var container = encoder.singleValueContainer()
+            try container.encode(self.rawValue)
+        }
     }
 }
 
@@ -59,14 +85,56 @@ enum MemoVisibility: String, Codable, CaseIterable {
     }
 }
 
-struct Resource: Codable, Identifiable, Hashable {
+struct Attachment: Codable, Identifiable, Hashable {
     let name: String
     let filename: String
     let type: String
-    let size: Int
+    let size: Int64
     var externalLink: String?
     let createTime: Date?
     let memo: String?
+
+    enum CodingKeys: String, CodingKey {
+        case name, filename, type, size, externalLink, createTime, memo
+        case create_time, external_link  // Legacy compat if needed
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        name = try container.decodeIfPresent(String.self, forKey: .name) ?? ""
+        filename = try container.decodeIfPresent(String.self, forKey: .filename) ?? ""
+        type = try container.decodeIfPresent(String.self, forKey: .type) ?? ""
+
+        // Handle size as Int64 or String
+        if let intSize = try? container.decode(Int64.self, forKey: .size) {
+            size = intSize
+        } else if let stringSize = try? container.decode(String.self, forKey: .size),
+            let intSize = Int64(stringSize)
+        {
+            size = intSize
+        } else {
+            size = 0
+        }
+
+        externalLink =
+            try container.decodeIfPresent(String.self, forKey: .externalLink)
+            ?? container.decodeIfPresent(String.self, forKey: .external_link)
+        createTime =
+            try container.decodeIfPresent(Date.self, forKey: .createTime)
+            ?? container.decodeIfPresent(Date.self, forKey: .create_time)
+        memo = try container.decodeIfPresent(String.self, forKey: .memo)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(name, forKey: .name)
+        try container.encode(filename, forKey: .filename)
+        try container.encode(type, forKey: .type)
+        try container.encode(size, forKey: .size)
+        try container.encodeIfPresent(externalLink, forKey: .externalLink)
+        try container.encodeIfPresent(createTime, forKey: .createTime)
+        try container.encodeIfPresent(memo, forKey: .memo)
+    }
     
     var id: String { name }
     
