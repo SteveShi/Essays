@@ -12,6 +12,8 @@ struct ComposeMemoView: View {
     @State private var errorMessage: String?
     @FocusState private var isContentFocused: Bool
     
+    @State private var uploadedResources: [Resource] = []
+    @State private var isUploading = false
     @State private var suggestedTags: [String] = []
     
     var body: some View {
@@ -24,6 +26,11 @@ struct ComposeMemoView: View {
             
             Divider()
             
+            if !uploadedResources.isEmpty {
+                uploadPreview
+                Divider()
+            }
+
             footerView
         }
         .frame(width: 560, height: 480)
@@ -221,6 +228,27 @@ struct ComposeMemoView: View {
                 .buttonStyle(.plain)
                 .foregroundColor(LiquidGlassTheme.colors.secondaryText)
                 .help(String(localized: "Code Block", comment: "Help tooltip for code block button"))
+                
+                Button {
+                    selectImages()
+                } label: {
+                    Group {
+                        if isUploading {
+                            ProgressView()
+                                .controlSize(.small)
+                                .scaleEffect(0.6)
+                        } else {
+                            Image(systemName: "photo")
+                                .font(.system(size: 14, weight: .medium))
+                        }
+                    }
+                }
+                .buttonStyle(.plain)
+                .foregroundColor(LiquidGlassTheme.colors.secondaryText)
+                .disabled(isUploading)
+                .help(
+                    String(
+                        localized: "Upload Image", comment: "Help tooltip for image upload button"))
             }
         }
         .padding(16)
@@ -258,17 +286,82 @@ struct ComposeMemoView: View {
         }
     }
     
+    private var uploadPreview: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(uploadedResources) { resource in
+                    ZStack(alignment: .topTrailing) {
+                        AsyncImage(url: URL(string: resource.externalLink ?? "")) { image in
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                        } placeholder: {
+                            Rectangle()
+                                .fill(LiquidGlassTheme.colors.tertiaryBackground)
+                        }
+                        .frame(width: 80, height: 80)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                        Button {
+                            uploadedResources.removeAll { $0.id == resource.id }
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .symbolRenderingMode(.palette)
+                                .foregroundStyle(.white, .black.opacity(0.6))
+                        }
+                        .buttonStyle(.plain)
+                        .padding(4)
+                    }
+                }
+            }
+            .padding(12)
+        }
+        .background(LiquidGlassTheme.colors.secondaryBackground.opacity(0.5))
+    }
+
+    private func selectImages() {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = true
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+        panel.allowedContentTypes = [.image]
+
+        if panel.runModal() == .OK {
+            isUploading = true
+            Task {
+                for url in panel.urls {
+                    do {
+                        let data = try Data(contentsOf: url)
+                        let filename = url.lastPathComponent
+                        let resource = try await MemosAPIClient.shared.uploadAttachment(
+                            data: data,
+                            filename: filename,
+                            mimeType: "image/png"  // Fallback, could be more dynamic
+                        )
+                        uploadedResources.append(resource)
+                    } catch {
+                        errorMessage = error.localizedDescription
+                    }
+                }
+                isUploading = false
+            }
+        }
+    }
+
     private func saveMemo() async {
         isSaving = true
         errorMessage = nil
         defer { isSaving = false }
         
+        let resourceNames = uploadedResources.map { $0.name }
+
         do {
             if let memo = editingMemo {
                 let updated = try await MemosAPIClient.shared.updateMemo(
                     id: memo.id,
                     content: content,
-                    visibility: visibility
+                    visibility: visibility,
+                    resourceNames: resourceNames
                 )
                 
                 if let index = appState.memos.firstIndex(where: { $0.id == memo.id }) {
@@ -277,7 +370,8 @@ struct ComposeMemoView: View {
             } else {
                 let newMemo = try await MemosAPIClient.shared.createMemo(
                     content: content,
-                    visibility: visibility
+                    visibility: visibility,
+                    resourceNames: resourceNames
                 )
                 appState.memos.insert(newMemo, at: 0)
             }

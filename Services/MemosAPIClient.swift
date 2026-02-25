@@ -204,16 +204,22 @@ actor MemosAPIClient {
         }
     }
     
-    func createMemo(content: String, visibility: MemoVisibility = .private) async throws -> Memo {
+    func createMemo(
+        content: String, visibility: MemoVisibility = .private, resourceNames: [String] = []
+    ) async throws -> Memo {
         guard let url = buildURL("/api/v1/memos") else {
             throw MemosAPIError.invalidURL
         }
         
-        let body: [String: Any] = [
+        var body: [String: Any] = [
             "content": content,
             "visibility": visibility.rawValue
         ]
         
+        if !resourceNames.isEmpty {
+            body["resources"] = resourceNames.map { ["name": $0] }
+        }
+
         let request = buildRequest(url: url, method: "POST", body: try? JSONSerialization.data(withJSONObject: body))
         
         let data: MemoData = try await performRequest(request)
@@ -232,7 +238,10 @@ actor MemosAPIClient {
         )
     }
     
-    func updateMemo(id: Int, content: String, visibility: MemoVisibility? = nil, pinned: Bool? = nil) async throws -> Memo {
+    func updateMemo(
+        id: Int, content: String, visibility: MemoVisibility? = nil, pinned: Bool? = nil,
+        resourceNames: [String]? = nil
+    ) async throws -> Memo {
         guard var urlComponents = URLComponents(string: "\(baseURL)/api/v1/memos/\(id)") else {
             throw MemosAPIError.invalidURL
         }
@@ -247,6 +256,10 @@ actor MemosAPIClient {
         if let pinned = pinned {
             body["pinned"] = pinned
             updateMasks.append("pinned")
+        }
+        if let resourceNames = resourceNames {
+            body["resources"] = resourceNames.map { ["name": $0] }
+            updateMasks.append("resources")
         }
         
         urlComponents.queryItems = [URLQueryItem(name: "updateMask", value: updateMasks.joined(separator: ","))]
