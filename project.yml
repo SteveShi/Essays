@@ -30,8 +30,6 @@ targets:
           - "warnings.log"
           - "build/**"
           - "*.py"
-          - "*.swift"
-          - "!**/*.swift" # Ensure we don't exclude actual source files, but top-level helper scripts
           - "draw_icon.swift"
           - "base_icon.png"
     settings:
