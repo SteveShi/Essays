@@ -45,6 +45,41 @@ struct Relation: Codable, Hashable, Equatable {
     let relatedMemo: String  // The memo that is related
     let type: RelationType
 
+    enum CodingKeys: String, CodingKey {
+        case memo, relatedMemo, type
+    }
+
+    // Struct to handle the dict format returned in Memos v0.22
+    struct MemoRef: Codable {
+        let name: String
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.type = try container.decode(RelationType.self, forKey: .type)
+
+        if let memoStr = try? container.decode(String.self, forKey: .memo) {
+            self.memo = memoStr
+        } else {
+            let ref = try container.decode(MemoRef.self, forKey: .memo)
+            self.memo = ref.name
+        }
+
+        if let relatedMemoStr = try? container.decode(String.self, forKey: .relatedMemo) {
+            self.relatedMemo = relatedMemoStr
+        } else {
+            let ref = try container.decode(MemoRef.self, forKey: .relatedMemo)
+            self.relatedMemo = ref.name
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(type, forKey: .type)
+        try container.encode(memo, forKey: .memo)
+        try container.encode(relatedMemo, forKey: .relatedMemo)
+    }
+
     enum RelationType: String, Codable {
         case reference = "REFERENCE"
         case comment = "COMMENT"

@@ -114,6 +114,7 @@ actor MemosAPIClient {
         let pinned: Bool?
         let tags: [String]?
         let attachments: [Attachment]?
+        let resources: [Attachment]?
         let location: Location?
         let relations: [Relation]?
         
@@ -189,7 +190,7 @@ actor MemosAPIClient {
         }
         
         urlComponents.queryItems = [
-            URLQueryItem(name: "view", value: "VIEW_FULL")
+            URLQueryItem(name: "view", value: "MEMO_VIEW_FULL")
         ]
 
         guard let url = urlComponents.url else {
@@ -211,7 +212,7 @@ actor MemosAPIClient {
                 visibility: visibility,
                 pinned: data.pinned ?? false,
                 tags: data.tags ?? [],
-                attachments: data.attachments ?? [],
+                attachments: (data.attachments ?? []) + (data.resources ?? []),
                 location: data.location,
                 relations: data.relations ?? []
             )
@@ -258,7 +259,7 @@ actor MemosAPIClient {
             visibility: memoVisibility,
             pinned: data.pinned ?? false,
             tags: data.tags ?? [],
-            attachments: data.attachments ?? [],
+            attachments: (data.attachments ?? []) + (data.resources ?? []),
             location: data.location,
             relations: data.relations ?? []
         )
@@ -316,7 +317,7 @@ actor MemosAPIClient {
             visibility: memoVisibility,
             pinned: data.pinned ?? false,
             tags: data.tags ?? [],
-            attachments: data.attachments ?? [],
+            attachments: (data.attachments ?? []) + (data.resources ?? []),
             location: data.location,
             relations: data.relations ?? []
         )
@@ -363,7 +364,7 @@ actor MemosAPIClient {
             visibility: visibility,
             pinned: data.pinned ?? false,
             tags: data.tags ?? [],
-            attachments: data.attachments ?? [],
+            attachments: (data.attachments ?? []) + (data.resources ?? []),
             location: data.location,
             relations: data.relations ?? []
         )
