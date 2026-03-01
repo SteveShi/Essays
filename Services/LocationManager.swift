@@ -33,14 +33,40 @@ class LocationManager: NSObject, CLLocationManagerDelegate {
         _ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]
     ) {
         if let first = locations.first {
-            let lat = first.coordinate.latitude
-            let lon = first.coordinate.longitude
-            Task { @MainActor in
-                self.location = Location(
-                    latitude: lat,
-                    longitude: lon
-                )
-                self.isFetching = false
+            Task {
+                let lat = first.coordinate.latitude
+                let lon = first.coordinate.longitude
+                
+                var addressString: String? = nil
+                do {
+                    let geocoder = CLGeocoder()
+                    let placemarks = try await geocoder.reverseGeocodeLocation(first)
+                    if let placemark = placemarks.first {
+                        let components = [
+                            placemark.thoroughfare,
+                            placemark.subThoroughfare,
+                            placemark.locality,
+                            placemark.administrativeArea,
+                            placemark.postalCode,
+                            placemark.country,
+                        ].compactMap { $0 }.filter { !$0.isEmpty }
+
+                        if !components.isEmpty {
+                            addressString = components.joined(separator: ", ")
+                        }
+                    }
+                } catch {
+                    print("Reverse geocoding failed: \(error.localizedDescription)")
+                }
+
+                await MainActor.run {
+                    self.location = Location(
+                        placeholder: addressString,
+                        latitude: lat,
+                        longitude: lon
+                    )
+                    self.isFetching = false
+                }
             }
         }
     }

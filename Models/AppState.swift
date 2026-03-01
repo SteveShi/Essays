@@ -10,27 +10,34 @@ class AppState {
     var serverURL: String = ""
     var accessToken: String = ""
     var memos: [Memo] = [] {
-        didSet { updateFilteredState() }
+        didSet {
+            updateRawDataDerivedStates()
+            updateFilteredMemosState()
+        }
     }
     var tags: [Tag] = []
     var isLoading: Bool = false
     var errorMessage: String?
     var selectedMemo: Memo?
     var searchText: String = "" {
-        didSet { updateFilteredState() }
+        didSet { scheduleFilteredUpdate() }
     }
+    private var updateTask: Task<Void, Error>?
     var selectedTag: String? {
-        didSet { updateFilteredState() }
+        didSet { updateFilteredMemosState() }
     }
     var showArchived: Bool = false
 
     // Pre-computed filtered and grouped results
+    private(set) var memosByName: [String: Memo] = [:]
     private(set) var filteredMemos: [Memo] = []
     private(set) var pinnedMemosList: [Memo] = []
     private(set) var timelineGroups: [(date: Date, memos: [Memo])] = []
     private(set) var memoDateComponents: Set<DateComponents> = []
     private(set) var todayMemosCount: Int = 0
     private(set) var recentWeekMemosCount: Int = 0
+    private(set) var publicMemosCount: Int = 0
+    private(set) var privateMemosCount: Int = 0
 
     private let userDefaults = UserDefaults.standard
     private let serverURLKey = "memos_server_url"
@@ -39,10 +46,53 @@ class AppState {
     
     init() {
         loadSavedCredentials()
-        updateFilteredState()  // Initial computation
+        updateFilteredMemosState()  // Initial computation
     }
 
-    private func updateFilteredState() {
+    private func scheduleFilteredUpdate() {
+        updateTask?.cancel()
+        updateTask = Task {
+            try? await Task.sleep(nanoseconds: 300_000_000)  // 300ms debounce
+            if Task.isCancelled { return }
+            updateFilteredMemosState()
+        }
+    }
+
+    /// 仅在 memos 原始数据改变时调用的昂贵计算（日历点位、字典索引、全局计数）
+    @MainActor
+    private func updateRawDataDerivedStates() {
+        // 更新以 Name 为索引的快速查找字典
+        var byName: [String: Memo] = [:]
+        for memo in memos {
+            byName[memo.name] = memo
+        }
+        self.memosByName = byName
+
+        let calendar = Calendar.current
+
+        // Date components for the sidebar calendar (耗时操作，仅在数据变动时执行一次)
+        let components = memos.map {
+            calendar.dateComponents([.year, .month, .day], from: $0.createdAt)
+        }
+        self.memoDateComponents = Set(components)
+
+        // Pre-compute quick action counts
+        self.todayMemosCount = memos.filter { calendar.isDateInToday($0.createdAt) }.count
+
+        if let startOfRecentWeek = calendar.date(byAdding: .day, value: -7, to: Date()) {
+            self.recentWeekMemosCount = memos.filter { $0.createdAt >= startOfRecentWeek }.count
+        } else {
+            self.recentWeekMemosCount = 0
+        }
+        
+        // 统计公开和私有数量
+        self.publicMemosCount = memos.filter { $0.visibility == MemoVisibility.`public` }.count
+        self.privateMemosCount = memos.filter { $0.visibility == MemoVisibility.`private` }.count
+    }
+
+    /// 在搜索、标签过滤或数据变动时调用的过滤状态更新（主要针对当前视图显示）
+    @MainActor
+    func updateFilteredMemosState() {
         let allFiltered = computeFilteredMemos()
         self.filteredMemos = allFiltered
         self.pinnedMemosList = allFiltered.filter { $0.pinned }
@@ -59,21 +109,6 @@ class AppState {
             grouped
             .map { (date: $0.key, memos: $0.value.sorted { $0.createdAt > $1.createdAt }) }
             .sorted { $0.date > $1.date }
-
-        // Date components for the sidebar calendar
-        let components = memos.map {
-            calendar.dateComponents([.year, .month, .day], from: $0.createdAt)
-        }
-        self.memoDateComponents = Set(components)
-
-        // Pre-compute quick action counts
-        self.todayMemosCount = memos.filter { calendar.isDateInToday($0.createdAt) }.count
-
-        if let startOfRecentWeek = calendar.date(byAdding: .day, value: -7, to: Date()) {
-            self.recentWeekMemosCount = memos.filter { $0.createdAt >= startOfRecentWeek }.count
-        } else {
-            self.recentWeekMemosCount = 0
-        }
     }
     
     func loadSavedCredentials() {
@@ -144,8 +179,10 @@ class AppState {
         if !keywordTerms.isEmpty {
             result = result.filter { memo in
                 keywordTerms.allSatisfy { term in
-                    memo.content.localizedCaseInsensitiveContains(term) ||
-                    memo.tags.contains { $0.localizedCaseInsensitiveContains(term) }
+                    // 安全检查：跳过过短或空的词项
+                    guard !term.isEmpty else { return true }
+                    return memo.content.localizedCaseInsensitiveContains(term)
+                        || memo.tags.contains { $0.localizedCaseInsensitiveContains(term) }
                 }
             }
         }

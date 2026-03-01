@@ -21,7 +21,6 @@ struct ContentView: View {
                 mainView
             } else {
                 LoginView()
-                    .environment(appState)
             }
         }
         .preferredColorScheme(preferredColorScheme)
@@ -33,7 +32,6 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showComposeSheet) {
             ComposeMemoView()
-                .environment(appState)
         }
         .alert(
             String(localized: "Error"),
@@ -57,11 +55,9 @@ struct ContentView: View {
     private var mainView: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             SidebarView()
-                .environment(appState)
                 .frame(minWidth: 220, idealWidth: 260, maxWidth: 300)
         } detail: {
             MemoListView()
-                .environment(appState)
         }
         .navigationSplitViewStyle(.balanced)
         .task {

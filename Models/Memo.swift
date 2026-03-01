@@ -1,6 +1,6 @@
 import Foundation
 
-struct Memo: Identifiable, Hashable, Equatable, Sendable {
+struct Memo: Codable, Identifiable, Hashable, Equatable, Sendable {
     let name: String          // Full resource name, e.g. "memos/123" or "memos/uid"
     let numericID: Int  // Extracted numeric ID from name for legacy compat
     let content: String
@@ -13,32 +13,6 @@ struct Memo: Identifiable, Hashable, Equatable, Sendable {
     let location: Location?
     let relations: [Relation]
     
-    init(
-        name: String = "",
-        id: Int,
-        content: String,
-        createdAt: Date = Date(),
-        updatedAt: Date = Date(),
-        visibility: MemoVisibility = .private,
-        pinned: Bool = false,
-        tags: [String] = [],
-        attachments: [Attachment]? = [],
-        location: Location? = nil,
-        relations: [Relation] = []
-    ) {
-        self.name = name.isEmpty ? "memos/\(id)" : name
-        self.numericID = id
-        self.content = content
-        self.createdAt = createdAt
-        self.updatedAt = updatedAt
-        self.visibility = visibility
-        self.pinned = pinned
-        self.tags = tags
-        self.attachments = attachments ?? []
-        self.location = location
-        self.relations = relations
-    }
-
     var id: String { name }
 
     var truncatedContent: String {
@@ -65,6 +39,35 @@ struct Memo: Identifiable, Hashable, Equatable, Sendable {
         formatter.unitsStyle = .short
         return formatter
     }()
+}
+
+// Move custom init to extension to preserve Codable synthesis
+extension Memo {
+    init(
+        name: String = "",
+        id: Int,
+        content: String,
+        createdAt: Date = Date(),
+        updatedAt: Date = Date(),
+        visibility: MemoVisibility = .private,
+        pinned: Bool = false,
+        tags: [String] = [],
+        attachments: [Attachment]? = [],
+        location: Location? = nil,
+        relations: [Relation] = []
+    ) {
+        self.name = name.isEmpty ? "memos/\(id)" : name
+        self.numericID = id
+        self.content = content
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.visibility = visibility
+        self.pinned = pinned
+        self.tags = tags
+        self.attachments = attachments ?? []
+        self.location = location
+        self.relations = relations
+    }
 }
 
 struct Relation: Codable, Hashable, Equatable, Sendable {
@@ -107,7 +110,7 @@ struct Relation: Codable, Hashable, Equatable, Sendable {
         try container.encode(relatedMemo, forKey: .relatedMemo)
     }
 
-    enum RelationType: String, Codable {
+    enum RelationType: String, Codable, Hashable, Equatable {
         case reference = "REFERENCE"
         case comment = "COMMENT"
         case unspecified = "RELATION_TYPE_UNSPECIFIED"
@@ -125,7 +128,7 @@ struct Relation: Codable, Hashable, Equatable, Sendable {
     }
 }
 
-enum MemoVisibility: String, Codable, CaseIterable {
+enum MemoVisibility: String, Codable, CaseIterable, Hashable, Equatable {
     case `public` = "PUBLIC"
     case `protected` = "PROTECTED"
     case `private` = "PRIVATE"
@@ -147,7 +150,7 @@ enum MemoVisibility: String, Codable, CaseIterable {
     }
 }
 
-struct Attachment: Codable, Identifiable, Hashable, Sendable {
+struct Attachment: Codable, Identifiable, Hashable, Equatable, Sendable {
     let name: String
     let filename: String
     let type: String
@@ -253,33 +256,41 @@ struct Attachment: Codable, Identifiable, Hashable, Sendable {
             filename.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? filename
 
         if !encodedFilename.isEmpty {
+            let thumbnailQuery = "?thumbnail=true"
             if let url = URL(
-                string: normalizedBaseURL + "/file/" + encodedName + "/" + encodedFilename)
+                string: normalizedBaseURL + "/file/" + encodedName + "/" + encodedFilename
+                    + thumbnailQuery)
             {
                 candidates.append(url)
             }
             if name.hasPrefix("resources/"), let uid = name.split(separator: "/").last {
-                if let url = URL(string: normalizedBaseURL + "/o/r/\(uid)") {
-                    candidates.append(url)
-                }
-                if let url = URL(string: normalizedBaseURL + "/o/r/\(uid)/" + encodedFilename) {
+                if let url = URL(string: normalizedBaseURL + "/o/r/\(uid)" + thumbnailQuery) {
                     candidates.append(url)
                 }
                 if let url = URL(
-                    string: normalizedBaseURL + "/file/attachments/\(uid)/" + encodedFilename)
+                    string: normalizedBaseURL + "/o/r/\(uid)/" + encodedFilename + thumbnailQuery)
+                {
+                    candidates.append(url)
+                }
+                if let url = URL(
+                    string: normalizedBaseURL + "/file/attachments/\(uid)/" + encodedFilename
+                        + thumbnailQuery)
                 {
                     candidates.append(url)
                 }
             }
             if name.hasPrefix("attachments/"), let uid = name.split(separator: "/").last {
-                if let url = URL(string: normalizedBaseURL + "/o/r/\(uid)") {
-                    candidates.append(url)
-                }
-                if let url = URL(string: normalizedBaseURL + "/o/r/\(uid)/" + encodedFilename) {
+                if let url = URL(string: normalizedBaseURL + "/o/r/\(uid)" + thumbnailQuery) {
                     candidates.append(url)
                 }
                 if let url = URL(
-                    string: normalizedBaseURL + "/file/attachments/\(uid)/" + encodedFilename)
+                    string: normalizedBaseURL + "/o/r/\(uid)/" + encodedFilename + thumbnailQuery)
+                {
+                    candidates.append(url)
+                }
+                if let url = URL(
+                    string: normalizedBaseURL + "/file/attachments/\(uid)/" + encodedFilename
+                        + thumbnailQuery)
                 {
                     candidates.append(url)
                 }
@@ -306,50 +317,4 @@ struct Attachment: Codable, Identifiable, Hashable, Sendable {
     }
 }
 
-struct Tag: Identifiable, Hashable, Sendable {
-    let id: UUID
-    let name: String
-    var count: Int
-    
-    init(name: String, count: Int = 0) {
-        self.id = UUID()
-        self.name = name
-        self.count = count
-    }
-}
 
-struct User: Codable, Identifiable, Sendable {
-    let name: String          // Resource name, e.g. "users/1"
-    let role: UserRole
-    let username: String
-    let email: String?
-    let displayName: String?
-    let avatarUrl: String?
-    let description: String?
-    let state: String?
-    let createTime: String?
-    let updateTime: String?
-    
-    var id: String { name }
-    
-    var displayNameResolved: String {
-        if let dn = displayName, !dn.isEmpty {
-            return dn
-        }
-        return username
-    }
-}
-
-enum UserRole: String, Codable {
-    case roleUnspecified = "ROLE_UNSPECIFIED"
-    case admin = "ADMIN"
-    case user = "USER"
-}
-
-struct ServerInfo: Codable {
-    let version: String
-    let mode: String
-    let allowSignUp: Bool
-    let disablePasswordLogin: Bool
-    let dbType: String
-}

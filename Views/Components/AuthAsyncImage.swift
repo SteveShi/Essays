@@ -1,11 +1,11 @@
 import SwiftUI
 import Foundation
 
-/// Authenticated image loading following the MoeMemos pattern.
+/// 遵循 MoeMemos 模式的带鉴权图片加载组件。
 ///
-/// Images are downloaded manually to the local disk cache using standard URLSession.
-/// Once downloaded, SwiftUI's native `AsyncImage` renders the `file://` URL.
-/// This prevents layout loops, cross-thread NSImage crashes, and memory leaks.
+/// 核心优化：
+/// 1. 所有磁盘 I/O 均在后台线程执行，防止主线程卡死。
+/// 2. 使用原生 AsyncImage 处理 file:// URL，规避多线程解码崩溃。
 struct AuthAsyncImage<Content: View, Placeholder: View>: View {
     let urls: [URL]
     let content: (Image) -> Content
@@ -37,13 +37,16 @@ struct AuthAsyncImage<Content: View, Placeholder: View>: View {
     var body: some View {
         Group {
             if let localURL = localURL {
-                // SwiftUI AsyncImage rendering a local disk file (100% safe, no network loop)
                 AsyncImage(url: localURL) { phase in
-                    if let image = phase.image {
+                    switch phase {
+                    case .success(let image):
                         content(image)
-                    } else if phase.error != nil {
+                    case .failure:
                         placeholder()
-                    } else {
+                            .onAppear { hasFailed = true }
+                    case .empty:
+                        placeholder()
+                    @unknown default:
                         placeholder()
                     }
                 }
@@ -52,68 +55,89 @@ struct AuthAsyncImage<Content: View, Placeholder: View>: View {
             } else {
                 placeholder()
                     .task {
-                        await downloadToLocalCache()
+                        // 显式异步执行磁盘与下载逻辑，防止阻塞 MainActor
+                        await prepareLocalURL()
                     }
             }
         }
     }
 
-    private func downloadToLocalCache() async {
+    private func prepareLocalURL() async {
         guard !urls.isEmpty else {
-            hasFailed = true
+            self.hasFailed = true
             return
         }
 
-        let cacheDir = FileManager.default.temporaryDirectory.appendingPathComponent(
-            "MemosImageCache", isDirectory: true)
-        if !FileManager.default.fileExists(atPath: cacheDir.path) {
-            try? FileManager.default.createDirectory(
-                at: cacheDir, withIntermediateDirectories: true)
+        // 调用静态助手方法在非隔离上下文中执行 I/O
+        if let resultURL = await ImageStorageHelper.shared.ensureLocalImage(for: urls) {
+            self.localURL = resultURL
+        } else {
+            self.hasFailed = true
         }
+    }
+}
 
-        // Try candidate URLs one by one
+/// 专门用于磁盘 I/O 的单例助手，确保不占用主线程
+actor ImageStorageHelper {
+    static let shared = ImageStorageHelper()
+
+    private let cacheDir: URL
+
+    private init() {
+        let caches = FileManager.default.urls(
+            for: .cachesDirectory, in: .userDomainMask
+        ).first!
+        self.cacheDir =
+            caches
+            .appendingPathComponent("Essays", isDirectory: true)
+            .appendingPathComponent("Caches", isDirectory: true)
+            .appendingPathComponent("Images", isDirectory: true)
+        
+        // 初始确保目录存在
+        try? FileManager.default.createDirectory(at: cacheDir, withIntermediateDirectories: true)
+    }
+
+    func ensureLocalImage(for urls: [URL]) async -> URL? {
         for url in urls {
-            if Task.isCancelled { return }
+            // 如果已经是本地文件
+            if url.isFileURL { return url }
 
-            // Use url string hash as cache key
-            let safeName = "\((url.absoluteString).hashValue).img"
+            // 检查磁盘缓存
+            let safeName = "\(abs(url.absoluteString.hashValue)).img"
             let localFile = cacheDir.appendingPathComponent(safeName)
-
-            // If already cached on disk, use it immediately
+            
             if FileManager.default.fileExists(atPath: localFile.path) {
-                self.localURL = localFile
-                return
+                return localFile
             }
 
+            // 下载逻辑
             var request = URLRequest(url: url)
             request.timeoutInterval = 10
+
             if let token = UserDefaults.standard.string(forKey: "memos_access_token"),
                 !token.isEmpty
             {
                 request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
             }
 
-            if let (data, response) = try? await URLSession.shared.data(for: request),
-                let httpResponse = response as? HTTPURLResponse,
-                (200...299).contains(httpResponse.statusCode)
-            {
-                if Task.isCancelled { return }
-                
-                // Save to local disk cache
-                do {
-                    try data.write(to: localFile)
-                    self.localURL = localFile
-                    return
-                } catch {
-                    // Write failed, try next url
+            do {
+                let (tempURL, response) = try await URLSession.shared.download(for: request)
+                guard let httpResponse = response as? HTTPURLResponse,
+                    (200...299).contains(httpResponse.statusCode)
+                else {
+                    try? FileManager.default.removeItem(at: tempURL)
                     continue
                 }
+
+                if FileManager.default.fileExists(atPath: localFile.path) {
+                    try? FileManager.default.removeItem(at: localFile)
+                }
+                try FileManager.default.moveItem(at: tempURL, to: localFile)
+                return localFile
+            } catch {
+                continue
             }
         }
-
-        // All URLs failed
-        if !Task.isCancelled {
-            self.hasFailed = true
-        }
+        return nil
     }
 }

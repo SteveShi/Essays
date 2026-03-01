@@ -123,11 +123,9 @@ struct MemoListView: View {
         .background(LiquidGlassTheme.colors.background)
         .sheet(item: $memoToEdit) { memo in
             ComposeMemoView(editingMemo: memo)
-                .environment(appState)
         }
         .sheet(isPresented: $showComposeSheet) {
             ComposeMemoView()
-                .environment(appState)
         }
     }
 
@@ -371,7 +369,6 @@ struct MemoListView: View {
             LazyVStack(spacing: 12) {
                 ForEach(appState.pinnedMemosList) { memo in
                     MemoCard(memo: memo)
-                        .environment(appState)
                         .onTapGesture {
                             memoToEdit = memo
                         }
@@ -393,7 +390,6 @@ struct MemoListView: View {
                     LazyVStack(spacing: 12) {
                         ForEach(group.memos) { memo in
                             MemoCard(memo: memo)
-                                .environment(appState)
                                 .onTapGesture {
                                     memoToEdit = memo
                                 }
@@ -440,39 +436,57 @@ struct MemoListView: View {
 
         if panel.runModal() == .OK {
             isQuickUploading = true
-            Task {
-                for url in panel.urls {
+            let urls = panel.urls
+            Task.detached {
+                for url in urls {
                     do {
                         let data = try Data(contentsOf: url)
                         let filename = url.lastPathComponent
+                        let ext = url.pathExtension.lowercased()
+                        let mimeType =
+                            (ext == "jpg" || ext == "jpeg")
+                            ? "image/jpeg"
+                            : (ext == "gif"
+                                ? "image/gif" : (ext == "webp" ? "image/webp" : "image/png"))
                         let attachment = try await MemosAPIClient.shared.uploadAttachment(
                             data: data,
                             filename: filename,
-                            mimeType: "image/jpeg"
+                            mimeType: mimeType
                         )
-                        quickCaptureAttachments.append(attachment)
+                        await MainActor.run {
+                            self.quickCaptureAttachments.append(attachment)
+                        }
                     } catch {
-                        appState.errorMessage = error.localizedDescription
+                        await MainActor.run {
+                            self.appState.errorMessage = error.localizedDescription
+                        }
                     }
                 }
-                isQuickUploading = false
+                await MainActor.run {
+                    self.isQuickUploading = false
+                }
             }
         }
     }
     private func uploadQuickPhoto(data: Data) {
         isQuickUploading = true
-        Task {
+        Task.detached {
             do {
                 let attachment = try await MemosAPIClient.shared.uploadAttachment(
                     data: data,
                     filename: "photo_\(Int(Date().timeIntervalSince1970)).jpg",
                     mimeType: "image/jpeg"
                 )
-                quickCaptureAttachments.append(attachment)
+                await MainActor.run {
+                    self.quickCaptureAttachments.append(attachment)
+                    self.isQuickUploading = false
+                }
             } catch {
-                appState.errorMessage = error.localizedDescription
+                await MainActor.run {
+                    self.appState.errorMessage = error.localizedDescription
+                    self.isQuickUploading = false
+                }
             }
-            isQuickUploading = false
         }
     }
 
@@ -754,32 +768,29 @@ struct MemoCard: View {
     private func locationView(_ location: Location) -> some View {
         HStack(spacing: 6) {
             Image(systemName: "mappin.and.ellipse")
-                .font(.system(size: 10, weight: .semibold))
+                .font(.system(size: 11, weight: .medium))
 
-            Text(
+            let coordStr =
                 "[\(String(format: "%.2f°", location.latitude)), \(String(format: "%.2f°", location.longitude))]"
-            )
-            .font(LiquidGlassTheme.typography.monoCaption)
-            .padding(.horizontal, 4)
-            .background(
-                RoundedRectangle(cornerRadius: 4).fill(LiquidGlassTheme.colors.tertiaryBackground))
-
-            Text(String(localized: "Location recorded", comment: "Location label"))
-                .font(LiquidGlassTheme.typography.caption)
-                .foregroundStyle(LiquidGlassTheme.colors.secondaryText)
+            if let placeholder = location.placeholder, !placeholder.isEmpty {
+                Text("\(coordStr) \(placeholder)")
+                    .font(LiquidGlassTheme.typography.caption)
+                    .lineLimit(1)
+            } else {
+                Text(coordStr)
+                    .font(LiquidGlassTheme.typography.caption)
+                    .lineLimit(1)
+            }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .foregroundColor(LiquidGlassTheme.colors.secondaryText)
         .background(
-            Rectangle()
-                .fill(LiquidGlassTheme.colors.background.opacity(0.8))
-                .overlay(
-                    Rectangle()
-                        .fill(LiquidGlassTheme.colors.border.opacity(0.3))
-                        .frame(height: 0.5),
-                    alignment: .bottom
-                )
+            RoundedRectangle(cornerRadius: 8)
+                .fill(LiquidGlassTheme.colors.tertiaryBackground)
         )
+        .padding(.bottom, 12)
+        .padding(.leading, 16)
     }
 
     private var relationsView: some View {
@@ -817,18 +828,46 @@ struct MemoCard: View {
                 ForEach(items, id: \.self) { relation in
                     let targetName =
                         relation.memo == memo.name ? relation.relatedMemo : relation.memo
-                    HStack {
-                        Image(systemName: "doc.text")
-                            .font(.system(size: 10))
-                        Text(targetName)
+                    let shortId =
+                        targetName.split(separator: "/").last.map(String.init) ?? targetName
+
+                    if let targetMemo = appState.memosByName[targetName] {
+                        HStack(alignment: .top, spacing: 6) {
+                            Text(shortId)
+                                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                                .padding(.horizontal, 4)
+                                .padding(.vertical, 2)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 4)
+                                        .fill(LiquidGlassTheme.colors.secondaryBackground)
+                                )
+                            Text(
+                                targetMemo.truncatedContent.prefix(100)
+                                    + (targetMemo.truncatedContent.count > 100 ? "..." : "")
+                            )
                             .font(LiquidGlassTheme.typography.caption)
-                            .lineLimit(1)
+                            .lineLimit(2)
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 6)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6).fill(
+                                LiquidGlassTheme.colors.tertiaryBackground)
+                        )
+                    } else {
+                        HStack {
+                            Image(systemName: "doc.text")
+                                .font(.system(size: 10))
+                            Text(targetName)
+                                .font(LiquidGlassTheme.typography.caption)
+                                .lineLimit(1)
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(
+                            RoundedRectangle(cornerRadius: 4).fill(
+                                LiquidGlassTheme.colors.tertiaryBackground))
                     }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(
-                        RoundedRectangle(cornerRadius: 4).fill(
-                            LiquidGlassTheme.colors.tertiaryBackground))
                 }
             }
             .padding(.horizontal, 10)

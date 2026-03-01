@@ -356,8 +356,17 @@ struct ComposeMemoView: View {
                 HStack(spacing: 4) {
                     Image(systemName: "mappin.and.ellipse")
                         .font(.system(size: 10))
-                    Text(String(format: "%.4f, %.4f", location.latitude, location.longitude))
-                        .font(LiquidGlassTheme.typography.caption)
+                    let coordStr =
+                        "[\(String(format: "%.4f", location.latitude)), \(String(format: "%.4f", location.longitude))]"
+                    if let placeholder = location.placeholder, !placeholder.isEmpty {
+                        Text("\(coordStr) \(placeholder)")
+                            .font(LiquidGlassTheme.typography.caption)
+                            .lineLimit(1)
+                    } else {
+                        Text(coordStr)
+                            .font(LiquidGlassTheme.typography.caption)
+                            .lineLimit(1)
+                    }
                     Button {
                         currentLocation = nil
                     } label: {
@@ -433,40 +442,58 @@ struct ComposeMemoView: View {
 
         if panel.runModal() == .OK {
             isUploading = true
-            Task {
-                for url in panel.urls {
+            let urls = panel.urls
+            Task.detached {
+                for url in urls {
                     do {
                         let data = try Data(contentsOf: url)
                         let filename = url.lastPathComponent
+                        let ext = url.pathExtension.lowercased()
+                        let mimeType =
+                            (ext == "jpg" || ext == "jpeg")
+                            ? "image/jpeg"
+                            : (ext == "gif"
+                                ? "image/gif" : (ext == "webp" ? "image/webp" : "image/png"))
                         let attachment = try await MemosAPIClient.shared.uploadAttachment(
                             data: data,
                             filename: filename,
-                            mimeType: "image/png"
+                            mimeType: mimeType
                         )
-                        uploadedAttachments.append(attachment)
+                        await MainActor.run {
+                            self.uploadedAttachments.append(attachment)
+                        }
                     } catch {
-                        errorMessage = error.localizedDescription
+                        await MainActor.run {
+                            self.errorMessage = error.localizedDescription
+                        }
                     }
                 }
-                isUploading = false
+                await MainActor.run {
+                    self.isUploading = false
+                }
             }
         }
     }
 
     private func uploadPhoto(data: Data) {
         isUploading = true
-        Task {
+        Task.detached {
             do {
                 let attachment = try await MemosAPIClient.shared.uploadAttachment(
                     data: data,
                     filename: "photo_\(Int(Date().timeIntervalSince1970)).jpg",
                     mimeType: "image/jpeg"
                 )
-                uploadedAttachments.append(attachment)
+                await MainActor.run {
+                    self.uploadedAttachments.append(attachment)
+                    self.isUploading = false
+                }
             } catch {
-                errorMessage = error.localizedDescription
+                await MainActor.run {
+                    self.errorMessage = error.localizedDescription
+                    self.isUploading = false
+                }
             }
-            isUploading = false
         }
     }
 

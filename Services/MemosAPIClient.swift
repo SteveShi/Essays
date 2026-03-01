@@ -149,12 +149,13 @@ class MemosAPIClient {
             throw MemosAPIError.invalidURL
         }
         
-        let body: [String: String] = [
+        let body: [String: Any] = [
             "username": username,
             "password": password
         ]
         
-        var request = buildRequest(url: url, method: "POST", body: try? JSONEncoder().encode(body))
+        var request = buildRequest(
+            url: url, method: "POST", body: try? JSONSerialization.data(withJSONObject: body))
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         
         let (data, response) = try await session.data(for: request)
@@ -200,7 +201,8 @@ class MemosAPIClient {
         }
         
         urlComponents.queryItems = [
-            URLQueryItem(name: "view", value: "MEMO_VIEW_FULL")
+            URLQueryItem(name: "view", value: "MEMO_VIEW_FULL"),
+            URLQueryItem(name: "pageSize", value: "100")
         ]
 
         guard let url = urlComponents.url else {

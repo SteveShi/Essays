@@ -24,25 +24,17 @@ targets:
     type: application
     platform: macOS
     sources:
-      - path: .
-        excludes:
-          - "**/.DS_Store"
-          - "EssaysTests/**"
-          - "Essays.xcodeproj/**"
-          - "project.yml"
-          - ".git/**"
-          - ".github/**"
-          - "warnings.log"
-          - "build/**"
-          - "memos_sample.json"
-          - "test_decode.swift"
-          - "test_*.swift"
-          - "*.py"
-          - "draw_icon.swift"
-          - "base_icon.png"
+      - path: Models
+      - path: Views
+      - path: Services
+      - path: Theme
+      - path: Utilities
+      - path: Resources
+      - path: EssaysApp.swift
+      - path: Info.plist
     settings:
       base:
-        SWIFT_VERSION: "6.0"
+        SWIFT_VERSION: "6.2"
         SWIFT_STRICT_CONCURRENCY: complete
         INFOPLIST_FILE: Info.plist
         PRODUCT_BUNDLE_IDENTIFIER: com.essays.app

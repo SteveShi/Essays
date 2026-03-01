@@ -126,7 +126,6 @@ struct SidebarView: View {
     
     private var calendarSection: some View {
         SidebarCalendarView()
-            .environment(appState)
     }
     
     private var tagsSection: some View {
@@ -165,7 +164,7 @@ struct SidebarView: View {
                 SidebarItem(
                     icon: "globe",
                     title: String(localized: "Public", comment: "Sidebar item for public memos"),
-                    count: appState.memos.filter { $0.visibility == .public }.count,
+                    count: appState.publicMemosCount,
                     isSelected: appState.searchText.lowercased().contains("visibility:public")
                 ) {
                     appState.searchText = "visibility:public"
@@ -175,7 +174,7 @@ struct SidebarView: View {
                 SidebarItem(
                     icon: "lock",
                     title: String(localized: "Private", comment: "Sidebar item for private memos"),
-                    count: appState.memos.filter { $0.visibility == .private }.count,
+                    count: appState.privateMemosCount,
                     isSelected: appState.searchText.lowercased().contains("visibility:private")
                 ) {
                     appState.searchText = "visibility:private"
@@ -440,7 +439,13 @@ struct SidebarCalendarView: View {
         return cal
     }()
     
+    // 缓存日期组件以提高查找性能
+    private var memoDateComponents: Set<DateComponents> {
+        appState.memoDateComponents
+    }
+
     private func computeDays() {
+        // 只有当月份真正改变时才重新计算
         guard let monthInterval = calendar.dateInterval(of: .month, for: currentMonth),
               let monthFirstWeek = calendar.dateInterval(of: .weekOfMonth, for: monthInterval.start),
               let monthLastWeek = calendar.dateInterval(of: .weekOfMonth, for: monthInterval.end - 1) else {
@@ -456,10 +461,6 @@ struct SidebarCalendarView: View {
         self.days = dates
     }
     
-    private var memoDates: Set<DateComponents> {
-        appState.memoDateComponents
-    }
-    
     private static let monthFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateFormat = "LLLL yyyy"
@@ -468,107 +469,147 @@ struct SidebarCalendarView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text(Self.monthFormatter.string(from: currentMonth))
-                    .font(LiquidGlassTheme.typography.caption)
-                    .foregroundStyle(LiquidGlassTheme.colors.tertiaryText)
-                    .textCase(.uppercase)
-                    .tracking(1.5)
-                    .padding(.leading, 4)
-                
-                Spacer()
-                
-                HStack(spacing: 12) {
-                    Button { changeMonth(by: -1) } label: { Image(systemName: "chevron.left").font(.system(size: 10, weight: .bold)) }
-                    Button { currentMonth = Date() } label: { Image(systemName: "circle").font(.system(size: 8, weight: .bold)) }
-                    Button { changeMonth(by: 1) } label: { Image(systemName: "chevron.right").font(.system(size: 10, weight: .bold)) }
+            headerView
+
+            calendarGrid
+                .padding(10)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(LiquidGlassTheme.colors.cardBackground.opacity(0.4))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(LiquidGlassTheme.colors.border.opacity(0.5), lineWidth: 0.5)
+                        )
+                )
+        }
+        .onAppear {
+            computeDays()
+        }
+        .onChange(of: currentMonth) { _, _ in
+            computeDays()
+        }
+    }
+
+    private var headerView: some View {
+        HStack {
+            Text(Self.monthFormatter.string(from: currentMonth))
+                .font(LiquidGlassTheme.typography.caption)
+                .foregroundStyle(LiquidGlassTheme.colors.tertiaryText)
+                .textCase(.uppercase)
+                .tracking(1.5)
+                .padding(.leading, 4)
+
+            Spacer()
+
+            HStack(spacing: 12) {
+                Button {
+                    changeMonth(by: -1)
+                } label: {
+                    Image(systemName: "chevron.left").font(.system(size: 10, weight: .bold))
                 }
-                .foregroundColor(LiquidGlassTheme.colors.tertiaryText)
-                .buttonStyle(.plain)
+                Button {
+                    currentMonth = Date()
+                } label: {
+                    Image(systemName: "circle").font(.system(size: 8, weight: .bold))
+                }
+                Button {
+                    changeMonth(by: 1)
+                } label: {
+                    Image(systemName: "chevron.right").font(.system(size: 10, weight: .bold))
+                }
             }
-            
-            let columns = Array(repeating: GridItem(.flexible(), spacing: 2), count: 7)
-            
-            LazyVGrid(columns: columns, spacing: 6) {
-                ForEach([
+            .foregroundColor(LiquidGlassTheme.colors.tertiaryText)
+            .buttonStyle(.plain)
+        }
+    }
+    
+    private var calendarGrid: some View {
+        let columns = Array(repeating: GridItem(.flexible(), spacing: 2), count: 7)
+
+        return LazyVGrid(columns: columns, spacing: 6) {
+            ForEach(
+                [
                     String(localized: "Sun", comment: "Sunday short form"),
                     String(localized: "Mon", comment: "Monday short form"),
                     String(localized: "Tue", comment: "Tuesday short form"),
                     String(localized: "Wed", comment: "Wednesday short form"),
                     String(localized: "Thu", comment: "Thursday short form"),
                     String(localized: "Fri", comment: "Friday short form"),
-                    String(localized: "Sat", comment: "Saturday short form")
-                ], id: \.self) { day in
-                    Text(day)
-                        .font(LiquidGlassTheme.typography.caption2)
-                        .foregroundStyle(LiquidGlassTheme.colors.tertiaryText)
-                        .frame(maxWidth: .infinity)
-                }
-                ForEach(days, id: \.self) { date in
-                    let isCurrentMonth = calendar.isDate(date, equalTo: currentMonth, toGranularity: .month)
-                    let components = calendar.dateComponents([.year, .month, .day], from: date)
-                    let hasMemo = appState.memoDateComponents.contains(components)
-                    let dateString = Self.sharedDateFormatter.string(from: date)
-                    let isSelected = appState.searchText == "created:\(dateString)"
-                    let isToday = calendar.isDateInToday(date)
-                    
-                    Button {
-                        if isSelected {
-                            appState.searchText = ""
-                        } else {
-                            appState.searchText = "created:\(dateString)"
-                            appState.selectedTag = nil
-                        }
-                    } label: {
-                        Text("\(calendar.component(.day, from: date))")
-                            .font(.system(size: 12, weight: isSelected || isToday ? .semibold : .regular, design: .rounded))
-                            .frame(width: 24, height: 24)
-                            .foregroundStyle(
-                                isCurrentMonth
-                                    ? (isSelected
-                                        ? .white
-                                        : (isToday
-                                            ? LiquidGlassTheme.colors.accent
-                                            : LiquidGlassTheme.colors.text))
-                                    : LiquidGlassTheme.colors.tertiaryText.opacity(0.3))
-                            .background(
-                                ZStack {
-                                    if isSelected {
-                                        Circle().fill(LiquidGlassTheme.colors.accent)
-                                    } else if hasMemo {
-                                        Circle().fill(LiquidGlassTheme.colors.accent.opacity(0.15))
-                                    }
-                                }
-                            )
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(!hasMemo && !isToday && !isSelected)
-                }
+                    String(localized: "Sat", comment: "Saturday short form"),
+                ], id: \.self
+            ) { day in
+                Text(day)
+                    .font(LiquidGlassTheme.typography.caption2)
+                    .foregroundStyle(LiquidGlassTheme.colors.tertiaryText)
+                    .frame(maxWidth: .infinity)
             }
-            .padding(10)
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(LiquidGlassTheme.colors.cardBackground.opacity(0.4))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(LiquidGlassTheme.colors.border.opacity(0.5), lineWidth: 0.5)
-                    )
-            )
-            .onAppear {
-                computeDays()
-            }
-            .onChange(of: currentMonth) {
-                computeDays()
+            
+            ForEach(days, id: \.self) { date in
+                DayButton(date: date, currentMonth: currentMonth, calendar: calendar)
             }
         }
     }
-    
+
     private func changeMonth(by value: Int) {
         if let newMonth = calendar.date(byAdding: .month, value: value, to: currentMonth) {
             withAnimation(.easeInOut) {
                 currentMonth = newMonth
             }
         }
+    }
+}
+
+/// 提取子视图以减少全量重绘产生的压力
+struct DayButton: View {
+    let date: Date
+    let currentMonth: Date
+    let calendar: Calendar
+    @Environment(AppState.self) var appState
+
+    var body: some View {
+        let isCurrentMonth = calendar.isDate(date, equalTo: currentMonth, toGranularity: .month)
+        let components = calendar.dateComponents([.year, .month, .day], from: date)
+        let hasMemo = appState.memoDateComponents.contains(components)
+        let dateString = DayButton.sharedDateFormatter.string(from: date)
+        let isSelected = appState.searchText == "created:\(dateString)"
+        let isToday = calendar.isDateInToday(date)
+
+        return Button {
+            if isSelected {
+                appState.searchText = ""
+            } else {
+                appState.searchText = "created:\(dateString)"
+                appState.selectedTag = nil
+            }
+        } label: {
+            Text("\(calendar.component(.day, from: date))")
+                .font(
+                    .system(
+                        size: 12, weight: isSelected || isToday ? .semibold : .regular,
+                        design: .rounded)
+                )
+                .frame(width: 24, height: 24)
+                .foregroundStyle(
+                    isCurrentMonth
+                        ? (isSelected
+                            ? .white
+                            : (isToday
+                                ? LiquidGlassTheme.colors.accent
+                                : LiquidGlassTheme.colors.text))
+                        : LiquidGlassTheme.colors.tertiaryText.opacity(0.3)
+                )
+                .background(
+                    ZStack {
+                        if isSelected {
+                            Circle().fill(LiquidGlassTheme.colors.accent)
+                        } else if hasMemo {
+                            Circle().fill(LiquidGlassTheme.colors.accent.opacity(0.15))
+                        }
+                    }
+                )
+        }
+        .buttonStyle(.plain)
+        .disabled(!hasMemo && !isToday && !isSelected)
     }
     
     private static let sharedDateFormatter: DateFormatter = {
