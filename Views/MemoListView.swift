@@ -2,7 +2,7 @@ import SwiftUI
 import CoreLocation
 
 struct MemoListView: View {
-    @EnvironmentObject var appState: AppState
+    @Environment(AppState.self) var appState
     @State private var showComposeSheet = false
     @State private var memoToEdit: Memo?
     @State private var showAIAssistant = false
@@ -17,19 +17,8 @@ struct MemoListView: View {
     @State private var isQuickUploading = false
     @AppStorage("enableAIFeatures") private var enableAIFeatures = true
     
-    @StateObject private var locationManager = LocationManager()
+    @State private var locationManager = LocationManager()
     @State private var hoveredMemoId: String? = nil
-
-    private var timelineGroups: [(date: Date, memos: [Memo])] {
-        let calendar = Calendar.current
-        let grouped = Dictionary(grouping: appState.unpinnedMemos) { memo in
-            calendar.startOfDay(for: memo.createdAt)
-        }
-
-        return grouped
-            .map { (date: $0.key, memos: $0.value.sorted { $0.createdAt > $1.createdAt }) }
-            .sorted { $0.date > $1.date }
-    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -51,11 +40,11 @@ struct MemoListView: View {
                         emptyStateView
                             .padding(.top, 40)
                     } else {
-                        if !appState.pinnedMemos.isEmpty {
+                        if !appState.pinnedMemosList.isEmpty {
                             pinnedSection
                         }
 
-                        if !timelineGroups.isEmpty {
+                        if !appState.timelineGroups.isEmpty {
                             memosSection
                         }
                     }
@@ -81,7 +70,16 @@ struct MemoListView: View {
                         .help(String(localized: "AI Assistant", comment: "Help text for AI assistant button"))
                         .popover(isPresented: $showAIAssistant) {
                             if let memo = appState.selectedMemo ?? appState.filteredMemos.first {
-                                AIAssistantView(memo: memo)
+                                if #available(macOS 26.0, *) {
+                                    AIAssistantView(memo: memo)
+                                } else {
+                                    Text(
+                                        String(
+                                            localized: "AI Assistant requires macOS 26.0 or newer",
+                                            comment: "AI assistant availability fallback")
+                                    )
+                                    .padding()
+                                }
                             } else {
                                 VStack(spacing: 8) {
                                     Image(systemName: "doc.text")
@@ -125,11 +123,11 @@ struct MemoListView: View {
         .background(LiquidGlassTheme.colors.background)
         .sheet(item: $memoToEdit) { memo in
             ComposeMemoView(editingMemo: memo)
-                .environmentObject(appState)
+                .environment(appState)
         }
         .sheet(isPresented: $showComposeSheet) {
             ComposeMemoView()
-                .environmentObject(appState)
+                .environment(appState)
         }
     }
 
@@ -172,25 +170,20 @@ struct MemoListView: View {
 
                         ForEach(quickCaptureAttachments) { attachment in
                             ZStack(alignment: .topTrailing) {
-                                let attachmentURL: URL? = {
-                                    if let link = attachment.externalLink, !link.isEmpty {
-                                        return URL(string: link)
+                                if attachment.isImage {
+                                    let attachmentURLs = attachment.resolvedURLs(
+                                        serverURL: appState.serverURL)
+                                    AuthAsyncImage(urls: attachmentURLs) { image in
+                                        image
+                                            .resizable()
+                                            .aspectRatio(contentMode: .fill)
+                                    } placeholder: {
+                                        Rectangle()
+                                            .fill(LiquidGlassTheme.colors.tertiaryBackground)
                                     }
-                                    let baseURL = appState.serverURL.trimmingCharacters(
-                                        in: .init(charactersIn: "/"))
-                                    return URL(string: baseURL + "/file/" + attachment.name)
-                                }()
-
-                                AuthAsyncImage(url: attachmentURL) { image in
-                                    image
-                                        .resizable()
-                                        .aspectRatio(contentMode: .fill)
-                                } placeholder: {
-                                    Rectangle()
-                                        .fill(LiquidGlassTheme.colors.tertiaryBackground)
+                                    .frame(width: 60, height: 60)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
                                 }
-                                .frame(width: 60, height: 60)
-                                .clipShape(RoundedRectangle(cornerRadius: 8))
 
                                 Button {
                                     quickCaptureAttachments.removeAll { $0.id == attachment.id }
@@ -334,7 +327,7 @@ struct MemoListView: View {
                 )
             )
         }
-        .onChange(of: locationManager.location) { newLocation in
+        .onChange(of: locationManager.location, initial: false) { _, newLocation in
             if newLocation != nil {
                 withAnimation(LiquidGlassTheme.animation.spring) {
                     quickCaptureLocation = newLocation
@@ -376,9 +369,9 @@ struct MemoListView: View {
             SectionHeader(title: String(localized: "Pinned Inspiration", comment: "Section header for pinned memos"))
 
             LazyVStack(spacing: 12) {
-                ForEach(appState.pinnedMemos) { memo in
+                ForEach(appState.pinnedMemosList) { memo in
                     MemoCard(memo: memo)
-                        .environmentObject(appState)
+                        .environment(appState)
                         .onTapGesture {
                             memoToEdit = memo
                         }
@@ -389,18 +382,18 @@ struct MemoListView: View {
 
     private var memosSection: some View {
         VStack(alignment: .leading, spacing: 14) {
-            if !appState.pinnedMemos.isEmpty {
+            if !appState.pinnedMemosList.isEmpty {
                 SectionHeader(title: String(localized: "Timeline", comment: "Section header for the timeline of memos"))
             }
 
-            ForEach(timelineGroups, id: \.date) { group in
+            ForEach(appState.timelineGroups, id: \.date) { group in
                 VStack(alignment: .leading, spacing: 10) {
                     DaySectionHeader(date: group.date)
 
                     LazyVStack(spacing: 12) {
                         ForEach(group.memos) { memo in
                             MemoCard(memo: memo)
-                                .environmentObject(appState)
+                                .environment(appState)
                                 .onTapGesture {
                                     memoToEdit = memo
                                 }
@@ -488,7 +481,7 @@ struct MemoListView: View {
         defer { appState.isLoading = false }
 
         do {
-            await MemosAPIClient.shared.configure(
+            MemosAPIClient.shared.configure(
                 serverURL: appState.serverURL,
                 accessToken: appState.accessToken
             )
@@ -520,19 +513,27 @@ private struct DaySectionHeader: View {
     }
 
     private func dayTitle(for date: Date) -> String {
-        let calendar = Calendar.current
+        let calendar = Self.sharedCalendar
         if calendar.isDateInToday(date) {
             return String(localized: "Today", comment: "Day title for today")
         }
         if calendar.isDateInYesterday(date) {
             return String(localized: "Yesterday", comment: "Day title for yesterday")
         }
-        return date.formatted(.dateTime.weekday(.wide))
+        return Self.weekdayFormatter.string(from: date)
     }
+
+    private static let weekdayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEEE"
+        return formatter
+    }()
+
+    private static let sharedCalendar = Calendar.current
 }
 
 struct MemoCard: View {
-    @EnvironmentObject var appState: AppState
+    @Environment(AppState.self) var appState
     let memo: Memo
 
     @State private var isHovered = false
@@ -543,9 +544,8 @@ struct MemoCard: View {
             headerView
 
             if !memo.content.isEmpty {
-                MarkdownView(content: memo.content, fontSize: 13)
-                    .lineLimit(10)
-                    .foregroundColor(LiquidGlassTheme.colors.text)
+                MarkdownView(content: memo.truncatedContent)
+                    .textSelection(.enabled)
             }
 
             if !memo.tags.isEmpty {
@@ -618,14 +618,30 @@ struct MemoCard: View {
                     Task { await togglePin() }
                 } label: {
                     Label(
-                        memo.pinned ? "Unpin" : "Pin",
+                        memo.pinned
+                            ? String(localized: "Unpin", comment: "Context menu item to unpin memo")
+                            : String(localized: "Pin", comment: "Context menu item to pin memo"),
                         systemImage: memo.pinned ? "pin.slash" : "pin")
                 }
                 
                 Button {
                     copyContent()
                 } label: {
-                    Label("Copy Content", systemImage: "doc.on.doc")
+                    Label(
+                        String(
+                            localized: "Copy Content",
+                            comment: "Context menu item to copy memo content"),
+                        systemImage: "doc.on.doc")
+                }
+
+                Button {
+                    copyLink()
+                } label: {
+                    Label(
+                        String(
+                            localized: "Copy Link",
+                            comment: "Context menu item to copy memo link"),
+                        systemImage: "link")
                 }
 
                 Divider()
@@ -633,7 +649,9 @@ struct MemoCard: View {
                 Button(role: .destructive) {
                     Task { await deleteMemo() }
                 } label: {
-                    Label("Delete", systemImage: "trash")
+                    Label(
+                        String(localized: "Delete", comment: "Context menu item to delete memo"),
+                        systemImage: "trash")
                 }
             } label: {
                 Image(systemName: "ellipsis")
@@ -646,6 +664,8 @@ struct MemoCard: View {
             .opacity(isHovered ? 1 : 0.6)
         }
     }
+
+    // Truncation logic moved to Memo model extension
 
     private var tagsView: some View {
         FlowLayout(spacing: 6) {
@@ -686,19 +706,12 @@ struct MemoCard: View {
             .padding(.top, 8)
 
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
+                LazyHStack(spacing: 10) {
                     ForEach(memo.attachments) { attachment in
                         if attachment.isImage {
-                            let attachmentURL: URL? = {
-                                if let link = attachment.externalLink, !link.isEmpty {
-                                    return URL(string: link)
-                                }
-                                let baseURL = appState.serverURL.trimmingCharacters(
-                                    in: .init(charactersIn: "/"))
-                                return URL(string: baseURL + "/file/" + attachment.name)
-                            }()
-
-                            AuthAsyncImage(url: attachmentURL) { image in
+                            let attachmentURLs = attachment.resolvedURLs(
+                                serverURL: appState.serverURL)
+                            AuthAsyncImage(urls: attachmentURLs) { image in
                                 image
                                     .resizable()
                                     .aspectRatio(contentMode: .fill)
@@ -753,16 +766,18 @@ struct MemoCard: View {
 
             Text(String(localized: "Location recorded", comment: "Location label"))
                 .font(LiquidGlassTheme.typography.caption)
+                .foregroundStyle(LiquidGlassTheme.colors.secondaryText)
         }
-        .foregroundColor(LiquidGlassTheme.colors.secondaryText)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
         .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color.black.opacity(0.1))
+            Rectangle()
+                .fill(LiquidGlassTheme.colors.background.opacity(0.8))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(LiquidGlassTheme.colors.border.opacity(0.15), lineWidth: 0.5)
+                    Rectangle()
+                        .fill(LiquidGlassTheme.colors.border.opacity(0.3))
+                        .frame(height: 0.5),
+                    alignment: .bottom
                 )
         )
     }
@@ -831,8 +846,9 @@ struct MemoCard: View {
 
     private func togglePin() async {
         do {
-            let updated = try await MemosAPIClient.shared.togglePinMemo(id: memo.id, pinned: !memo.pinned, memoName: memo.name)
-            if let index = appState.memos.firstIndex(where: { $0.id == memo.id }) {
+            let updated = try await MemosAPIClient.shared.togglePinMemo(
+                id: memo.numericID, pinned: !memo.pinned, memoName: memo.name)
+            if let index = appState.memos.firstIndex(where: { $0.name == memo.name }) {
                 appState.memos[index] = updated
             }
         } catch {
@@ -845,21 +861,22 @@ struct MemoCard: View {
         NSPasteboard.general.setString(memo.content, forType: .string)
     }
 
+    private func copyLink() {
+        let base = appState.serverURL
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        let link = "\(base)/m/\(memo.name)"
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(link, forType: .string)
+    }
+
     private func deleteMemo() async {
         do {
-            try await MemosAPIClient.shared.deleteMemo(id: memo.id)
-            appState.memos.removeAll { $0.id == memo.id }
+            try await MemosAPIClient.shared.deleteMemo(id: memo.numericID, memoName: memo.name)
+            appState.memos.removeAll { $0.name == memo.name }
         } catch {
             appState.errorMessage = error.localizedDescription
         }
     }
 }
 
-private extension Memo {
-    var relativeCreatedAtDescription: String {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .short
-        formatter.locale = .current
-        return formatter.localizedString(for: createdAt, relativeTo: Date())
-    }
-}

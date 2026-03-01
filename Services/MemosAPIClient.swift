@@ -1,6 +1,9 @@
 import Foundation
+import Observation
 
-actor MemosAPIClient {
+@MainActor
+@Observable
+class MemosAPIClient {
     static let shared = MemosAPIClient()
     
     private var baseURL: String = ""
@@ -47,29 +50,32 @@ actor MemosAPIClient {
         return request
     }
     
-    private func makeDecoder() -> JSONDecoder {
+
+    private let decoder: JSONDecoder = {
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         decoder.dateDecodingStrategy = .custom { decoder in
             let container = try decoder.singleValueContainer()
             let dateString = try container.decode(String.self)
             
-            let formatters: [ISO8601DateFormatter] = {
-                let formatter = ISO8601DateFormatter()
-                formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-                let formatter2 = ISO8601DateFormatter()
-                formatter2.formatOptions = [.withInternetDateTime]
-                return [formatter, formatter2]
-            }()
-            
-            for formatter in formatters {
-                if let date = formatter.date(from: dateString) {
-                    return date
-                }
+            let formatter = ISO8601DateFormatter()
+            // Try with fractional seconds first
+            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            if let date = formatter.date(from: dateString) {
+                return date
+            }
+            // Fallback to basic ISO8601
+            formatter.formatOptions = [.withInternetDateTime]
+            if let date = formatter.date(from: dateString) {
+                return date
             }
             
             throw DecodingError.dataCorruptedError(in: container, debugDescription: "Cannot decode date: \(dateString)")
         }
+        return decoder
+    }()
+
+    private func makeDecoder() -> JSONDecoder {
         return decoder
     }
 
@@ -104,7 +110,11 @@ actor MemosAPIClient {
     struct MemoResponse: Decodable {
         let memos: [MemoData]
     }
-    
+
+    struct MemoAttachmentResponse: Decodable {
+        let attachments: [Attachment]
+    }
+
     struct MemoData: Decodable {
         let name: String
         let content: String
@@ -201,7 +211,7 @@ actor MemosAPIClient {
         
         let response: MemoResponse = try await performRequest(request)
         
-        return response.memos.map { data in
+        var memos = response.memos.map { data in
             let visibility = MemoVisibility(rawValue: data.visibility) ?? .private
             return Memo(
                 name: data.name,
@@ -217,6 +227,80 @@ actor MemosAPIClient {
                 relations: data.relations ?? []
             )
         }
+
+        return memos
+    }
+
+    private func fetchMemoAttachments(memoName: String) async throws -> [Attachment] {
+        let primaryEncodedMemoName =
+            memoName.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? memoName
+        let fallbackMemoId = memoName.split(separator: "/").last.map(String.init) ?? memoName
+        let fallbackEncodedMemoId =
+            fallbackMemoId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed)
+            ?? fallbackMemoId
+
+        let candidatePaths = [
+            "/api/v1/\(primaryEncodedMemoName)/attachments",
+            "/api/v1/memos/\(fallbackEncodedMemoId)/attachments",
+        ]
+
+        var lastError: Error?
+        for path in candidatePaths {
+            guard let url = buildURL(path) else { continue }
+            let request = buildRequest(url: url)
+            do {
+                let response: MemoAttachmentResponse = try await performRequest(request)
+                return try await hydrateAttachmentsIfNeeded(response.attachments)
+            } catch {
+                lastError = error
+            }
+        }
+
+        if let lastError {
+            throw lastError
+        }
+        throw MemosAPIError.invalidURL
+    }
+
+    private func hydrateAttachmentsIfNeeded(_ attachments: [Attachment]) async throws
+        -> [Attachment]
+    {
+        try await withThrowingTaskGroup(of: (Int, Attachment).self) { group in
+            for (index, attachment) in attachments.enumerated() {
+                group.addTask {
+                    let hasInlineContent = !(attachment.content?.isEmpty ?? true)
+                    let hasExternalLink = !(attachment.externalLink?.isEmpty ?? true)
+
+                    if (hasInlineContent || hasExternalLink) || attachment.name.isEmpty {
+                        return (index, attachment)
+                    }
+
+                    do {
+                        let detailed = try await self.fetchAttachment(resourceName: attachment.name)
+                        return (index, detailed)
+                    } catch {
+                        return (index, attachment)
+                    }
+                }
+            }
+
+            var results = attachments
+            for try await (index, detailed) in group {
+                results[index] = detailed
+            }
+            return results
+        }
+    }
+
+    private func fetchAttachment(resourceName: String) async throws -> Attachment {
+        let encodedResourceName =
+            resourceName.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed)
+            ?? resourceName
+        guard let url = buildURL("/api/v1/\(encodedResourceName)") else {
+            throw MemosAPIError.invalidURL
+        }
+        let request = buildRequest(url: url)
+        return try await performRequest(request)
     }
     
     func createMemo(
@@ -266,14 +350,20 @@ actor MemosAPIClient {
     }
     
     func updateMemo(
-        id: Int, content: String, visibility: MemoVisibility? = nil, pinned: Bool? = nil,
+        id: Int, memoName: String? = nil, content: String, visibility: MemoVisibility? = nil,
+        pinned: Bool? = nil,
         attachmentNames: [String]? = nil, location: Location? = nil
     ) async throws -> Memo {
-        guard var urlComponents = URLComponents(string: "\(baseURL)/api/v1/memos/\(id)") else {
+        let resourceName = memoName ?? "memos/\(id)"
+        let encodedResourceName =
+            resourceName.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed)
+            ?? resourceName
+        guard var urlComponents = URLComponents(string: "\(baseURL)/api/v1/\(encodedResourceName)")
+        else {
             throw MemosAPIError.invalidURL
         }
         
-        var body: [String: Any] = ["content": content, "name": "memos/\(id)"]
+        var body: [String: Any] = ["content": content, "name": resourceName]
         var updateMasks: [String] = ["content"]
         
         if let visibility = visibility {
@@ -323,8 +413,12 @@ actor MemosAPIClient {
         )
     }
     
-    func deleteMemo(id: Int) async throws {
-        guard let url = buildURL("/api/v1/memos/\(id)") else {
+    func deleteMemo(id: Int, memoName: String? = nil) async throws {
+        let resourceName = memoName ?? "memos/\(id)"
+        let encodedResourceName =
+            resourceName.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed)
+            ?? resourceName
+        guard let url = buildURL("/api/v1/\(encodedResourceName)") else {
             throw MemosAPIError.invalidURL
         }
         let request = buildRequest(url: url, method: "DELETE")
@@ -384,6 +478,7 @@ actor MemosAPIClient {
         
         let body: [String: Any] = [
             "filename": filename,
+            "type": mimeType,
             "content": data.base64EncodedString(),
         ]
         

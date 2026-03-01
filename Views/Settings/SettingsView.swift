@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct SettingsView: View {
-    @EnvironmentObject var appState: AppState
+    @Environment(AppState.self) var appState
     @Environment(\.dismiss) private var dismiss
     
     @AppStorage("editorFontSize") private var editorFontSize: Double = 14
@@ -33,10 +33,6 @@ struct SettingsView: View {
                     Label(String(localized: "Account", comment: "Settings tab label"), systemImage: "person.circle")
                 }
             
-            aboutTab
-                .tabItem {
-                    Label(String(localized: "About", comment: "Settings tab label"), systemImage: "info.circle")
-                }
         }
         .frame(width: 550, height: 450)
     }
@@ -124,12 +120,14 @@ struct SettingsView: View {
             Section {
                 Picker(String(localized: "Target Translation Language", comment: "Translation language picker label"), selection: $targetTranslationLanguage) {
                     Text(String(localized: "Auto-detect", comment: "Auto-detect language")).tag("auto")
-                    Text("English").tag("en")
-                    Text("简体中文").tag("zh-Hans")
-                    Text("繁體中文").tag("zh-Hant")
-                    Text("日本語").tag("ja")
-                    Text("Español").tag("es")
-                    Text("Français").tag("fr")
+                    Text(String(localized: "English", comment: "Language option English")).tag("en")
+                    Text(String(localized: "简体中文", comment: "Language option Simplified Chinese"))
+                        .tag("zh-Hans")
+                    Text(String(localized: "繁體中文", comment: "Language option Traditional Chinese"))
+                        .tag("zh-Hant")
+                    Text(String(localized: "日本語", comment: "Language option Japanese")).tag("ja")
+                    Text(String(localized: "Español", comment: "Language option Spanish")).tag("es")
+                    Text(String(localized: "Français", comment: "Language option French")).tag("fr")
                 }
             } header: {
                 Label(String(localized: "Translation", comment: "Translation header"), systemImage: "globe")
@@ -216,45 +214,5 @@ struct SettingsView: View {
         .padding()
     }
     
-    private var aboutTab: some View {
-        VStack(spacing: 24) {
-            Image(systemName: "note.text")
-                .font(.system(size: 64, weight: .light))
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [.accentColor, .accentColor.opacity(0.7)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-            
-            VStack(spacing: 8) {
-                Text("Essays")
-                    .font(LiquidGlassTheme.typography.largeTitle)
-                
-                Text("Version 1.0.0")
-                    .font(LiquidGlassTheme.typography.subheadline)
-                    .foregroundColor(LiquidGlassTheme.colors.secondaryText)
-            }
-            
-            Text(String(localized: "A beautiful macOS client for Memos", comment: "App description"))
-                .font(LiquidGlassTheme.typography.body)
-                .foregroundColor(LiquidGlassTheme.colors.secondaryText)
-                .multilineTextAlignment(.center)
-            
-            VStack(spacing: 12) {
-                Link(destination: URL(string: "https://github.com/usememos/memos")!) {
-                    Label(String(localized: "Memos on GitHub", comment: "GitHub link label"), systemImage: "link")
-                        .font(LiquidGlassTheme.typography.callout)
-                }
-                
-                Text(String(localized: "Built with SwiftUI and ❤️", comment: "Credits text"))
-                    .font(LiquidGlassTheme.typography.footnote)
-                    .foregroundColor(LiquidGlassTheme.colors.tertiaryText)
-            }
-            
-            Spacer()
-        }
-        .padding(32)
-    }
+
 }

@@ -1,6 +1,7 @@
 import Foundation
 import FoundationModels
 
+@available(macOS 26.0, *)
 actor MemosAIAssistant {
     static let shared = MemosAIAssistant()
     

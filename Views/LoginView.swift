@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct LoginView: View {
-    @EnvironmentObject var appState: AppState
+    @Environment(AppState.self) var appState
     @State private var serverURL: String = ""
     @State private var accessToken: String = ""
     @State private var isLoading = false
@@ -56,7 +56,7 @@ struct LoginView: View {
                     )
                 )
             
-            Text("Essays")
+            Text(String(localized: "Essays", comment: "Application name"))
                 .font(LiquidGlassTheme.typography.largeTitle)
                 .foregroundColor(LiquidGlassTheme.colors.text)
             
@@ -75,7 +75,10 @@ struct LoginView: View {
                     .textCase(.uppercase)
                     .tracking(1)
                 
-                TextField("https://your-memos-server.com", text: $serverURL)
+                TextField(
+                    String(
+                        localized: "https://your-memos-server.com",
+                        comment: "Placeholder for server URL field"), text: $serverURL)
                     .textFieldStyle(.roundedBorder)
                     .font(LiquidGlassTheme.typography.body)
                     .autocorrectionDisabled()
@@ -167,7 +170,8 @@ struct LoginView: View {
         defer { isLoading = false }
         
         do {
-            await MemosAPIClient.shared.configure(serverURL: normalizedServerURL, accessToken: normalizedAccessToken)
+            MemosAPIClient.shared.configure(
+                serverURL: normalizedServerURL, accessToken: normalizedAccessToken)
             let user = try await MemosAPIClient.shared.getCurrentUser()
 
             appState.serverURL = normalizedServerURL

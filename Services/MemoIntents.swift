@@ -1,5 +1,4 @@
 import Foundation
-import FoundationModels
 import AppIntents
 
 struct MemoIntent: AppIntent {
@@ -37,7 +36,7 @@ struct MemoIntent: AppIntent {
         
         do {
             let memo = try await MemosAPIClient.shared.createMemo(content: memoContent)
-            return .result(value: "Memo created successfully with ID: \(memo.id)")
+            return .result(value: "Memo created successfully: \(memo.name)")
         } catch {
             throw error
         }

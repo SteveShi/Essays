@@ -1,5 +1,5 @@
 import SwiftUI
-import AVFoundation
+@preconcurrency import AVFoundation
 
 struct CameraCaptureView: View {
     @Environment(\.dismiss) var dismiss
@@ -44,7 +44,7 @@ struct CameraCaptureView: View {
 
     private var header: some View {
         HStack {
-            Text("Take Photo")
+            Text(String(localized: "Take Photo", comment: "Title for camera capture view"))
                 .font(.headline)
             Spacer()
             Button {

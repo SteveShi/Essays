@@ -1,12 +1,16 @@
 import Foundation
 import CoreLocation
 
-class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
+import Observation
+
+@MainActor
+@Observable
+class LocationManager: NSObject, CLLocationManagerDelegate {
     private let manager = CLLocationManager()
     
-    @Published var location: Location?
-    @Published var isFetching = false
-    @Published var error: String?
+    var location: Location?
+    var isFetching = false
+    var error: String?
 
     override init() {
         super.init()
@@ -25,22 +29,27 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         manager.requestLocation()
     }
 
-    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+    nonisolated func locationManager(
+        _ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]
+    ) {
         if let first = locations.first {
-            DispatchQueue.main.async {
+            let lat = first.coordinate.latitude
+            let lon = first.coordinate.longitude
+            Task { @MainActor in
                 self.location = Location(
-                    latitude: first.coordinate.latitude,
-                    longitude: first.coordinate.longitude
+                    latitude: lat,
+                    longitude: lon
                 )
                 self.isFetching = false
             }
         }
     }
 
-    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        print("Location manager failed: \(error.localizedDescription)")
-        DispatchQueue.main.async {
-            self.error = error.localizedDescription
+    nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        let description = error.localizedDescription
+        Task { @MainActor in
+            print("Location manager failed: \(description)")
+            self.error = description
             self.isFetching = false
         }
     }

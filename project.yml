@@ -2,13 +2,13 @@ name: Essays
 options:
   bundleIdPrefix: com.essays.app
   deploymentTarget:
-    macOS: "26.0"
-  xcodeVersion: "26.2"
+    macOS: "15.0"
+  xcodeVersion: "15.3"
   generateEmptyDirectories: true
   defaultConfig: Release
 settings:
   base:
-    MARKETING_VERSION: 1.0.2
+    MARKETING_VERSION: 1.1.0
     CURRENT_PROJECT_VERSION: 2
 
 configs:
@@ -28,16 +28,22 @@ targets:
         excludes:
           - "**/.DS_Store"
           - "EssaysTests/**"
+          - "Essays.xcodeproj/**"
           - "project.yml"
           - ".git/**"
           - ".github/**"
           - "warnings.log"
           - "build/**"
+          - "memos_sample.json"
+          - "test_decode.swift"
+          - "test_*.swift"
           - "*.py"
           - "draw_icon.swift"
           - "base_icon.png"
     settings:
       base:
+        SWIFT_VERSION: "6.0"
+        SWIFT_STRICT_CONCURRENCY: complete
         INFOPLIST_FILE: Info.plist
         PRODUCT_BUNDLE_IDENTIFIER: com.essays.app
         PRODUCT_NAME: Essays
@@ -48,3 +54,16 @@ targets:
       properties:
         com.apple.security.app-sandbox: false
         com.apple.security.network.client: true
+
+  EssaysTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: EssaysTests
+    dependencies:
+      - target: Essays
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.essays.app.tests
+        PRODUCT_NAME: EssaysTests
+        GENERATE_INFOPLIST_FILE: true
