@@ -1,10 +1,11 @@
 import SwiftUI
 
 struct SidebarView: View {
-    @EnvironmentObject var appState: AppState
+    @Environment(AppState.self) var appState
     @FocusState private var isSearchFocused: Bool
     
     var body: some View {
+        @Bindable var appState = appState
         VStack(spacing: 0) {
             headerSection
             
@@ -32,9 +33,10 @@ struct SidebarView: View {
     }
     
     private var headerSection: some View {
-        VStack(spacing: 12) {
+        @Bindable var appState = appState
+        return VStack(spacing: 12) {
             HStack {
-                Text("Essays")
+                Text(String(localized: "Essays", comment: "Application name"))
                     .font(LiquidGlassTheme.typography.title2)
                     .foregroundColor(LiquidGlassTheme.colors.text)
                 
@@ -59,7 +61,7 @@ struct SidebarView: View {
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 12))
-                            .foregroundColor(LiquidGlassTheme.colors.tertiaryText)
+                            .foregroundStyle(LiquidGlassTheme.colors.tertiaryText)
                     }
                     .buttonStyle(.plain)
                 }
@@ -92,7 +94,7 @@ struct SidebarView: View {
                 SidebarItem(
                     icon: "sun.max",
                     title: String(localized: "Today", comment: "Sidebar item for today's memos"),
-                    count: appState.memos.filter { Calendar.current.isDateInToday($0.createdAt) }.count,
+                    count: appState.todayMemosCount,
                     isSelected: appState.searchText.lowercased().contains("created:today")
                 ) {
                     appState.searchText = "created:today"
@@ -102,7 +104,7 @@ struct SidebarView: View {
                 SidebarItem(
                     icon: "clock.arrow.circlepath",
                     title: String(localized: "Past 7 Days", comment: "Sidebar item for memos in the last week"),
-                    count: recentWeekCount,
+                    count: appState.recentWeekMemosCount,
                     isSelected: appState.searchText.lowercased().contains("created:7d")
                 ) {
                     appState.searchText = "created:7d"
@@ -112,7 +114,7 @@ struct SidebarView: View {
                 SidebarItem(
                     icon: "pin.fill",
                     title: String(localized: "Pinned", comment: "Sidebar item for pinned memos"),
-                    count: appState.pinnedMemos.count,
+                    count: appState.pinnedMemosList.count,
                     isSelected: appState.searchText.lowercased().contains("pinned:true")
                 ) {
                     appState.searchText = "pinned:true"
@@ -124,7 +126,7 @@ struct SidebarView: View {
     
     private var calendarSection: some View {
         SidebarCalendarView()
-            .environmentObject(appState)
+            .environment(appState)
     }
     
     private var tagsSection: some View {
@@ -232,12 +234,6 @@ struct SidebarView: View {
         .padding(16)
     }
     
-    private var recentWeekCount: Int {
-        guard let start = Calendar.current.date(byAdding: .day, value: -7, to: Date()) else {
-            return 0
-        }
-        return appState.memos.filter { $0.createdAt >= start }.count
-    }
 }
 
 struct SectionHeader: View {
@@ -264,22 +260,27 @@ struct SidebarItem: View {
     
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 10) {
+            HStack(spacing: 12) {
                 Image(systemName: icon)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(isSelected ? LiquidGlassTheme.colors.accent : LiquidGlassTheme.colors.secondaryText)
-                    .frame(width: 20)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(
+                        isSelected
+                            ? LiquidGlassTheme.colors.accent : LiquidGlassTheme.colors.secondaryText
+                    )
+                    .frame(width: 24)
                 
                 Text(title)
-                    .font(LiquidGlassTheme.typography.callout)
-                    .foregroundColor(LiquidGlassTheme.colors.text)
+                    .font(LiquidGlassTheme.typography.body)
+                    .foregroundStyle(
+                        isSelected
+                            ? LiquidGlassTheme.colors.text : LiquidGlassTheme.colors.secondaryText)
                 
                 Spacer()
                 
                 if count > 0 {
                     Text("\(count)")
                         .font(LiquidGlassTheme.typography.caption)
-                        .foregroundColor(LiquidGlassTheme.colors.tertiaryText)
+                        .foregroundStyle(LiquidGlassTheme.colors.tertiaryText)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
                         .background(
@@ -288,16 +289,19 @@ struct SidebarItem: View {
                         )
                 }
             }
-            .padding(.horizontal, 10)
+            .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .background(
-                LiquidGlassTheme.glass.sidebarItemBackground(isSelected: isSelected, isHovered: isHovered)
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(
+                        isSelected
+                            ? LiquidGlassTheme.colors.accent.opacity(0.1)
+                            : (isHovered ? Color.primary.opacity(0.04) : Color.clear))
             )
-            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .onHover { hovering in
-            withAnimation(LiquidGlassTheme.animation.easeOut) {
+            withAnimation(.easeInOut(duration: 0.2)) {
                 isHovered = hovering
             }
         }
@@ -348,15 +352,54 @@ struct TagChip: View {
 struct FlowLayout: Layout {
     var spacing: CGFloat = 8
     
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let result = FlowResult(in: proposal.width ?? 0, subviews: subviews, spacing: spacing)
+    struct Cache {
+        var sizes: [CGSize] = []
+        var maxWidth: CGFloat = -1
+        var result: FlowResult?
+    }
+
+    func makeCache(subviews: Subviews) -> Cache {
+        Cache(sizes: subviews.map { $0.sizeThatFits(.unspecified) })
+    }
+
+    func updateCache(_ cache: inout Cache, subviews: Subviews) {
+        cache.sizes = subviews.map { $0.sizeThatFits(.unspecified) }
+        cache.maxWidth = -1  // Force recompute
+        cache.result = nil
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout Cache) -> CGSize
+    {
+        let width = proposal.width ?? 0
+        if let cached = cache.result, cache.maxWidth == width {
+            return cached.size
+        }
+        let result = FlowResult(in: width, sizes: cache.sizes, spacing: spacing)
+        cache.maxWidth = width
+        cache.result = result
         return result.size
     }
     
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        let result = FlowResult(in: bounds.width, subviews: subviews, spacing: spacing)
+    func placeSubviews(
+        in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout Cache
+    ) {
+        let width = bounds.width
+        let result: FlowResult
+        if let cached = cache.result, cache.maxWidth == width {
+            result = cached
+        } else {
+            result = FlowResult(in: width, sizes: cache.sizes, spacing: spacing)
+            cache.maxWidth = width
+            cache.result = result
+        }
+
         for (index, subview) in subviews.enumerated() {
-            subview.place(at: CGPoint(x: bounds.minX + result.positions[index].x, y: bounds.minY + result.positions[index].y), proposal: .unspecified)
+            if index < result.positions.count {
+                subview.place(
+                    at: CGPoint(
+                        x: bounds.minX + result.positions[index].x,
+                        y: bounds.minY + result.positions[index].y), proposal: .unspecified)
+            }
         }
     }
     
@@ -364,14 +407,12 @@ struct FlowLayout: Layout {
         var size: CGSize = .zero
         var positions: [CGPoint] = []
         
-        init(in maxWidth: CGFloat, subviews: Subviews, spacing: CGFloat) {
+        init(in maxWidth: CGFloat, sizes: [CGSize], spacing: CGFloat) {
             var currentX: CGFloat = 0
             var currentY: CGFloat = 0
             var lineHeight: CGFloat = 0
             
-            for subview in subviews {
-                let size = subview.sizeThatFits(.unspecified)
-                
+            for size in sizes {
                 if currentX + size.width > maxWidth, currentX > 0 {
                     currentX = 0
                     currentY += lineHeight + spacing
@@ -389,8 +430,9 @@ struct FlowLayout: Layout {
 }
 
 struct SidebarCalendarView: View {
-    @EnvironmentObject var appState: AppState
+    @Environment(AppState.self) var appState
     @State private var currentMonth: Date = Date()
+    @State private var days: [Date] = []
     
     private let calendar: Calendar = {
         var cal = Calendar.current
@@ -398,11 +440,12 @@ struct SidebarCalendarView: View {
         return cal
     }()
     
-    private var days: [Date] {
+    private func computeDays() {
         guard let monthInterval = calendar.dateInterval(of: .month, for: currentMonth),
               let monthFirstWeek = calendar.dateInterval(of: .weekOfMonth, for: monthInterval.start),
               let monthLastWeek = calendar.dateInterval(of: .weekOfMonth, for: monthInterval.end - 1) else {
-            return []
+            self.days = []
+            return
         }
         var dates: [Date] = []
         var date = monthFirstWeek.start
@@ -410,26 +453,25 @@ struct SidebarCalendarView: View {
             dates.append(date)
             date = calendar.date(byAdding: .day, value: 1, to: date)!
         }
-        return dates
+        self.days = dates
     }
     
     private var memoDates: Set<DateComponents> {
-        let dates = appState.memos.map { calendar.dateComponents([.year, .month, .day], from: $0.createdAt) }
-        return Set(dates)
+        appState.memoDateComponents
     }
     
-    private var dateFormatter: DateFormatter {
+    private static let monthFormatter: DateFormatter = {
         let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.dateFormat = "LLLL yyyy"
         return formatter
-    }
+    }()
     
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text(currentMonth.formatted(.dateTime.year().month()))
+                Text(Self.monthFormatter.string(from: currentMonth))
                     .font(LiquidGlassTheme.typography.caption)
-                    .foregroundColor(LiquidGlassTheme.colors.tertiaryText)
+                    .foregroundStyle(LiquidGlassTheme.colors.tertiaryText)
                     .textCase(.uppercase)
                     .tracking(1.5)
                     .padding(.leading, 4)
@@ -459,15 +501,14 @@ struct SidebarCalendarView: View {
                 ], id: \.self) { day in
                     Text(day)
                         .font(LiquidGlassTheme.typography.caption2)
-                        .foregroundColor(LiquidGlassTheme.colors.tertiaryText)
+                        .foregroundStyle(LiquidGlassTheme.colors.tertiaryText)
                         .frame(maxWidth: .infinity)
                 }
-                
                 ForEach(days, id: \.self) { date in
                     let isCurrentMonth = calendar.isDate(date, equalTo: currentMonth, toGranularity: .month)
                     let components = calendar.dateComponents([.year, .month, .day], from: date)
-                    let hasMemo = memoDates.contains(components)
-                    let dateString = dateFormatter.string(from: date)
+                    let hasMemo = appState.memoDateComponents.contains(components)
+                    let dateString = Self.sharedDateFormatter.string(from: date)
                     let isSelected = appState.searchText == "created:\(dateString)"
                     let isToday = calendar.isDateInToday(date)
                     
@@ -482,7 +523,14 @@ struct SidebarCalendarView: View {
                         Text("\(calendar.component(.day, from: date))")
                             .font(.system(size: 12, weight: isSelected || isToday ? .semibold : .regular, design: .rounded))
                             .frame(width: 24, height: 24)
-                            .foregroundColor(isCurrentMonth ? (isSelected ? .white : (isToday ? LiquidGlassTheme.colors.accent : LiquidGlassTheme.colors.text)) : LiquidGlassTheme.colors.tertiaryText.opacity(0.3))
+                            .foregroundStyle(
+                                isCurrentMonth
+                                    ? (isSelected
+                                        ? .white
+                                        : (isToday
+                                            ? LiquidGlassTheme.colors.accent
+                                            : LiquidGlassTheme.colors.text))
+                                    : LiquidGlassTheme.colors.tertiaryText.opacity(0.3))
                             .background(
                                 ZStack {
                                     if isSelected {
@@ -506,6 +554,12 @@ struct SidebarCalendarView: View {
                             .stroke(LiquidGlassTheme.colors.border.opacity(0.5), lineWidth: 0.5)
                     )
             )
+            .onAppear {
+                computeDays()
+            }
+            .onChange(of: currentMonth) {
+                computeDays()
+            }
         }
     }
     
@@ -516,4 +570,10 @@ struct SidebarCalendarView: View {
             }
         }
     }
+    
+    private static let sharedDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
 }

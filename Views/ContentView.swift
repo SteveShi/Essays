@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct ContentView: View {
-    @EnvironmentObject var appState: AppState
+    @Environment(AppState.self) var appState
     @State private var showComposeSheet = false
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @AppStorage("theme") private var theme = "system"
@@ -21,7 +21,7 @@ struct ContentView: View {
                 mainView
             } else {
                 LoginView()
-                    .environmentObject(appState)
+                    .environment(appState)
             }
         }
         .preferredColorScheme(preferredColorScheme)
@@ -33,7 +33,7 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showComposeSheet) {
             ComposeMemoView()
-                .environmentObject(appState)
+                .environment(appState)
         }
         .alert(
             String(localized: "Error"),
@@ -57,11 +57,11 @@ struct ContentView: View {
     private var mainView: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             SidebarView()
-                .environmentObject(appState)
+                .environment(appState)
                 .frame(minWidth: 220, idealWidth: 260, maxWidth: 300)
         } detail: {
             MemoListView()
-                .environmentObject(appState)
+                .environment(appState)
         }
         .navigationSplitViewStyle(.balanced)
         .task {
@@ -74,7 +74,7 @@ struct ContentView: View {
         defer { appState.isLoading = false }
 
         do {
-            await MemosAPIClient.shared.configure(
+            MemosAPIClient.shared.configure(
                 serverURL: appState.serverURL,
                 accessToken: appState.accessToken
             )

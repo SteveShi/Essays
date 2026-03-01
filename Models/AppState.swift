@@ -1,31 +1,79 @@
 import Foundation
 import SwiftUI
-import Combine
+import Observation
 
 @MainActor
-class AppState: ObservableObject {
-    @Published var isLoggedIn: Bool = false
-    @Published var currentUser: User?
-    @Published var serverURL: String = ""
-    @Published var accessToken: String = ""
-    @Published var memos: [Memo] = []
-    @Published var tags: [Tag] = []
-    @Published var isLoading: Bool = false
-    @Published var errorMessage: String?
-    @Published var selectedMemo: Memo?
-    @Published var searchText: String = ""
-    @Published var selectedTag: String?
-    @Published var showArchived: Bool = false
-    
+@Observable
+class AppState {
+    var isLoggedIn: Bool = false
+    var currentUser: User?
+    var serverURL: String = ""
+    var accessToken: String = ""
+    var memos: [Memo] = [] {
+        didSet { updateFilteredState() }
+    }
+    var tags: [Tag] = []
+    var isLoading: Bool = false
+    var errorMessage: String?
+    var selectedMemo: Memo?
+    var searchText: String = "" {
+        didSet { updateFilteredState() }
+    }
+    var selectedTag: String? {
+        didSet { updateFilteredState() }
+    }
+    var showArchived: Bool = false
+
+    // Pre-computed filtered and grouped results
+    private(set) var filteredMemos: [Memo] = []
+    private(set) var pinnedMemosList: [Memo] = []
+    private(set) var timelineGroups: [(date: Date, memos: [Memo])] = []
+    private(set) var memoDateComponents: Set<DateComponents> = []
+    private(set) var todayMemosCount: Int = 0
+    private(set) var recentWeekMemosCount: Int = 0
+
     private let userDefaults = UserDefaults.standard
     private let serverURLKey = "memos_server_url"
     private let accessTokenKey = "memos_access_token"
     private let currentUserKey = "memos_current_user"
     
-    private var cancellables = Set<AnyCancellable>()
-    
     init() {
         loadSavedCredentials()
+        updateFilteredState()  // Initial computation
+    }
+
+    private func updateFilteredState() {
+        let allFiltered = computeFilteredMemos()
+        self.filteredMemos = allFiltered
+        self.pinnedMemosList = allFiltered.filter { $0.pinned }
+
+        let unpinned = allFiltered.filter { !$0.pinned }
+        let calendar = Calendar.current
+
+        // Grouping for the timeline
+        let grouped = Dictionary(grouping: unpinned) { memo in
+            calendar.startOfDay(for: memo.createdAt)
+        }
+
+        self.timelineGroups =
+            grouped
+            .map { (date: $0.key, memos: $0.value.sorted { $0.createdAt > $1.createdAt }) }
+            .sorted { $0.date > $1.date }
+
+        // Date components for the sidebar calendar
+        let components = memos.map {
+            calendar.dateComponents([.year, .month, .day], from: $0.createdAt)
+        }
+        self.memoDateComponents = Set(components)
+
+        // Pre-compute quick action counts
+        self.todayMemosCount = memos.filter { calendar.isDateInToday($0.createdAt) }.count
+
+        if let startOfRecentWeek = calendar.date(byAdding: .day, value: -7, to: Date()) {
+            self.recentWeekMemosCount = memos.filter { $0.createdAt >= startOfRecentWeek }.count
+        } else {
+            self.recentWeekMemosCount = 0
+        }
     }
     
     func loadSavedCredentials() {
@@ -33,7 +81,7 @@ class AppState: ObservableObject {
         accessToken = userDefaults.string(forKey: accessTokenKey) ?? ""
         
         if let userData = userDefaults.data(forKey: currentUserKey),
-           let user = try? JSONDecoder().decode(User.self, from: userData),
+            let user = try? JSONDecoder().decode(User.self, from: userData) as User,
            !serverURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
            !accessToken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             currentUser = user
@@ -67,7 +115,7 @@ class AppState: ObservableObject {
         tags = []
     }
     
-    var filteredMemos: [Memo] {
+    private func computeFilteredMemos() -> [Memo] {
         var result = memos
         let (keywordTerms, pinnedFilter, visibilityFilter, createdFilter) = parseSearchFilters(from: searchText)
         
@@ -107,14 +155,6 @@ class AppState: ObservableObject {
         }
         
         return result.sorted { $0.pinned && !$1.pinned || ($0.pinned == $1.pinned && $0.createdAt > $1.createdAt) }
-    }
-    
-    var pinnedMemos: [Memo] {
-        filteredMemos.filter { $0.pinned }
-    }
-    
-    var unpinnedMemos: [Memo] {
-        filteredMemos.filter { !$0.pinned }
     }
     
     private func parseSearchFilters(from rawSearch: String) -> ([String], Bool?, MemoVisibility?, CreatedFilter?) {

@@ -1,6 +1,6 @@
 # 闪念 (Essays)
 
-**闪念 (Essays)** 是一款为 [Memos](https://usememos.com) 开源笔记服务量身打造的优美 macOS 原生客户端。使用 SwiftUI 构建，专注于极简体验与视觉美感，为您提供捕捉灵感、记录日记和整理想法的无缝体验。
+**闪念 (Essays)** 是一款为 [Memos](https://usememos.com) 开源笔记服务量身打造的 macOS 原生客户端。使用 SwiftUI 构建，专注于极简体验与视觉美感，为您提供捕捉灵感、记录日记和整理想法的无缝体验。
 
 ## 功能特性
 

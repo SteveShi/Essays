@@ -1,10 +1,10 @@
 # Essays
 
-**Essays** is a premium, native macOS client for the [Memos](https://usememos.com) self-hosted note-taking service. Built with SwiftUI and a focus on visual excellence, it provides a seamless and lightweight experience for capturing thoughts, logging daily activities, and organizing inspiration.
+**Essays** is a native macOS client for the [Memos](https://usememos.com) self-hosted note-taking service. It provides a seamless and lightweight experience for capturing thoughts, logging daily activities, and organizing inspiration.
 
 ## Features
 
-- ✨ **Premium Native UI**: A state-of-the-art "LiquidGlass" aesthetic with glassmorphism, thin materials, and subtle micro-animations.
+- ✨ **Premium Native UI**: A "LiquidGlass" aesthetic with glassmorphism, thin materials, and subtle micro-animations.
 - 🤖 **Apple AI Assistant**: Integrated Foundation Models for on-device text processing and intelligence.
 - 🚀 **Quick Capture**: A pinned input box at the top of your timeline for instant thought recording.
 - 📅 **Interactive Calendar**: A reactive Monthly Calendar directly in the sidebar to filter your daily logs.

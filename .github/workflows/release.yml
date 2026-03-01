@@ -37,8 +37,8 @@ jobs:
           git checkout HEAD CHANGELOG.md
           
           # Extract latest changelog section
-          # Finds content between the first and second H2 headers starting with [
-          CHANGELOG=$(sed -n '/## \[/,/## \[/p' CHANGELOG.md | sed '$d')
+          # Extract latest changelog section using awk to grab everything between the first and second '## ['
+          CHANGELOG=$(awk '/^## \[/ { count++; if (count == 2) exit; next } count == 1 { print }' CHANGELOG.md)
           
           # Determine if we should release
           SHOULD_RELEASE="false"
@@ -104,7 +104,7 @@ jobs:
           
           cp -R build/Essays.xcarchive/Products/Applications/Essays.app build/Export/
           cd build/Export
-          zip -r ../../Essays.zip Essays.app
+          zip -r ../../Essays-AppleSilicon.zip Essays.app
           
           # Create DMG
           create-dmg \
@@ -115,7 +115,7 @@ jobs:
             --icon "Essays.app" 175 190 \
             --hide-extension "Essays.app" \
             --app-drop-link 425 190 \
-            "../../Essays.dmg" \
+            "../../Essays-AppleSilicon.dmg" \
             "Essays.app"
 
       - name: Create Release
@@ -125,7 +125,7 @@ jobs:
           name: v${{ needs.check-version.outputs.version }}
           body: ${{ needs.check-version.outputs.changelog }}
           files: |
-            Essays.zip
-            Essays.dmg
+            Essays-AppleSilicon.zip
+            Essays-AppleSilicon.dmg
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

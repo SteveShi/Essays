@@ -1,5 +1,6 @@
 import SwiftUI
 
+@available(macOS 26.0, *)
 struct AIAssistantView: View {
     let memo: Memo
     @Environment(\.dismiss) private var dismiss

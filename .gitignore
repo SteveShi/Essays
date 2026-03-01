@@ -61,3 +61,5 @@ fastlane/test_output
 # XCGenearted
 Essays.xcodeproj/
 *.log
+*.log
+*.txt

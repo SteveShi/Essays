@@ -1,8 +1,8 @@
 import Foundation
 
-struct Memo: Identifiable, Hashable, Equatable {
+struct Memo: Identifiable, Hashable, Equatable, Sendable {
     let name: String          // Full resource name, e.g. "memos/123" or "memos/uid"
-    let id: Int               // Extracted numeric ID from name for legacy compat
+    let numericID: Int  // Extracted numeric ID from name for legacy compat
     let content: String
     let createdAt: Date
     let updatedAt: Date
@@ -27,7 +27,7 @@ struct Memo: Identifiable, Hashable, Equatable {
         relations: [Relation] = []
     ) {
         self.name = name.isEmpty ? "memos/\(id)" : name
-        self.id = id
+        self.numericID = id
         self.content = content
         self.createdAt = createdAt
         self.updatedAt = updatedAt
@@ -38,9 +38,36 @@ struct Memo: Identifiable, Hashable, Equatable {
         self.location = location
         self.relations = relations
     }
+
+    var id: String { name }
+
+    var truncatedContent: String {
+        let lines = content.components(separatedBy: "\n")
+        let limitedLines = lines.prefix(10)
+        let joined = limitedLines.joined(separator: "\n")
+        if joined.count > 500 {
+            return String(joined.prefix(500)) + "…"
+        }
+        if lines.count > 10 {
+            return joined + "\n…"
+        }
+        return joined
+    }
+
+    @MainActor
+    var relativeCreatedAtDescription: String {
+        Memo.relativeFormatter.localizedString(for: createdAt, relativeTo: Date())
+    }
+
+    @MainActor
+    private static let relativeFormatter: RelativeDateTimeFormatter = {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .short
+        return formatter
+    }()
 }
 
-struct Relation: Codable, Hashable, Equatable {
+struct Relation: Codable, Hashable, Equatable, Sendable {
     let memo: String  // The memo that has the relation
     let relatedMemo: String  // The memo that is related
     let type: RelationType
@@ -120,17 +147,18 @@ enum MemoVisibility: String, Codable, CaseIterable {
     }
 }
 
-struct Attachment: Codable, Identifiable, Hashable {
+struct Attachment: Codable, Identifiable, Hashable, Sendable {
     let name: String
     let filename: String
     let type: String
     let size: Int64
+    let content: String?
     var externalLink: String?
     let createTime: Date?
     let memo: String?
 
     enum CodingKeys: String, CodingKey {
-        case name, filename, type, size, externalLink, createTime, memo
+        case name, filename, type, size, content, externalLink, createTime, memo
         case create_time, external_link  // Legacy compat if needed
     }
 
@@ -154,6 +182,7 @@ struct Attachment: Codable, Identifiable, Hashable {
         externalLink =
             try container.decodeIfPresent(String.self, forKey: .externalLink)
             ?? container.decodeIfPresent(String.self, forKey: .external_link)
+        content = try container.decodeIfPresent(String.self, forKey: .content)
         createTime =
             try container.decodeIfPresent(Date.self, forKey: .createTime)
             ?? container.decodeIfPresent(Date.self, forKey: .create_time)
@@ -166,6 +195,7 @@ struct Attachment: Codable, Identifiable, Hashable {
         try container.encode(filename, forKey: .filename)
         try container.encode(type, forKey: .type)
         try container.encode(size, forKey: .size)
+        try container.encodeIfPresent(content, forKey: .content)
         try container.encodeIfPresent(externalLink, forKey: .externalLink)
         try container.encodeIfPresent(createTime, forKey: .createTime)
         try container.encodeIfPresent(memo, forKey: .memo)
@@ -174,32 +204,121 @@ struct Attachment: Codable, Identifiable, Hashable {
     var id: String { name }
     
     var isImage: Bool {
-        type.hasPrefix("image/")
-    }
-    
-    var thumbnailURL: String? {
-        if let link = externalLink, !link.isEmpty {
-            return link
+        let normalizedType = type.lowercased()
+        if normalizedType.hasPrefix("image/") {
+            return true
         }
-        // Fallback to internal file path: /file/resources/uid/filename
-        // We'll need to prepend the server URL in the UI layer or here if we have context.
-        // For now, return the internal path and handle it in the UI.
-        return "/file/\(name)"
+        let lowerFilename = filename.lowercased()
+        return [".png", ".jpg", ".jpeg", ".gif", ".webp", ".heic", ".bmp", ".svg"].contains {
+            lowerFilename.hasSuffix($0)
+        }
+    }
+
+    var embeddedContentData: Data? {
+        guard let content, !content.isEmpty else { return nil }
+        let raw = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let commaIndex = raw.firstIndex(of: ","), raw[..<commaIndex].contains("base64") {
+            let payload = String(raw[raw.index(after: commaIndex)...])
+            return Data(base64Encoded: payload, options: [.ignoreUnknownCharacters])
+        }
+        return Data(base64Encoded: raw, options: [.ignoreUnknownCharacters])
+    }
+
+    func resolvedURLs(serverURL: String) -> [URL] {
+        let normalizedBaseURL =
+            serverURL
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        var candidates: [URL] = []
+
+        if let link = externalLink?.trimmingCharacters(in: .whitespacesAndNewlines), !link.isEmpty {
+            if let absoluteURL = URL(string: link), absoluteURL.scheme != nil {
+                candidates.append(absoluteURL)
+            } else if !normalizedBaseURL.isEmpty {
+                if link.hasPrefix("/") {
+                    if let url = URL(string: normalizedBaseURL + link) {
+                        candidates.append(url)
+                    }
+                } else if let url = URL(string: normalizedBaseURL + "/" + link) {
+                    candidates.append(url)
+                }
+            } else if let url = URL(string: link) {
+                candidates.append(url)
+            }
+        }
+
+        guard !normalizedBaseURL.isEmpty else { return candidates }
+        let encodedName = name.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? name
+        let encodedFilename =
+            filename.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? filename
+
+        if !encodedFilename.isEmpty {
+            if let url = URL(
+                string: normalizedBaseURL + "/file/" + encodedName + "/" + encodedFilename)
+            {
+                candidates.append(url)
+            }
+            if name.hasPrefix("resources/"), let uid = name.split(separator: "/").last {
+                if let url = URL(string: normalizedBaseURL + "/o/r/\(uid)") {
+                    candidates.append(url)
+                }
+                if let url = URL(string: normalizedBaseURL + "/o/r/\(uid)/" + encodedFilename) {
+                    candidates.append(url)
+                }
+                if let url = URL(
+                    string: normalizedBaseURL + "/file/attachments/\(uid)/" + encodedFilename)
+                {
+                    candidates.append(url)
+                }
+            }
+            if name.hasPrefix("attachments/"), let uid = name.split(separator: "/").last {
+                if let url = URL(string: normalizedBaseURL + "/o/r/\(uid)") {
+                    candidates.append(url)
+                }
+                if let url = URL(string: normalizedBaseURL + "/o/r/\(uid)/" + encodedFilename) {
+                    candidates.append(url)
+                }
+                if let url = URL(
+                    string: normalizedBaseURL + "/file/attachments/\(uid)/" + encodedFilename)
+                {
+                    candidates.append(url)
+                }
+            }
+        }
+        if let url = URL(string: normalizedBaseURL + "/file/" + encodedName) {
+            candidates.append(url)
+        }
+
+        var deduped: [URL] = []
+        var seen: Set<String> = []
+        for url in candidates {
+            let key = url.absoluteString
+            if !seen.contains(key) {
+                seen.insert(key)
+                deduped.append(url)
+            }
+        }
+        return deduped
+    }
+
+    func resolvedURL(serverURL: String) -> URL? {
+        resolvedURLs(serverURL: serverURL).first
     }
 }
 
-struct Tag: Identifiable, Hashable {
-    let id = UUID()
+struct Tag: Identifiable, Hashable, Sendable {
+    let id: UUID
     let name: String
     var count: Int
     
     init(name: String, count: Int = 0) {
+        self.id = UUID()
         self.name = name
         self.count = count
     }
 }
 
-struct User: Codable, Identifiable {
+struct User: Codable, Identifiable, Sendable {
     let name: String          // Resource name, e.g. "users/1"
     let role: UserRole
     let username: String

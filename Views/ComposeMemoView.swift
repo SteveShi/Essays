@@ -2,7 +2,7 @@ import SwiftUI
 import CoreLocation
 
 struct ComposeMemoView: View {
-    @EnvironmentObject var appState: AppState
+    @Environment(AppState.self) var appState
     @Environment(\.dismiss) private var dismiss
     
     var editingMemo: Memo?
@@ -19,7 +19,7 @@ struct ComposeMemoView: View {
     @State private var attachmentNames: [String] = []
     @State private var suggestedTags: [String] = []
     
-    @StateObject private var locationManager = LocationManager()
+    @State private var locationManager = LocationManager()
 
     @State private var showMemoPicker = false
     @State private var showCamera = false
@@ -49,7 +49,7 @@ struct ComposeMemoView: View {
             }
             isContentFocused = true
         }
-        .onChange(of: content) { _, newValue in
+        .onChange(of: content, initial: false) { _, newValue in
             updateSuggestedTags(from: newValue)
         }
         .sheet(isPresented: $showCamera) {
@@ -256,7 +256,8 @@ struct ComposeMemoView: View {
                 )
                 .popover(isPresented: $showMemoPicker) {
                     MemoPicker(onSelect: { memo in
-                        content += " [Memo](\(memo.name))"
+                        content +=
+                            " [\(String(localized: "Memo", comment: "Label for linked memo reference"))](\(memo.name))"
                         showMemoPicker = false
                     })
                     .frame(width: 300, height: 400)
@@ -373,28 +374,23 @@ struct ComposeMemoView: View {
             Divider()
 
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
+                LazyHStack(spacing: 8) {
                     ForEach(uploadedAttachments) { attachment in
                         ZStack(alignment: .topTrailing) {
-                            let attachmentURL: URL? = {
-                                if let link = attachment.externalLink, !link.isEmpty {
-                                    return URL(string: link)
+                            if attachment.isImage {
+                                let attachmentURLs = attachment.resolvedURLs(
+                                    serverURL: appState.serverURL)
+                                AuthAsyncImage(urls: attachmentURLs) { image in
+                                    image
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fill)
+                                } placeholder: {
+                                    Rectangle()
+                                        .fill(LiquidGlassTheme.colors.tertiaryBackground)
                                 }
-                                let baseURL = appState.serverURL.trimmingCharacters(
-                                    in: .init(charactersIn: "/"))
-                                return URL(string: baseURL + "/file/" + attachment.name)
-                            }()
-
-                            AuthAsyncImage(url: attachmentURL) { image in
-                                image
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fill)
-                            } placeholder: {
-                                Rectangle()
-                                    .fill(LiquidGlassTheme.colors.tertiaryBackground)
+                                .frame(width: 80, height: 80)
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
                             }
-                            .frame(width: 80, height: 80)
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
 
                             Button {
                                 uploadedAttachments.removeAll { $0.id == attachment.id }
@@ -419,7 +415,7 @@ struct ComposeMemoView: View {
                 currentLocation = editingMemo?.location
             }
         }
-        .onChange(of: locationManager.location) { newLocation in
+        .onChange(of: locationManager.location, initial: false) { _, newLocation in
             if newLocation != nil {
                 currentLocation = newLocation
             }
@@ -484,14 +480,15 @@ struct ComposeMemoView: View {
         do {
             if let memo = editingMemo {
                 let updated = try await MemosAPIClient.shared.updateMemo(
-                    id: memo.id,
+                    id: memo.numericID,
+                    memoName: memo.name,
                     content: content,
                     visibility: visibility,
                     attachmentNames: attachmentNames,
                     location: currentLocation
                 )
                 
-                if let index = appState.memos.firstIndex(where: { $0.id == memo.id }) {
+                if let index = appState.memos.firstIndex(where: { $0.name == memo.name }) {
                     appState.memos[index] = updated
                 }
             } else {
@@ -512,7 +509,7 @@ struct ComposeMemoView: View {
 }
 
 struct MemoPicker: View {
-    @EnvironmentObject var appState: AppState
+    @Environment(AppState.self) var appState
     var onSelect: (Memo) -> Void
 
     var body: some View {

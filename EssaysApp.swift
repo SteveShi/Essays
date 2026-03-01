@@ -3,7 +3,7 @@
 @main
 struct EssaysApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
-    @StateObject private var appState = AppState()
+    @State private var appState = AppState()
     @AppStorage("theme") private var theme = "system"
     
     private var preferredColorScheme: ColorScheme? {
@@ -17,10 +17,14 @@ struct EssaysApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .environmentObject(appState)
+                .environment(appState)
                 .frame(minWidth: 900, minHeight: 600)
                 .task {
-                    await MemosAIAssistant.shared.initialize()
+                    if #available(macOS 26.0, *) {
+                        await MemosAIAssistant.shared.initialize()
+                    } else {
+                        // Fallback on earlier versions
+                    }
                 }
         }
         .windowToolbarStyle(.unified(showsTitle: true))
@@ -49,7 +53,7 @@ struct EssaysApp: App {
         
         Settings {
             SettingsView()
-                .environmentObject(appState)
+                .environment(appState)
                 .preferredColorScheme(preferredColorScheme)
         }
     }
@@ -66,4 +70,17 @@ extension Notification.Name {
     static let focusSearch = Notification.Name("focusSearch")
     static let toggleSidebar = Notification.Name("toggleSidebar")
     static let openSettings = Notification.Name("openSettings")
+}
+
+struct OpenSettingsKey: EnvironmentKey {
+    static let defaultValue: @Sendable () -> Void = {
+        NotificationCenter.default.post(name: .openSettings, object: nil)
+    }
+}
+
+extension EnvironmentValues {
+    var openSettings: @Sendable () -> Void {
+        get { self[OpenSettingsKey.self] }
+        set { self[OpenSettingsKey.self] = newValue }
+    }
 }
