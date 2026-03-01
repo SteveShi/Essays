@@ -46,6 +46,9 @@ struct ComposeMemoView: View {
             if let memo = editingMemo {
                 content = memo.content
                 visibility = memo.visibility
+                // 恢复已有附件和定位，防止保存时被空值覆盖
+                uploadedAttachments = memo.attachments
+                currentLocation = memo.location
             }
             isContentFocused = true
         }
@@ -419,13 +422,14 @@ struct ComposeMemoView: View {
         }
         .onAppear {
             if editingMemo == nil {
+                // 仅在新建模式下自动请求定位
                 locationManager.requestLocation()
-            } else {
-                currentLocation = editingMemo?.location
             }
+            // 编辑模式的 location 已在主 onAppear 中由 editingMemo 恢复
         }
         .onChange(of: locationManager.location, initial: false) { _, newLocation in
-            if newLocation != nil {
+            // 仅在用户主动请求定位或新建模式下更新
+            if newLocation != nil, editingMemo == nil || currentLocation == nil {
                 currentLocation = newLocation
             }
         }

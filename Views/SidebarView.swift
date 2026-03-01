@@ -544,7 +544,7 @@ struct SidebarCalendarView: View {
                     .frame(maxWidth: .infinity)
             }
             
-            ForEach(days, id: \.self) { date in
+            ForEach(days, id: \.timeIntervalSince1970) { date in
                 DayButton(date: date, currentMonth: currentMonth, calendar: calendar)
             }
         }

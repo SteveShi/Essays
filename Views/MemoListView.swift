@@ -366,7 +366,7 @@ struct MemoListView: View {
         VStack(alignment: .leading, spacing: 12) {
             SectionHeader(title: String(localized: "Pinned Inspiration", comment: "Section header for pinned memos"))
 
-            LazyVStack(spacing: 12) {
+            VStack(spacing: 12) {
                 ForEach(appState.pinnedMemosList) { memo in
                     MemoCard(memo: memo)
                         .onTapGesture {
@@ -383,11 +383,11 @@ struct MemoListView: View {
                 SectionHeader(title: String(localized: "Timeline", comment: "Section header for the timeline of memos"))
             }
 
-            ForEach(appState.timelineGroups, id: \.date) { group in
+            ForEach(appState.timelineGroups) { group in
                 VStack(alignment: .leading, spacing: 10) {
                     DaySectionHeader(date: group.date)
 
-                    LazyVStack(spacing: 12) {
+                    VStack(spacing: 12) {
                         ForEach(group.memos) { memo in
                             MemoCard(memo: memo)
                                 .onTapGesture {
@@ -558,7 +558,7 @@ struct MemoCard: View {
             headerView
 
             if !memo.content.isEmpty {
-                MarkdownView(content: memo.truncatedContent)
+                MemoMarkdownContent(content: memo.truncatedContent)
                     .textSelection(.enabled)
             }
 

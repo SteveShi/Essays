@@ -5,6 +5,12 @@ import Observation
 @MainActor
 @Observable
 class AppState {
+    struct MemoGroup: Identifiable {
+        let id: String
+        let date: Date
+        let memos: [Memo]
+    }
+
     var isLoggedIn: Bool = false
     var currentUser: User?
     var serverURL: String = ""
@@ -32,7 +38,7 @@ class AppState {
     private(set) var memosByName: [String: Memo] = [:]
     private(set) var filteredMemos: [Memo] = []
     private(set) var pinnedMemosList: [Memo] = []
-    private(set) var timelineGroups: [(date: Date, memos: [Memo])] = []
+    private(set) var timelineGroups: [MemoGroup] = []
     private(set) var memoDateComponents: Set<DateComponents> = []
     private(set) var todayMemosCount: Int = 0
     private(set) var recentWeekMemosCount: Int = 0
@@ -107,7 +113,13 @@ class AppState {
 
         self.timelineGroups =
             grouped
-            .map { (date: $0.key, memos: $0.value.sorted { $0.createdAt > $1.createdAt }) }
+            .map {
+                MemoGroup(
+                    id: "group-\($0.key.timeIntervalSince1970)",
+                    date: $0.key,
+                    memos: $0.value.sorted { $0.createdAt > $1.createdAt }
+                )
+            }
             .sorted { $0.date > $1.date }
     }
     

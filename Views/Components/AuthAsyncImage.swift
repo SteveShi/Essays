@@ -64,15 +64,21 @@ struct AuthAsyncImage<Content: View, Placeholder: View>: View {
 
     private func prepareLocalURL() async {
         guard !urls.isEmpty else {
-            self.hasFailed = true
+            await MainActor.run {
+                self.hasFailed = true
+            }
             return
         }
 
         // 调用静态助手方法在非隔离上下文中执行 I/O
         if let resultURL = await ImageStorageHelper.shared.ensureLocalImage(for: urls) {
-            self.localURL = resultURL
+            await MainActor.run {
+                self.localURL = resultURL
+            }
         } else {
-            self.hasFailed = true
+            await MainActor.run {
+                self.hasFailed = true
+            }
         }
     }
 }

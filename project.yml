@@ -8,7 +8,7 @@ options:
   defaultConfig: Release
 settings:
   base:
-    MARKETING_VERSION: 1.1.0
+    MARKETING_VERSION: 1.1.1
     CURRENT_PROJECT_VERSION: 2
 
 configs:
@@ -46,6 +46,9 @@ targets:
       properties:
         com.apple.security.app-sandbox: false
         com.apple.security.network.client: true
+    dependencies:
+      - package: MarkdownView
+        product: MarkdownView
 
   EssaysTests:
     type: bundle.unit-test
@@ -59,3 +62,8 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.essays.app.tests
         PRODUCT_NAME: EssaysTests
         GENERATE_INFOPLIST_FILE: true
+
+packages:
+  MarkdownView:
+    url: https://github.com/mudkipme/MarkdownView
+    branch: main
