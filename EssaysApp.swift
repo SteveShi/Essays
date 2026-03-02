@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 @main
 struct EssaysApp: App {
@@ -18,6 +19,7 @@ struct EssaysApp: App {
         WindowGroup {
             ContentView()
                 .environment(appState)
+                .preferredColorScheme(preferredColorScheme)
                 .frame(minWidth: 900, minHeight: 600)
                 .task {
                     if #available(macOS 26.0, *) {
@@ -74,7 +76,11 @@ extension Notification.Name {
 
 struct OpenSettingsKey: EnvironmentKey {
     static let defaultValue: @Sendable () -> Void = {
-        NotificationCenter.default.post(name: .openSettings, object: nil)
+        #if os(macOS)
+            Task { @MainActor in
+                NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+            }
+        #endif
     }
 }
 

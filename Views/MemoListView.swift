@@ -407,12 +407,14 @@ struct MemoListView: View {
         isQuickCaptureSaving = true
         defer { isQuickCaptureSaving = false }
 
+        let extractedTags = MemoUtility.extractTags(from: trimmed)
         let attachmentNames = quickCaptureAttachments.map { $0.name }
 
         do {
             let memo = try await MemosAPIClient.shared.createMemo(
                 content: trimmed,
                 visibility: quickCaptureVisibility,
+                tags: extractedTags,
                 attachmentNames: attachmentNames,
                 location: quickCaptureLocation
             )
@@ -437,7 +439,7 @@ struct MemoListView: View {
         if panel.runModal() == .OK {
             isQuickUploading = true
             let urls = panel.urls
-            Task.detached {
+            Task {
                 for url in urls {
                     do {
                         let data = try Data(contentsOf: url)
@@ -453,39 +455,29 @@ struct MemoListView: View {
                             filename: filename,
                             mimeType: mimeType
                         )
-                        await MainActor.run {
-                            self.quickCaptureAttachments.append(attachment)
-                        }
+                        self.quickCaptureAttachments.append(attachment)
                     } catch {
-                        await MainActor.run {
-                            self.appState.errorMessage = error.localizedDescription
-                        }
+                        self.appState.errorMessage = error.localizedDescription
                     }
                 }
-                await MainActor.run {
-                    self.isQuickUploading = false
-                }
+                self.isQuickUploading = false
             }
         }
     }
     private func uploadQuickPhoto(data: Data) {
         isQuickUploading = true
-        Task.detached {
+        Task {
             do {
                 let attachment = try await MemosAPIClient.shared.uploadAttachment(
                     data: data,
                     filename: "photo_\(Int(Date().timeIntervalSince1970)).jpg",
                     mimeType: "image/jpeg"
                 )
-                await MainActor.run {
-                    self.quickCaptureAttachments.append(attachment)
-                    self.isQuickUploading = false
-                }
+                self.quickCaptureAttachments.append(attachment)
+                self.isQuickUploading = false
             } catch {
-                await MainActor.run {
-                    self.appState.errorMessage = error.localizedDescription
-                    self.isQuickUploading = false
-                }
+                self.appState.errorMessage = error.localizedDescription
+                self.isQuickUploading = false
             }
         }
     }
@@ -500,8 +492,8 @@ struct MemoListView: View {
                 accessToken: appState.accessToken
             )
             
-            async let memos = try await MemosAPIClient.shared.fetchMemos()
-            appState.memos = try await memos
+            let memos = try await MemosAPIClient.shared.fetchMemos()
+            appState.memos = memos
         } catch {
             appState.errorMessage = error.localizedDescription
         }
@@ -624,6 +616,15 @@ struct MemoCard: View {
             Image(systemName: memo.visibility.icon)
                 .font(.system(size: 10))
                 .foregroundColor(LiquidGlassTheme.colors.tertiaryText)
+
+            if memo.isPendingSync {
+                Image(systemName: "icloud.and.arrow.up")
+                    .font(.system(size: 10))
+                    .foregroundColor(LiquidGlassTheme.colors.accent)
+                    .help(
+                        String(
+                            localized: "Pending Sync", comment: "Tooltip for pending sync status"))
+            }
 
             Spacer()
 
@@ -825,7 +826,7 @@ struct MemoCard: View {
             .padding(.top, 6)
 
             VStack(alignment: .leading, spacing: 4) {
-                ForEach(items, id: \.self) { relation in
+                ForEach(items) { relation in
                     let targetName =
                         relation.memo == memo.name ? relation.relatedMemo : relation.memo
                     let shortId =

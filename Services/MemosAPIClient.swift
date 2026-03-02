@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 import Observation
 
 @MainActor
@@ -58,16 +59,45 @@ class MemosAPIClient {
             let container = try decoder.singleValueContainer()
             let dateString = try container.decode(String.self)
             
-            let formatter = ISO8601DateFormatter()
-            // Try with fractional seconds first
-            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-            if let date = formatter.date(from: dateString) {
-                return date
+            // Standard ISO8601 variants
+            let formatters: [ISO8601DateFormatter] = [
+                {
+                    let f = ISO8601DateFormatter()
+                    f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+                    return f
+                }(),
+                {
+                    let f = ISO8601DateFormatter()
+                    f.formatOptions = [.withInternetDateTime]
+                    return f
+                }(),
+            ]
+
+            for formatter in formatters {
+                if let date = formatter.date(from: dateString) {
+                    return date
+                }
             }
-            // Fallback to basic ISO8601
-            formatter.formatOptions = [.withInternetDateTime]
-            if let date = formatter.date(from: dateString) {
-                return date
+
+            // Fallback for more aggressive fractional seconds (Memos Go backend sometimes returns many digits)
+            // Using a more manual approach if ISO8601DateFormatter fails
+            let commonDateFormatter = DateFormatter()
+            commonDateFormatter.calendar = Calendar(identifier: .iso8601)
+            commonDateFormatter.locale = Locale(identifier: "en_US_POSIX")
+            commonDateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+
+            let possibleFormats = [
+                "yyyy-MM-dd'T'HH:mm:ss.SSSSSSSSSXXXXX",
+                "yyyy-MM-dd'T'HH:mm:ss.SSSSSSXXXXX",
+                "yyyy-MM-dd'T'HH:mm:ss.SSSXXXXX",
+                "yyyy-MM-dd'T'HH:mm:ssXXXXX",
+            ]
+
+            for format in possibleFormats {
+                commonDateFormatter.dateFormat = format
+                if let date = commonDateFormatter.date(from: dateString) {
+                    return date
+                }
             }
             
             throw DecodingError.dataCorruptedError(in: container, debugDescription: "Cannot decode date: \(dateString)")
@@ -112,7 +142,7 @@ class MemosAPIClient {
     }
 
     struct MemoAttachmentResponse: Decodable {
-        let attachments: [Attachment]
+        let attachments: [AttachmentData]
     }
 
     struct MemoData: Decodable {
@@ -123,10 +153,10 @@ class MemosAPIClient {
         let visibility: String
         let pinned: Bool?
         let tags: [String]?
-        let attachments: [Attachment]?
-        let resources: [Attachment]?
-        let location: Location?
-        let relations: [Relation]?
+        let attachments: [AttachmentData]?
+        let resources: [AttachmentData]?
+        let location: LocationData?
+        let relations: [RelationData]?
         
         var extractedId: Int {
             if let idString = name.split(separator: "/").last, let id = Int(idString) {
@@ -135,7 +165,87 @@ class MemosAPIClient {
             return 0
         }
     }
-    
+
+    struct AttachmentData: Decodable {
+        let name: String
+        let filename: String
+        let type: String
+        let size: FlexibleSize
+        let content: String?
+        let externalLink: String?
+        let createTime: Date?
+
+        var sizeInt: Int64 {
+            size.value
+        }
+
+        enum FlexibleSize: Decodable {
+            case string(String)
+            case int(Int64)
+
+            var value: Int64 {
+                switch self {
+                case .string(let s): return Int64(s) ?? 0
+                case .int(let i): return i
+                }
+            }
+
+            init(from decoder: Decoder) throws {
+                let container = try decoder.singleValueContainer()
+                if let s = try? container.decode(String.self) {
+                    self = .string(s)
+                } else if let i = try? container.decode(Int64.self) {
+                    self = .int(i)
+                } else {
+                    self = .int(0)
+                }
+            }
+        }
+    }
+
+    struct LocationData: Decodable {
+        let placeholder: String?
+        let latitude: Double
+        let longitude: Double
+    }
+
+    struct RelationData: Decodable {
+        let memo: FlexibleMemoReference
+        let relatedMemo: FlexibleMemoReference
+        let type: String
+
+        enum FlexibleMemoReference: Decodable {
+            case string(String)
+            case object(ResourceReference)
+
+            var value: String {
+                switch self {
+                case .string(let s): return s
+                case .object(let obj): return obj.name
+                }
+            }
+
+            struct ResourceReference: Decodable {
+                let name: String
+            }
+
+            init(from decoder: Decoder) throws {
+                let container = try decoder.singleValueContainer()
+                if let s = try? container.decode(String.self) {
+                    self = .string(s)
+                } else if let obj = try? container.decode(ResourceReference.self) {
+                    self = .object(obj)
+                } else {
+                    throw DecodingError.typeMismatch(
+                        FlexibleMemoReference.self,
+                        DecodingError.Context(
+                            codingPath: decoder.codingPath,
+                            debugDescription: "Expected String or Object with 'name'"))
+                }
+            }
+        }
+    }
+
     func checkServerStatus() async throws -> ServerInfo {
         guard let url = buildURL("/api/v1/status") else {
             throw MemosAPIError.invalidURL
@@ -211,26 +321,90 @@ class MemosAPIClient {
 
         let request = buildRequest(url: url)
         
-        let response: MemoResponse = try await performRequest(request)
-        
-        var memos = response.memos.map { data in
-            let visibility = MemoVisibility(rawValue: data.visibility) ?? .private
-            return Memo(
-                name: data.name,
-                id: data.extractedId,
-                content: data.content,
-                createdAt: data.createTime,
-                updatedAt: data.updateTime,
-                visibility: visibility,
-                pinned: data.pinned ?? false,
-                tags: data.tags ?? [],
-                attachments: (data.attachments ?? []) + (data.resources ?? []),
-                location: data.location,
-                relations: data.relations ?? []
-            )
-        }
+        do {
+            let (data, response) = try await session.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse,
+                (200...299).contains(httpResponse.statusCode)
+            else {
+                throw MemosAPIError.invalidResponse
+            }
 
-        return memos
+            let memosData: [MemoData]
+            let decoder = makeDecoder()
+
+            if let memoResponse = try? decoder.decode(MemoResponse.self, from: data) {
+                memosData = memoResponse.memos
+            } else if let directMemos = try? decoder.decode([MemoData].self, from: data) {
+                memosData = directMemos
+            } else {
+                // Last ditch effort: decode and print error
+                do {
+                    _ = try decoder.decode([MemoData].self, from: data)
+                    memosData = []  // Should not reach here
+                } catch {
+                    print("Decoding failed for even direct array: \(error)")
+                    if let json = String(data: data, encoding: .utf8) {
+                        print("JSON sample: \(json.prefix(1000))")
+                    }
+                    throw MemosAPIError.decodingError(error)
+                }
+            }
+
+            let memos = memosData.map { data in
+                let visibility = MemoVisibility(rawValue: data.visibility) ?? .private
+                let location = data.location.map {
+                    Location(
+                        placeholder: $0.placeholder, latitude: $0.latitude, longitude: $0.longitude)
+                }
+                let attachments = ((data.attachments ?? []) + (data.resources ?? [])).map {
+                    Attachment(
+                        name: $0.name, filename: $0.filename, type: $0.type, size: $0.sizeInt,
+                        content: $0.content, externalLink: $0.externalLink,
+                        createTime: $0.createTime)
+                }
+                let relations = (data.relations ?? []).map {
+                    Relation(
+                        memo: $0.memo.value, relatedMemo: $0.relatedMemo.value,
+                        type: Relation.RelationType(rawValue: $0.type) ?? .unspecified)
+                }
+
+                let memoModel = Memo(
+                    name: data.name,
+                    numericID: data.extractedId,
+                    content: data.content,
+                    createdAt: data.createTime,
+                    updatedAt: data.updateTime,
+                    visibility: visibility,
+                    pinned: data.pinned ?? false,
+                    tags: data.tags ?? [],
+                    attachments: attachments,
+                    location: location,
+                    relations: relations
+                )
+                
+                // V0.26 fix: API tags array is often empty, manually extract from content
+                if memoModel.tags.isEmpty {
+                    memoModel.extractTagsFromContent()
+                }
+
+                return memoModel
+            }
+
+            // Background save to local database
+            Task { @MainActor in
+                LocalDatabase.shared.saveMemos(memos)
+            }
+
+            return memos
+        } catch {
+            // If network error or decoding error, try local cache
+            print("Fetch failed or decoding failed: \(error)")
+            let cached = await LocalDatabase.shared.fetchAllMemos()
+            if !cached.isEmpty {
+                return cached
+            }
+            throw error  // Rethrow if no cache available
+        }
     }
 
     private func fetchMemoAttachments(memoName: String) async throws -> [Attachment] {
@@ -252,7 +426,18 @@ class MemosAPIClient {
             let request = buildRequest(url: url)
             do {
                 let response: MemoAttachmentResponse = try await performRequest(request)
-                return try await hydrateAttachmentsIfNeeded(response.attachments)
+                let attachments = response.attachments.map { data in
+                    Attachment(
+                        name: data.name,
+                        filename: data.filename,
+                        type: data.type,
+                        size: data.sizeInt,
+                        content: data.content,
+                        externalLink: data.externalLink,
+                        createTime: data.createTime
+                    )
+                }
+                return try await hydrateAttachmentsIfNeeded(attachments)
             } catch {
                 lastError = error
             }
@@ -267,31 +452,24 @@ class MemosAPIClient {
     private func hydrateAttachmentsIfNeeded(_ attachments: [Attachment]) async throws
         -> [Attachment]
     {
-        try await withThrowingTaskGroup(of: (Int, Attachment).self) { group in
-            for (index, attachment) in attachments.enumerated() {
-                group.addTask {
-                    let hasInlineContent = !(attachment.content?.isEmpty ?? true)
-                    let hasExternalLink = !(attachment.externalLink?.isEmpty ?? true)
+        var results = attachments
+        for index in results.indices {
+            let attachment = results[index]
+            let hasInlineContent = !(attachment.content?.isEmpty ?? true)
+            let hasExternalLink = !(attachment.externalLink?.isEmpty ?? true)
 
-                    if (hasInlineContent || hasExternalLink) || attachment.name.isEmpty {
-                        return (index, attachment)
-                    }
-
-                    do {
-                        let detailed = try await self.fetchAttachment(resourceName: attachment.name)
-                        return (index, detailed)
-                    } catch {
-                        return (index, attachment)
-                    }
-                }
+            if (hasInlineContent || hasExternalLink) || attachment.name.isEmpty {
+                continue
             }
 
-            var results = attachments
-            for try await (index, detailed) in group {
+            do {
+                let detailed = try await self.fetchAttachment(resourceName: attachment.name)
                 results[index] = detailed
+            } catch {
+                print("Failed to hydrate attachment: \(error)")
             }
-            return results
         }
+        return results
     }
 
     private func fetchAttachment(resourceName: String) async throws -> Attachment {
@@ -302,20 +480,49 @@ class MemosAPIClient {
             throw MemosAPIError.invalidURL
         }
         let request = buildRequest(url: url)
-        return try await performRequest(request)
+        let data: AttachmentData = try await performRequest(request)
+        return Attachment(
+            name: data.name,
+            filename: data.filename,
+            type: data.type,
+            size: data.sizeInt,
+            content: data.content,
+            externalLink: data.externalLink,
+            createTime: data.createTime
+        )
     }
     
     func createMemo(
-        content: String, visibility: MemoVisibility? = nil, pinned: Bool? = nil,
+        content: String, visibility: MemoVisibility? = nil, tags: [String]? = nil,
+        pinned: Bool? = nil,
         attachmentNames: [String]? = nil, location: Location? = nil
     ) async throws -> Memo {
+        // Handle Offline State
+        if !NetworkMonitor.shared.isConnected {
+            let pendingMemo = Memo(
+                numericID: Int.random(in: 1000000...9999999),
+                content: content,
+                visibility: visibility ?? .private,
+                pinned: pinned ?? false,
+                tags: tags ?? [],
+                attachments: [],  // Simplified for offline
+                location: location,
+                isPendingSync: true
+            )
+            LocalDatabase.shared.saveMemos([pendingMemo])
+            return pendingMemo
+        }
+
         guard let url = buildURL("/api/v1/memos") else {
             throw MemosAPIError.invalidURL
         }
-        
+
         var body: [String: Any] = ["content": content]
         if let visibility = visibility {
             body["visibility"] = visibility.rawValue
+        }
+        if let tags = tags {
+            body["tags"] = tags
         }
         if let pinned = pinned {
             body["pinned"] = pinned
@@ -336,23 +543,46 @@ class MemosAPIClient {
         let data: MemoData = try await performRequest(request)
         let memoVisibility = MemoVisibility(rawValue: data.visibility) ?? .private
         
-        return Memo(
+        let localAttachments = ((data.attachments ?? []) + (data.resources ?? [])).map {
+            Attachment(
+                name: $0.name, filename: $0.filename, type: $0.type, size: $0.sizeInt,
+                content: $0.content, externalLink: $0.externalLink, createTime: $0.createTime)
+        }
+
+        let locationValue = data.location.map {
+            Location(placeholder: $0.placeholder, latitude: $0.latitude, longitude: $0.longitude)
+        }
+
+        let localRelations = (data.relations ?? []).map {
+            Relation(
+                memo: $0.memo.value, relatedMemo: $0.relatedMemo.value,
+                type: Relation.RelationType(rawValue: $0.type) ?? .unspecified)
+        }
+
+        let memoModel = Memo(
             name: data.name,
-            id: data.extractedId,
+            numericID: data.extractedId,
             content: data.content,
             createdAt: data.createTime,
             updatedAt: data.updateTime,
             visibility: memoVisibility,
             pinned: data.pinned ?? false,
             tags: data.tags ?? [],
-            attachments: (data.attachments ?? []) + (data.resources ?? []),
-            location: data.location,
-            relations: data.relations ?? []
+            attachments: localAttachments,
+            location: locationValue,
+            relations: localRelations
         )
+        
+        if memoModel.tags.isEmpty {
+            memoModel.extractTagsFromContent()
+        }
+
+        return memoModel
     }
     
     func updateMemo(
         id: Int, memoName: String? = nil, content: String, visibility: MemoVisibility? = nil,
+        tags: [String]? = nil,
         pinned: Bool? = nil,
         attachmentNames: [String]? = nil, location: Location? = nil
     ) async throws -> Memo {
@@ -371,6 +601,10 @@ class MemosAPIClient {
         if let visibility = visibility {
             body["visibility"] = visibility.rawValue
             updateMasks.append("visibility")
+        }
+        if let tags = tags {
+            body["tags"] = tags
+            updateMasks.append("tags")
         }
         if let pinned = pinned {
             body["pinned"] = pinned
@@ -400,19 +634,41 @@ class MemosAPIClient {
         let data: MemoData = try await performRequest(request)
         let memoVisibility = MemoVisibility(rawValue: data.visibility) ?? .private
         
-        return Memo(
+        let localAttachments = ((data.attachments ?? []) + (data.resources ?? [])).map {
+            Attachment(
+                name: $0.name, filename: $0.filename, type: $0.type, size: $0.sizeInt,
+                content: $0.content, externalLink: $0.externalLink, createTime: $0.createTime)
+        }
+
+        let locationValue = data.location.map {
+            Location(placeholder: $0.placeholder, latitude: $0.latitude, longitude: $0.longitude)
+        }
+
+        let localRelations = (data.relations ?? []).map {
+            Relation(
+                memo: $0.memo.value, relatedMemo: $0.relatedMemo.value,
+                type: Relation.RelationType(rawValue: $0.type) ?? .unspecified)
+        }
+
+        let memoModel = Memo(
             name: data.name,
-            id: data.extractedId,
+            numericID: data.extractedId,
             content: data.content,
             createdAt: data.createTime,
             updatedAt: data.updateTime,
             visibility: memoVisibility,
             pinned: data.pinned ?? false,
             tags: data.tags ?? [],
-            attachments: (data.attachments ?? []) + (data.resources ?? []),
-            location: data.location,
-            relations: data.relations ?? []
+            attachments: localAttachments,
+            location: locationValue,
+            relations: localRelations
         )
+        
+        if memoModel.tags.isEmpty {
+            memoModel.extractTagsFromContent()
+        }
+
+        return memoModel
     }
     
     func deleteMemo(id: Int, memoName: String? = nil) async throws {
@@ -451,19 +707,41 @@ class MemosAPIClient {
         let data: MemoData = try await performRequest(request)
         let visibility = MemoVisibility(rawValue: data.visibility) ?? .private
         
-        return Memo(
+        let attachments = (data.attachments ?? []).map {
+            Attachment(
+                name: $0.name, filename: $0.filename, type: $0.type, size: $0.sizeInt,
+                content: $0.content, externalLink: $0.externalLink, createTime: $0.createTime)
+        }
+
+        let locationValue = data.location.map {
+            Location(placeholder: $0.placeholder, latitude: $0.latitude, longitude: $0.longitude)
+        }
+
+        let relations = (data.relations ?? []).map {
+            Relation(
+                memo: $0.memo.value, relatedMemo: $0.relatedMemo.value,
+                type: Relation.RelationType(rawValue: $0.type) ?? .unspecified)
+        }
+
+        let memoModel = Memo(
             name: data.name,
-            id: data.extractedId,
+            numericID: data.extractedId,
             content: data.content,
             createdAt: data.createTime,
             updatedAt: data.updateTime,
             visibility: visibility,
             pinned: data.pinned ?? false,
             tags: data.tags ?? [],
-            attachments: (data.attachments ?? []) + (data.resources ?? []),
-            location: data.location,
-            relations: data.relations ?? []
+            attachments: attachments,
+            location: locationValue,
+            relations: relations
         )
+        
+        if memoModel.tags.isEmpty {
+            memoModel.extractTagsFromContent()
+        }
+
+        return memoModel
     }
     
     func fetchTags() async throws -> [Tag] {
@@ -474,6 +752,10 @@ class MemosAPIClient {
     
     func uploadAttachment(data: Data, filename: String, mimeType: String) async throws -> Attachment
     {
+        guard NetworkMonitor.shared.isConnected else {
+            throw MemosAPIError.serverError("Cannot upload attachment while offline")
+        }
+
         guard let url = buildURL("/api/v1/attachments") else {
             throw MemosAPIError.invalidURL
         }
@@ -488,7 +770,40 @@ class MemosAPIClient {
         let request = buildRequest(
             url: url, method: "POST", body: try? JSONSerialization.data(withJSONObject: body))
         
-        return try await performRequest(request)
+        let response: AttachmentData = try await performRequest(request)
+        return Attachment(
+            name: response.name,
+            filename: response.filename,
+            type: response.type,
+            size: response.sizeInt,
+            content: response.content,
+            externalLink: response.externalLink,
+            createTime: response.createTime
+        )
+    }
+
+    func syncPendingMemos() async {
+        guard NetworkMonitor.shared.isConnected else { return }
+
+        let pending = await LocalDatabase.shared.fetchAllMemos().filter { $0.isPendingSync }
+        guard !pending.isEmpty else { return }
+
+        print("Syncing \(pending.count) pending memos...")
+
+        for memo in pending {
+            do {
+                _ = try await createMemo(
+                    content: memo.content,
+                    visibility: memo.visibility,
+                    pinned: memo.pinned,
+                    location: memo.location
+                )
+                // Success! Delete the pending one or update it
+                LocalDatabase.shared.deleteMemo(memo)
+            } catch {
+                print("Failed to sync memo: \(error)")
+            }
+        }
     }
 }
 
@@ -509,11 +824,11 @@ enum MemosAPIError: Error, LocalizedError {
         case .unauthorized:
             return String(localized: "Authentication required")
         case .httpError(let code):
-            return String(format: String(localized: "HTTP error: %@"), String(code))
+            return String(localized: "HTTP Error \(code)")
         case .serverError(let message):
-            return String(format: String(localized: "Server error: %@"), message)
+            return message
         case .decodingError(let error):
-            return String(format: String(localized: "Data decoding error: %@"), error.localizedDescription)
+            return error.localizedDescription
         }
     }
 }

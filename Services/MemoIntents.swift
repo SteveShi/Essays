@@ -17,6 +17,7 @@ struct MemoIntent: AppIntent {
         }
     }
     
+    @MainActor
     func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var memoContent = content
         let userDefaults = UserDefaults.standard

@@ -1,6 +1,7 @@
 import Foundation
 import SwiftUI
 import Observation
+import SwiftData
 
 @MainActor
 @Observable
@@ -11,10 +12,16 @@ class AppState {
         let memos: [Memo]
     }
 
-    var isLoggedIn: Bool = false
-    var currentUser: User?
     var serverURL: String = ""
     var accessToken: String = ""
+    var isOnline: Bool
+    var appVersion: String {
+        let version =
+            Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
+        return "\(version) (\(build))"
+    }
+
     var memos: [Memo] = [] {
         didSet {
             updateRawDataDerivedStates()
@@ -33,6 +40,9 @@ class AppState {
         didSet { updateFilteredMemosState() }
     }
     var showArchived: Bool = false
+    var isLoggedIn: Bool = false
+    var currentUser: User?
+    var user: User? { currentUser }  // 为向后兼容保留
 
     // Pre-computed filtered and grouped results
     private(set) var memosByName: [String: Memo] = [:]
@@ -51,8 +61,36 @@ class AppState {
     private let currentUserKey = "memos_current_user"
     
     init() {
+        self.isOnline = NetworkMonitor.shared.isConnected
         loadSavedCredentials()
+        loadLocalCachedMemos()  // 优先加载本地缓存
+        setupNetworkMonitoring()
         updateFilteredMemosState()  // Initial computation
+    }
+
+    private func setupNetworkMonitoring() {
+        _ = withObservationTracking {
+            NetworkMonitor.shared.isConnected
+        } onChange: { [weak self] in
+            Task { @MainActor in
+                self?.isOnline = NetworkMonitor.shared.isConnected
+                if NetworkMonitor.shared.isConnected {
+                    self?.syncPendingMemos()
+                }
+            }
+        }
+    }
+
+    private func loadLocalCachedMemos() {
+        let cached = LocalDatabase.shared.fetchAllMemos()
+        if !cached.isEmpty {
+            self.memos = cached
+        }
+    }
+
+    private func syncPendingMemos() {
+        // 同步逻辑将在后续 MemosAPIClient 改造中完善
+        print("Network restored, checking for pending syncs...")
     }
 
     private func scheduleFilteredUpdate() {
@@ -69,10 +107,17 @@ class AppState {
     private func updateRawDataDerivedStates() {
         // 更新以 Name 为索引的快速查找字典
         var byName: [String: Memo] = [:]
+        var tagCounts: [String: Int] = [:]
+
         for memo in memos {
             byName[memo.name] = memo
+            for tag in memo.tags {
+                tagCounts[tag, default: 0] += 1
+            }
         }
         self.memosByName = byName
+        self.tags = tagCounts.map { Tag(name: $0.key, count: $0.value) }
+            .sorted { $0.count > $1.count || ($0.count == $1.count && $0.name < $1.name) }
 
         let calendar = Calendar.current
 
@@ -163,15 +208,19 @@ class AppState {
     }
     
     private func computeFilteredMemos() -> [Memo] {
+        print(
+            "Computing filters: total memos: \(memos.count), searchText: '\(searchText)', selectedTag: '\(selectedTag ?? "nil")'")
         var result = memos
         let (keywordTerms, pinnedFilter, visibilityFilter, createdFilter) = parseSearchFilters(from: searchText)
         
         if let pinnedFilter {
             result = result.filter { $0.pinned == pinnedFilter }
+            print("After pinned filter: \(result.count)")
         }
         
         if let visibilityFilter {
             result = result.filter { $0.visibility == visibilityFilter }
+            print("After visibility filter (\(visibilityFilter)): \(result.count)")
         }
         
         if let createdFilter {
@@ -186,23 +235,26 @@ class AppState {
             case .specificDate(let date):
                 result = result.filter { calendar.isDate($0.createdAt, inSameDayAs: date) }
             }
+            print("After created filter: \(result.count)")
         }
         
         if !keywordTerms.isEmpty {
             result = result.filter { memo in
                 keywordTerms.allSatisfy { term in
-                    // 安全检查：跳过过短或空的词项
                     guard !term.isEmpty else { return true }
                     return memo.content.localizedCaseInsensitiveContains(term)
                         || memo.tags.contains { $0.localizedCaseInsensitiveContains(term) }
                 }
             }
+            print("After keyword filter: \(result.count)")
         }
         
         if let tag = selectedTag {
             result = result.filter { $0.tags.contains(tag) }
+            print("After tag filter: \(result.count)")
         }
         
+        print("Final filtered memos: \(result.count)")
         return result.sorted { $0.pinned && !$1.pinned || ($0.pinned == $1.pinned && $0.createdAt > $1.createdAt) }
     }
     
@@ -225,7 +277,7 @@ class AppState {
                 pinnedFilter = false
             case "visibility:public":
                 visibilityFilter = .public
-            case "visibility:protected":
+            case "visibility:workspace", "visibility:protected":
                 visibilityFilter = .protected
             case "visibility:private":
                 visibilityFilter = .private

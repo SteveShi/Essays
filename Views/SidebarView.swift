@@ -172,6 +172,17 @@ struct SidebarView: View {
                 }
                 
                 SidebarItem(
+                    icon: MemoVisibility.protected.icon,
+                    title: MemoVisibility.protected.displayName,
+                    count: appState.memos.filter { $0.visibility == .protected }.count,
+                    isSelected: appState.searchText.lowercased().contains("visibility:workspace")
+                        || appState.searchText.lowercased().contains("visibility:protected")
+                ) {
+                    appState.searchText = "visibility:workspace"
+                    appState.selectedTag = nil
+                }
+
+                SidebarItem(
                     icon: "lock",
                     title: String(localized: "Private", comment: "Sidebar item for private memos"),
                     count: appState.privateMemosCount,
@@ -196,14 +207,18 @@ struct SidebarView: View {
                 )
             
             VStack(alignment: .leading, spacing: 2) {
-                Text(appState.currentUser?.displayNameResolved ?? String(localized: "Me", comment: "Fallback for user display name"))
+                Text(
+                    appState.currentUser?.displayNameResolved
+                        ?? String(localized: "Guest", comment: "Fallback for user display name"))
                     .font(LiquidGlassTheme.typography.subheadline)
                     .foregroundColor(LiquidGlassTheme.colors.text)
                 
-                Text(appState.serverURL.replacingOccurrences(of: "https://", with: "").replacingOccurrences(of: "http://", with: ""))
+                Text(
+                    appState.isOnline
+                        ? String(localized: "Online", comment: "Network status: Online")
+                        : String(localized: "Offline", comment: "Network status: Offline"))
                     .font(LiquidGlassTheme.typography.caption)
-                    .foregroundColor(LiquidGlassTheme.colors.tertiaryText)
-                    .lineLimit(1)
+                .foregroundColor(appState.isOnline ? .green : .secondary)
             }
             
             Spacer()

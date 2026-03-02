@@ -52,6 +52,21 @@ struct SettingsView: View {
             }
             
             Section {
+                LabeledContent(String(localized: "Network Status", comment: "Network status label"))
+                {
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(appState.isOnline ? Color.green : Color.red)
+                            .frame(width: 8, height: 8)
+                        Text(
+                            appState.isOnline
+                                ? String(localized: "Online", comment: "Network status: Online")
+                                : String(localized: "Offline", comment: "Network status: Offline")
+                        )
+                        .foregroundColor(.secondary)
+                    }
+                }
+
                 Toggle(String(localized: "Auto-save drafts", comment: "Toggle for auto-save"), isOn: $autoSave)
             } header: {
                 Text(String(localized: "Behavior", comment: "Behavior section header"))
@@ -185,11 +200,21 @@ struct SettingsView: View {
             }
             
             Section {
+                LabeledContent(
+                    String(localized: "Version", comment: "App version label"),
+                    value: appState.appVersion)
+
                 LabeledContent(String(localized: "Server", comment: "Server info label"), value: appState.serverURL)
                 
-                LabeledContent(String(localized: "Total Memos", comment: "Memos count label"), value: "\(appState.memos.count)")
+                LabeledContent(
+                    String(localized: "Total Memos", comment: "Memos count label"),
+                    value: String(
+                        localized: "\(appState.memos.count)", comment: "Total memos count value"))
                 
-                LabeledContent(String(localized: "Total Tags", comment: "Tags count label"), value: "\(appState.tags.count)")
+                LabeledContent(
+                    String(localized: "Total Tags", comment: "Tags count label"),
+                    value: String(
+                        localized: "\(appState.tags.count)", comment: "Total tags count value"))
             } header: {
                 Text(String(localized: "Statistics", comment: "Statistics section header"))
                     .font(LiquidGlassTheme.typography.headline)

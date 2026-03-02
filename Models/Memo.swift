@@ -1,20 +1,64 @@
 import Foundation
+import SwiftData
 
-struct Memo: Codable, Identifiable, Hashable, Equatable, Sendable {
-    let name: String          // Full resource name, e.g. "memos/123" or "memos/uid"
-    let numericID: Int  // Extracted numeric ID from name for legacy compat
-    let content: String
-    let createdAt: Date
-    let updatedAt: Date
-    let visibility: MemoVisibility
-    let pinned: Bool
-    let tags: [String]
-    let attachments: [Attachment]
-    let location: Location?
-    let relations: [Relation]
+@Model
+final class Memo: Identifiable {
+    @Attribute(.unique) var name: String  // Full resource name, e.g. "memos/123"
+    var numericID: Int
+    var content: String
+    var createdAt: Date
+    var updatedAt: Date
+    var visibilityRaw: String
+    var pinned: Bool
+    var tags: [String]
+    var isPendingSync: Bool = false
+
+    // Relationships
+    @Relationship(deleteRule: .cascade, inverse: \Attachment.parentMemo) var attachments:
+        [Attachment]
+    @Relationship(deleteRule: .cascade, inverse: \Location.parentMemo) var location: Location?
+    @Relationship(deleteRule: .cascade, inverse: \Relation.parentMemo) var relations: [Relation]
     
     var id: String { name }
+    
+    var visibility: MemoVisibility {
+        get { MemoVisibility(rawValue: visibilityRaw) ?? .private }
+        set { visibilityRaw = newValue.rawValue }
+    }
 
+    init(
+        name: String = "",
+        numericID: Int,
+        content: String,
+        createdAt: Date = Date(),
+        updatedAt: Date = Date(),
+        visibility: MemoVisibility = .private,
+        pinned: Bool = false,
+        tags: [String] = [],
+        attachments: [Attachment] = [],
+        location: Location? = nil,
+        relations: [Relation] = [],
+        isPendingSync: Bool = false
+    ) {
+        self.name = name.isEmpty ? "memos/pending-\(UUID().uuidString)" : name
+        self.numericID = numericID
+        self.content = content
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.visibilityRaw = visibility.rawValue
+        self.pinned = pinned
+        self.tags = tags
+        self.attachments = attachments
+        self.location = location
+        self.relations = relations
+        self.isPendingSync = isPendingSync
+    }
+    func extractTagsFromContent() {
+        self.tags = MemoUtility.extractTags(from: self.content)
+    }
+}
+
+extension Memo {
     var truncatedContent: String {
         let lines = content.components(separatedBy: "\n")
         let limitedLines = lines.prefix(10)
@@ -41,103 +85,47 @@ struct Memo: Codable, Identifiable, Hashable, Equatable, Sendable {
     }()
 }
 
-// Move custom init to extension to preserve Codable synthesis
-extension Memo {
-    init(
-        name: String = "",
-        id: Int,
-        content: String,
-        createdAt: Date = Date(),
-        updatedAt: Date = Date(),
-        visibility: MemoVisibility = .private,
-        pinned: Bool = false,
-        tags: [String] = [],
-        attachments: [Attachment]? = [],
-        location: Location? = nil,
-        relations: [Relation] = []
-    ) {
-        self.name = name.isEmpty ? "memos/\(id)" : name
-        self.numericID = id
-        self.content = content
-        self.createdAt = createdAt
-        self.updatedAt = updatedAt
-        self.visibility = visibility
-        self.pinned = pinned
-        self.tags = tags
-        self.attachments = attachments ?? []
-        self.location = location
-        self.relations = relations
-    }
-}
+@Model
+final class Relation: Identifiable {
+    var memo: String
+    var relatedMemo: String
+    var typeRaw: String
+    var parentMemo: Memo?
 
-struct Relation: Codable, Hashable, Equatable, Sendable {
-    let memo: String  // The memo that has the relation
-    let relatedMemo: String  // The memo that is related
-    let type: RelationType
-
-    enum CodingKeys: String, CodingKey {
-        case memo, relatedMemo, type
+    var type: RelationType {
+        get { RelationType(rawValue: typeRaw) ?? .unspecified }
+        set { typeRaw = newValue.rawValue }
     }
 
-    // Struct to handle the dict format returned in Memos v0.22
-    struct MemoRef: Codable {
-        let name: String
+    init(memo: String, relatedMemo: String, type: RelationType, parentMemo: Memo? = nil) {
+        self.memo = memo
+        self.relatedMemo = relatedMemo
+        self.typeRaw = type.rawValue
+        self.parentMemo = parentMemo
     }
 
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        self.type = try container.decode(RelationType.self, forKey: .type)
-
-        if let memoStr = try? container.decode(String.self, forKey: .memo) {
-            self.memo = memoStr
-        } else {
-            let ref = try container.decode(MemoRef.self, forKey: .memo)
-            self.memo = ref.name
-        }
-
-        if let relatedMemoStr = try? container.decode(String.self, forKey: .relatedMemo) {
-            self.relatedMemo = relatedMemoStr
-        } else {
-            let ref = try container.decode(MemoRef.self, forKey: .relatedMemo)
-            self.relatedMemo = ref.name
-        }
+    var id: String {
+        "\(memo)-\(relatedMemo)-\(typeRaw)"
     }
 
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(type, forKey: .type)
-        try container.encode(memo, forKey: .memo)
-        try container.encode(relatedMemo, forKey: .relatedMemo)
-    }
-
-    enum RelationType: String, Codable, Hashable, Equatable {
+    enum RelationType: String, Codable, CaseIterable, Sendable {
         case reference = "REFERENCE"
         case comment = "COMMENT"
         case unspecified = "RELATION_TYPE_UNSPECIFIED"
-
-        init(from decoder: Decoder) throws {
-            let container = try decoder.singleValueContainer()
-            let label = try container.decode(String.self)
-            self = RelationType(rawValue: label) ?? .unspecified
-        }
-
-        func encode(to encoder: Encoder) throws {
-            var container = encoder.singleValueContainer()
-            try container.encode(self.rawValue)
-        }
     }
 }
 
-enum MemoVisibility: String, Codable, CaseIterable, Hashable, Equatable {
+enum MemoVisibility: String, Codable, CaseIterable, Sendable {
     case `public` = "PUBLIC"
     case `protected` = "PROTECTED"
     case `private` = "PRIVATE"
     
     var displayName: String {
         switch self {
-        case .public: return String(localized: "Public")
-        case .protected: return String(localized: "Protected")
-        case .private: return String(localized: "Private")
+        case .public: return String(localized: "Public", comment: "Visibility status: Public")
+        case .protected:
+            return String(localized: "Workspace", comment: "Visibility status: Workspace")
+        case .private: return String(localized: "Private", comment: "Visibility status: Private")
         }
     }
     
@@ -150,58 +138,38 @@ enum MemoVisibility: String, Codable, CaseIterable, Hashable, Equatable {
     }
 }
 
-struct Attachment: Codable, Identifiable, Hashable, Equatable, Sendable {
-    let name: String
-    let filename: String
-    let type: String
-    let size: Int64
-    let content: String?
+@Model
+final class Attachment: Identifiable {
+    @Attribute(.unique) var name: String
+    var filename: String
+    var type: String
+    var size: Int64
+    var content: String?
     var externalLink: String?
-    let createTime: Date?
-    let memo: String?
+    var createTime: Date?
+    var memoName: String?
+    var parentMemo: Memo?
 
-    enum CodingKeys: String, CodingKey {
-        case name, filename, type, size, content, externalLink, createTime, memo
-        case create_time, external_link  // Legacy compat if needed
-    }
-
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        name = try container.decodeIfPresent(String.self, forKey: .name) ?? ""
-        filename = try container.decodeIfPresent(String.self, forKey: .filename) ?? ""
-        type = try container.decodeIfPresent(String.self, forKey: .type) ?? ""
-
-        // Handle size as Int64 or String
-        if let intSize = try? container.decode(Int64.self, forKey: .size) {
-            size = intSize
-        } else if let stringSize = try? container.decode(String.self, forKey: .size),
-            let intSize = Int64(stringSize)
-        {
-            size = intSize
-        } else {
-            size = 0
-        }
-
-        externalLink =
-            try container.decodeIfPresent(String.self, forKey: .externalLink)
-            ?? container.decodeIfPresent(String.self, forKey: .external_link)
-        content = try container.decodeIfPresent(String.self, forKey: .content)
-        createTime =
-            try container.decodeIfPresent(Date.self, forKey: .createTime)
-            ?? container.decodeIfPresent(Date.self, forKey: .create_time)
-        memo = try container.decodeIfPresent(String.self, forKey: .memo)
-    }
-
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(name, forKey: .name)
-        try container.encode(filename, forKey: .filename)
-        try container.encode(type, forKey: .type)
-        try container.encode(size, forKey: .size)
-        try container.encodeIfPresent(content, forKey: .content)
-        try container.encodeIfPresent(externalLink, forKey: .externalLink)
-        try container.encodeIfPresent(createTime, forKey: .createTime)
-        try container.encodeIfPresent(memo, forKey: .memo)
+    init(
+        name: String,
+        filename: String,
+        type: String,
+        size: Int64,
+        content: String? = nil,
+        externalLink: String? = nil,
+        createTime: Date? = nil,
+        memoName: String? = nil,
+        parentMemo: Memo? = nil
+    ) {
+        self.name = name
+        self.filename = filename
+        self.type = type
+        self.size = size
+        self.content = content
+        self.externalLink = externalLink
+        self.createTime = createTime
+        self.memoName = memoName
+        self.parentMemo = parentMemo
     }
     
     var id: String { name }
@@ -228,25 +196,18 @@ struct Attachment: Codable, Identifiable, Hashable, Equatable, Sendable {
     }
 
     func resolvedURLs(serverURL: String) -> [URL] {
-        let normalizedBaseURL =
-            serverURL
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        let normalizedBaseURL = serverURL.trimmingCharacters(in: .whitespaces).trimmingCharacters(
+            in: CharacterSet(charactersIn: "/"))
         var candidates: [URL] = []
 
-        if let link = externalLink?.trimmingCharacters(in: .whitespacesAndNewlines), !link.isEmpty {
+        if let link = externalLink?.trimmingCharacters(in: .whitespaces), !link.isEmpty {
             if let absoluteURL = URL(string: link), absoluteURL.scheme != nil {
                 candidates.append(absoluteURL)
             } else if !normalizedBaseURL.isEmpty {
-                if link.hasPrefix("/") {
-                    if let url = URL(string: normalizedBaseURL + link) {
-                        candidates.append(url)
-                    }
-                } else if let url = URL(string: normalizedBaseURL + "/" + link) {
+                let separator = link.hasPrefix("/") ? "" : "/"
+                if let url = URL(string: normalizedBaseURL + separator + link) {
                     candidates.append(url)
                 }
-            } else if let url = URL(string: link) {
-                candidates.append(url)
             }
         }
 
@@ -263,38 +224,6 @@ struct Attachment: Codable, Identifiable, Hashable, Equatable, Sendable {
             {
                 candidates.append(url)
             }
-            if name.hasPrefix("resources/"), let uid = name.split(separator: "/").last {
-                if let url = URL(string: normalizedBaseURL + "/o/r/\(uid)" + thumbnailQuery) {
-                    candidates.append(url)
-                }
-                if let url = URL(
-                    string: normalizedBaseURL + "/o/r/\(uid)/" + encodedFilename + thumbnailQuery)
-                {
-                    candidates.append(url)
-                }
-                if let url = URL(
-                    string: normalizedBaseURL + "/file/attachments/\(uid)/" + encodedFilename
-                        + thumbnailQuery)
-                {
-                    candidates.append(url)
-                }
-            }
-            if name.hasPrefix("attachments/"), let uid = name.split(separator: "/").last {
-                if let url = URL(string: normalizedBaseURL + "/o/r/\(uid)" + thumbnailQuery) {
-                    candidates.append(url)
-                }
-                if let url = URL(
-                    string: normalizedBaseURL + "/o/r/\(uid)/" + encodedFilename + thumbnailQuery)
-                {
-                    candidates.append(url)
-                }
-                if let url = URL(
-                    string: normalizedBaseURL + "/file/attachments/\(uid)/" + encodedFilename
-                        + thumbnailQuery)
-                {
-                    candidates.append(url)
-                }
-            }
         }
         if let url = URL(string: normalizedBaseURL + "/file/" + encodedName) {
             candidates.append(url)
@@ -303,9 +232,8 @@ struct Attachment: Codable, Identifiable, Hashable, Equatable, Sendable {
         var deduped: [URL] = []
         var seen: Set<String> = []
         for url in candidates {
-            let key = url.absoluteString
-            if !seen.contains(key) {
-                seen.insert(key)
+            if !seen.contains(url.absoluteString) {
+                seen.insert(url.absoluteString)
                 deduped.append(url)
             }
         }
@@ -316,5 +244,3 @@ struct Attachment: Codable, Identifiable, Hashable, Equatable, Sendable {
         resolvedURLs(serverURL: serverURL).first
     }
 }
-
-

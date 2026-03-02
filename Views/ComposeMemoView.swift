@@ -447,7 +447,7 @@ struct ComposeMemoView: View {
         if panel.runModal() == .OK {
             isUploading = true
             let urls = panel.urls
-            Task.detached {
+            Task {
                 for url in urls {
                     do {
                         let data = try Data(contentsOf: url)
@@ -463,49 +463,36 @@ struct ComposeMemoView: View {
                             filename: filename,
                             mimeType: mimeType
                         )
-                        await MainActor.run {
-                            self.uploadedAttachments.append(attachment)
-                        }
+                        self.uploadedAttachments.append(attachment)
                     } catch {
-                        await MainActor.run {
-                            self.errorMessage = error.localizedDescription
-                        }
+                        self.errorMessage = error.localizedDescription
                     }
                 }
-                await MainActor.run {
-                    self.isUploading = false
-                }
+                self.isUploading = false
             }
         }
     }
 
     private func uploadPhoto(data: Data) {
         isUploading = true
-        Task.detached {
+        Task {
             do {
                 let attachment = try await MemosAPIClient.shared.uploadAttachment(
                     data: data,
                     filename: "photo_\(Int(Date().timeIntervalSince1970)).jpg",
                     mimeType: "image/jpeg"
                 )
-                await MainActor.run {
-                    self.uploadedAttachments.append(attachment)
-                    self.isUploading = false
-                }
+                self.uploadedAttachments.append(attachment)
+                self.isUploading = false
             } catch {
-                await MainActor.run {
-                    self.errorMessage = error.localizedDescription
-                    self.isUploading = false
-                }
+                self.errorMessage = error.localizedDescription
+                self.isUploading = false
             }
         }
     }
 
     private func saveMemo() async {
-        isSaving = true
-        errorMessage = nil
-        defer { isSaving = false }
-        
+        let extractedTags = MemoUtility.extractTags(from: content)
         let attachmentNames = uploadedAttachments.map { $0.name }
 
         do {
@@ -515,6 +502,7 @@ struct ComposeMemoView: View {
                     memoName: memo.name,
                     content: content,
                     visibility: visibility,
+                    tags: extractedTags,
                     attachmentNames: attachmentNames,
                     location: currentLocation
                 )

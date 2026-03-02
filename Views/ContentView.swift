@@ -27,9 +27,7 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .createNewMemo)) { _ in
             showComposeSheet = true
         }
-        .onReceive(NotificationCenter.default.publisher(for: .openSettings)) { _ in
-            openSettings()
-        }
+        .environment(appState)
         .sheet(isPresented: $showComposeSheet) {
             ComposeMemoView()
         }
@@ -65,6 +63,7 @@ struct ContentView: View {
         }
     }
 
+    @MainActor
     private func refreshMemos() async {
         appState.isLoading = true
         defer { appState.isLoading = false }
@@ -75,11 +74,11 @@ struct ContentView: View {
                 accessToken: appState.accessToken
             )
 
-            async let memos = try await MemosAPIClient.shared.fetchMemos()
-            async let tags = try await MemosAPIClient.shared.fetchTags()
+            let fetchedMemos = try await MemosAPIClient.shared.fetchMemos()
+            let fetchedTags = try await MemosAPIClient.shared.fetchTags()
 
-            appState.memos = try await memos
-            appState.tags = try await tags
+            appState.memos = fetchedMemos
+            appState.tags = fetchedTags
         } catch {
             appState.errorMessage = error.localizedDescription
         }

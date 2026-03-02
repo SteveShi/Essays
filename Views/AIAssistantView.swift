@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 @available(macOS 26.0, *)
 struct AIAssistantView: View {
@@ -138,7 +139,8 @@ struct AIAssistantView: View {
                 
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
-                        Text(currentAction?.title ?? "")
+                        Text(
+                            (currentAction?.title ?? "").isEmpty ? "" : (currentAction?.title ?? ""))
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundColor(.secondary)
                             .textCase(.uppercase)
