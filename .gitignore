@@ -63,3 +63,5 @@ Essays.xcodeproj/
 *.log
 *.log
 *.txt
+skills-lock.json
+/.agents
