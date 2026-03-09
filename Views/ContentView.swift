@@ -27,6 +27,9 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .createNewMemo)) { _ in
             showComposeSheet = true
         }
+        .onReceive(NotificationCenter.default.publisher(for: .openSettings)) { _ in
+            openSettings()
+        }
         .environment(appState)
         .sheet(isPresented: $showComposeSheet) {
             ComposeMemoView()

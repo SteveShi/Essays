@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1] - 2026-03-09
+
+### Fixed
+- Fixed settings button not responding in sidebar and menu bar.
+- Finalized all localizations for English and Simplified Chinese.
+
 ## [1.3.0] - 2026-03-09
 
 ### Added
