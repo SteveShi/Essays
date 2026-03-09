@@ -19,6 +19,7 @@ struct MemoListView: View {
     
     @State private var locationManager = LocationManager()
     @State private var hoveredMemoId: String? = nil
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         VStack(spacing: 0) {
@@ -314,9 +315,8 @@ struct MemoListView: View {
             .background(
                 ZStack {
                     RoundedRectangle(cornerRadius: 14)
-                        .fill(.ultraThinMaterial)
-                    RoundedRectangle(cornerRadius: 14)
-                        .fill(LiquidGlassTheme.colors.cardBackground.opacity(0.6))
+                        .fill(LiquidGlassTheme.colors.cardFill(isHovered: false, colorScheme: colorScheme))
+                        .glassEffect()
                 }
                 .shadow(color: .black.opacity(0.08), radius: 12, x: 0, y: 4)
                 .overlay(
@@ -540,6 +540,7 @@ private struct DaySectionHeader: View {
 
 struct MemoCard: View {
     @Environment(AppState.self) var appState
+    @Environment(\.colorScheme) private var colorScheme
     let memo: Memo
 
     @State private var isHovered = false
@@ -574,11 +575,8 @@ struct MemoCard: View {
         .background(
             ZStack {
                 RoundedRectangle(cornerRadius: 14)
-                    .fill(.ultraThinMaterial)
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(isHovered
-                        ? LiquidGlassTheme.colors.cardBackground.opacity(0.8)
-                        : LiquidGlassTheme.colors.cardBackground.opacity(0.55))
+                    .fill(LiquidGlassTheme.colors.cardFill(isHovered: isHovered, colorScheme: colorScheme))
+                    .glassEffect()
             }
             .shadow(
                 color: .black.opacity(isHovered ? 0.12 : 0.05), radius: isHovered ? 16 : 10, x: 0,

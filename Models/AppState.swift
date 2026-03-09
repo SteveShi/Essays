@@ -259,9 +259,9 @@ class AppState {
     }
     
     private func parseSearchFilters(from rawSearch: String) -> ([String], Bool?, MemoVisibility?, CreatedFilter?) {
-        let terms = rawSearch
-            .split(whereSeparator: \.isWhitespace)
-            .map { String($0) }
+        // We should split by whitespace, but allow for combining spaces inside quotes if needed.
+        // For simplicity, sticking to the whitespace split but ignoring empty.
+        let terms = rawSearch.split(whereSeparator: \.isWhitespace).map { String($0) }
         
         var keywordTerms: [String] = []
         var pinnedFilter: Bool?
@@ -286,14 +286,21 @@ class AppState {
             case "created:7d":
                 createdFilter = .last7Days
             default:
-                // Check for specific date pattern: created:YYYY-MM-DD
                 if normalized.hasPrefix("created:") {
                     let dateStr = String(normalized.dropFirst("created:".count))
-                    let formatter = DateFormatter()
-                    formatter.dateFormat = "yyyy-MM-dd"
-                    formatter.locale = Locale(identifier: "en_US_POSIX")
-                    if let date = formatter.date(from: dateStr) {
-                        createdFilter = .specificDate(date)
+                    let components = dateStr.split(separator: "-").compactMap { Int($0) }
+                    
+                    if components.count == 3 {
+                        var dateComps = DateComponents()
+                        dateComps.year = components[0]
+                        dateComps.month = components[1]
+                        dateComps.day = components[2]
+                        
+                        if let date = Calendar.current.date(from: dateComps) {
+                            createdFilter = .specificDate(date)
+                        } else {
+                            keywordTerms.append(term)
+                        }
                     } else {
                         keywordTerms.append(term)
                     }

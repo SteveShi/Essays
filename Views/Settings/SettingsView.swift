@@ -10,6 +10,7 @@ struct SettingsView: View {
     @AppStorage("theme") private var theme = "system"
     @AppStorage("enableAIFeatures") private var enableAIFeatures = true
     @AppStorage("targetTranslationLanguage") private var targetTranslationLanguage = "auto"
+    @AppStorage("quickInputShortcut") private var quickInputShortcut = 1
     
     var body: some View {
         TabView {
@@ -48,6 +49,16 @@ struct SettingsView: View {
                 .pickerStyle(.radioGroup)
             } header: {
                 Text(String(localized: "Theme", comment: "Theme section header"))
+                    .font(LiquidGlassTheme.typography.headline)
+            }
+            
+            Section {
+                Picker(String(localized: "Quick Input Shortcut", comment: "Shortcut picker label"), selection: $quickInputShortcut) {
+                    Text("⌘ + ⌥ + N").tag(1)
+                    Text("⌘ + ⇧ + N").tag(2)
+                }
+            } header: {
+                Text(String(localized: "Shortcuts", comment: "Shortcuts section header"))
                     .font(LiquidGlassTheme.typography.headline)
             }
             

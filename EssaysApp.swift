@@ -1,11 +1,14 @@
 import SwiftUI
 import SwiftData
+import AppKit
+import Carbon
 
 @main
 struct EssaysApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @State private var appState = AppState()
     @AppStorage("theme") private var theme = "system"
+    @AppStorage("quickInputShortcut") private var quickInputShortcut = 1
     
     private var preferredColorScheme: ColorScheme? {
         switch theme {
@@ -27,6 +30,9 @@ struct EssaysApp: App {
                     } else {
                         // Fallback on earlier versions
                     }
+                }
+                .onChange(of: quickInputShortcut) { old, new in
+                    appDelegate.updateGlobalHotkey()
                 }
         }
         .windowToolbarStyle(.unified(showsTitle: true))
@@ -61,9 +67,84 @@ struct EssaysApp: App {
     }
 }
 
+
 class AppDelegate: NSObject, NSApplicationDelegate {
+    var statusItem: NSStatusItem!
+    var settingsWindowController: NSWindowController?
+    var hotkeyRef: EventHotKeyRef?
+    
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // Window configuration handled by SwiftUI modifiers
+        setupMenuBar()
+        registerGlobalHotkey()
+    }
+    
+    private func setupMenuBar() {
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        if let button = statusItem.button {
+            button.image = NSImage(systemSymbolName: "pencil.line", accessibilityDescription: "Essays Quick Input")
+            button.action = #selector(statusBarButtonClicked(sender:))
+            button.sendAction(on: [.leftMouseUp, .rightMouseUp])
+            button.target = self
+        }
+    }
+    
+    @MainActor
+    @objc func statusBarButtonClicked(sender: NSStatusBarButton) {
+        let event = NSApp.currentEvent!
+        if event.type == .rightMouseUp {
+            let menu = NSMenu()
+            menu.addItem(NSMenuItem(title: String(localized: "Settings"), action: #selector(openSettings), keyEquivalent: ","))
+            menu.addItem(NSMenuItem.separator())
+            menu.addItem(NSMenuItem(title: String(localized: "Quit Essays"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+            statusItem.menu = menu
+            statusItem.button?.performClick(nil) // Trigger menu
+            statusItem.menu = nil // Reset so left click still works directly
+        } else {
+            QuickInputPanelManager.shared.togglePanel()
+        }
+    }
+    
+    @MainActor
+    @objc func openSettings() {
+        NotificationCenter.default.post(name: .openSettings, object: nil)
+    }
+    
+    func updateGlobalHotkey() {
+        if let hotkeyRef = hotkeyRef {
+            UnregisterEventHotKey(hotkeyRef)
+            self.hotkeyRef = nil
+        }
+        registerGlobalHotkey()
+    }
+    
+    private func registerGlobalHotkey() {
+        var hotKeyId = EventHotKeyID()
+        hotKeyId.signature = UTGetOSTypeFromString("ESSY" as CFString)
+        hotKeyId.id = 1
+        
+        let shortcutOpt = UserDefaults.standard.integer(forKey: "quickInputShortcut")
+        
+        let modifierFlags: UInt32
+        if shortcutOpt == 2 {
+            modifierFlags = UInt32(cmdKey | shiftKey) // Cmd + Shift + N
+        } else {
+            modifierFlags = UInt32(cmdKey | optionKey) // Cmd + Option + N
+        }
+        
+        let keyCode: UInt32 = 45 // 'N'
+        
+        var eventType = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
+        
+        let handler: EventHandlerUPP = { (nextHandler, event, userData) -> OSStatus in
+            // Must dispatch to main thread for UI interactions
+            DispatchQueue.main.async {
+                QuickInputPanelManager.shared.togglePanel()
+            }
+            return noErr
+        }
+        
+        InstallEventHandler(GetApplicationEventTarget(), handler, 1, &eventType, nil, nil)
+        RegisterEventHotKey(keyCode, modifierFlags, hotKeyId, GetApplicationEventTarget(), 0, &hotkeyRef)
     }
 }
 
@@ -72,6 +153,7 @@ extension Notification.Name {
     static let focusSearch = Notification.Name("focusSearch")
     static let toggleSidebar = Notification.Name("toggleSidebar")
     static let openSettings = Notification.Name("openSettings")
+    static let toggleQuickInput = Notification.Name("toggleQuickInput")
 }
 
 struct OpenSettingsKey: EnvironmentKey {

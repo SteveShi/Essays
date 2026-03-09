@@ -10,9 +10,9 @@ struct LiquidGlassTheme {
 }
 
 struct ThemeColors {
-    let background = Color(nsColor: .windowBackgroundColor)
-    let secondaryBackground = Color(nsColor: .controlBackgroundColor)
-    let tertiaryBackground = Color(nsColor: .underPageBackgroundColor)
+    let background = Color.clear // Window background is automatically handled by the system
+    let secondaryBackground = Color(nsColor: .controlBackgroundColor).opacity(0.8)
+    let tertiaryBackground = Color(nsColor: .underPageBackgroundColor).opacity(0.6)
     
     let text = Color(nsColor: .textColor)
     let secondaryText = Color(nsColor: .secondaryLabelColor)
@@ -21,8 +21,8 @@ struct ThemeColors {
     let accent = Color.accentColor
     let accentHover = Color.accentColor.opacity(0.8)
     
-    let separator = Color(nsColor: .separatorColor)
-    let border = Color(nsColor: .gridColor)
+    let separator = Color(nsColor: .separatorColor).opacity(0.5)
+    let border = Color(nsColor: .gridColor).opacity(0.5)
     
     let success = Color.green
     let warning = Color.orange
@@ -38,8 +38,19 @@ struct ThemeColors {
     let glassBackground = Color.white.opacity(0.08)
     let glassBorder = Color.white.opacity(0.12)
     
-    let sidebarBackground = Color(nsColor: .controlBackgroundColor).opacity(0.95)
-    let cardBackground = Color(nsColor: .controlBackgroundColor)
+    let sidebarBackground = Color(nsColor: .windowBackgroundColor).opacity(0.85) // Lighter sidebar
+    let cardBackground = Color.clear // Replaced with semantic colors in modifiers
+
+    func cardFill(isHovered: Bool, colorScheme: ColorScheme) -> Color {
+        switch colorScheme {
+        case .dark:
+            return isHovered ? Color.white.opacity(0.12) : Color.white.opacity(0.06)
+        case .light:
+            return isHovered ? Color.white.opacity(0.9) : Color.white.opacity(0.6) // Much brighter in light mode
+        @unknown default:
+            return Color(nsColor: .controlBackgroundColor)
+        }
+    }
     
     let hoverOverlay = Color.white.opacity(0.05)
     let pressedOverlay = Color.white.opacity(0.08)
