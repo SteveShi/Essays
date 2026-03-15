@@ -390,6 +390,8 @@ struct ComposeMemoView: View {
                 .foregroundColor(LiquidGlassTheme.colors.secondaryText)
                 .padding(.horizontal, 16)
                 .padding(.bottom, 8)
+            }
+
             if currentLocation != nil && !uploadedAttachments.isEmpty {
                 Divider()
             }
