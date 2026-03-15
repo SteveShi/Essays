@@ -214,28 +214,6 @@
         }
       }
     },
-    "⌘ + ⇧ + N" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "⌘ + ⇧ + N"
-          }
-        }
-      }
-    },
-    "⌘ + ⌥ + N" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "⌘ + ⌥ + N"
-          }
-        }
-      }
-    },
     "A beautiful macOS client for Memos" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -753,6 +731,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "先记下来，不用整理，稍后再回看"
+          }
+        }
+      }
+    },
+    "Click the shortcut field and press your desired key combination." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "点击快捷键区域，然后按下您想要的快捷键组合。"
           }
         }
       }
@@ -2037,6 +2026,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "相关灵感"
+          }
+        }
+      }
+    },
+    "Reset" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "复原"
           }
         }
       }

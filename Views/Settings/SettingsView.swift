@@ -312,6 +312,7 @@ struct KeyRecorderField: NSViewRepresentable {
     }
 
     func updateNSView(_ nsView: RecorderNSTextField, context: Context) {
+        context.coordinator.parent = self
         nsView.stringValue = isRecording
             ? String(localized: "Press shortcut…", comment: "Hotkey recorder prompt")
             : config.displayString
