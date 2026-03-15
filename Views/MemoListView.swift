@@ -174,10 +174,11 @@ struct MemoListView: View {
                             HStack(spacing: 4) {
                                 Image(systemName: "mappin.and.ellipse")
                                     .font(.system(size: 10))
-                                Text(
-                                    String(
-                                        format: "%.4f, %.4f", location.latitude, location.longitude)
-                                )
+                                if let placeholder = location.placeholder, !placeholder.isEmpty {
+                                    Text(placeholder)
+                                } else {
+                                    Text(String(format: "%.4f, %.4f", location.latitude, location.longitude))
+                                }
                                 .font(LiquidGlassTheme.typography.caption)
                                 Button {
                                     quickCaptureLocation = nil

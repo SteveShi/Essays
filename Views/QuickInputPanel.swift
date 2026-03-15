@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import AppKit
+import CoreLocation
 
 @MainActor
 class QuickInputPanelManager: NSObject {
@@ -11,7 +12,7 @@ class QuickInputPanelManager: NSObject {
         if panel == nil {
             let contentView = QuickInputWindowView()
             let newPanel = QuickInputPanel(
-                contentRect: NSRect(x: 0, y: 0, width: 450, height: 160),
+                contentRect: NSRect(x: 0, y: 0, width: 450, height: 180),
                 styleMask: [.nonactivatingPanel, .titled, .fullSizeContentView, .hudWindow],
                 backing: .buffered,
                 defer: false
@@ -61,6 +62,9 @@ struct QuickInputWindowView: View {
     @State private var isSaving = false
     @FocusState private var isFocused: Bool
     
+    @State private var locationManager = LocationManager()
+    @State private var currentLocation: Location?
+    
     var body: some View {
         VStack(spacing: 12) {
             TextField("Capture a thought... (Press Esc to cancel)", text: $text, axis: .vertical)
@@ -69,6 +73,37 @@ struct QuickInputWindowView: View {
                 .lineLimit(1...8)
                 .focused($isFocused)
                 .padding()
+            
+            if let location = currentLocation {
+                HStack(spacing: 4) {
+                    Image(systemName: "mappin.and.ellipse")
+                        .font(.system(size: 10))
+                    
+                    if let placeholder = location.placeholder, !placeholder.isEmpty {
+                        Text(placeholder)
+                    } else {
+                        Text(String(format: "%.4f, %.4f", location.latitude, location.longitude))
+                    }
+                    
+                    Button {
+                        currentLocation = nil
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 10))
+                    }
+                    .buttonStyle(.plain)
+                }
+                .font(.system(size: 11))
+                .foregroundColor(.secondary)
+                .padding(.horizontal)
+            }
+            
+            if let error = locationManager.error {
+                Text(error)
+                    .font(.system(size: 10))
+                    .foregroundColor(.red)
+                    .padding(.horizontal)
+            }
             
             HStack {
                 Menu {
@@ -91,7 +126,23 @@ struct QuickInputWindowView: View {
                 
                 Spacer()
                 
-                Button("Save") {
+                HStack(spacing: 12) {
+                    Button {
+                        locationManager.requestLocation()
+                    } label: {
+                        if locationManager.isFetching {
+                            ProgressView()
+                                .scaleEffect(0.5)
+                                .frame(width: 14, height: 14)
+                        } else {
+                            Image(systemName: "mappin.and.ellipse")
+                                .font(.system(size: 14))
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundColor(currentLocation != nil ? .accentColor : .secondary)
+                    
+                    Button("Save") {
                     saveMemo()
                 }
                 .buttonStyle(.borderedProminent)
@@ -113,6 +164,13 @@ struct QuickInputWindowView: View {
                 isFocused = true
             }
         }
+        .onChange(of: locationManager.location) { _, newLocation in
+            if let newLocation = newLocation {
+                withAnimation {
+                    currentLocation = newLocation
+                }
+            }
+        }
     }
     
     private func saveMemo() {
@@ -129,11 +187,12 @@ struct QuickInputWindowView: View {
                     visibility: visibility,
                     tags: tags,
                     attachmentNames: [],
-                    location: nil
+                    location: currentLocation
                 )
                 
                 await MainActor.run {
                     self.text = ""
+                    self.currentLocation = nil
                     self.isSaving = false
                     QuickInputPanelManager.shared.togglePanel() // Hide
                     
