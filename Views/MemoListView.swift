@@ -1,5 +1,7 @@
 import SwiftUI
 import CoreLocation
+import QuickLook
+import MapKit
 
 struct MemoListView: View {
     @Environment(AppState.self) var appState
@@ -368,10 +370,9 @@ struct MemoListView: View {
 
             VStack(spacing: 12) {
                 ForEach(appState.pinnedMemosList) { memo in
-                    MemoCard(memo: memo)
-                        .onTapGesture {
-                            memoToEdit = memo
-                        }
+                    MemoCard(memo: memo, onEdit: {
+                        memoToEdit = memo
+                    })
                 }
             }
         }
@@ -389,10 +390,9 @@ struct MemoListView: View {
 
                     VStack(spacing: 12) {
                         ForEach(group.memos) { memo in
-                            MemoCard(memo: memo)
-                                .onTapGesture {
-                                    memoToEdit = memo
-                                }
+                            MemoCard(memo: memo, onEdit: {
+                                memoToEdit = memo
+                            })
                         }
                     }
                 }
@@ -542,9 +542,12 @@ struct MemoCard: View {
     @Environment(AppState.self) var appState
     @Environment(\.colorScheme) private var colorScheme
     let memo: Memo
+    var onEdit: () -> Void
 
     @State private var isHovered = false
     @State private var showActions = false
+    @State private var quickLookURL: URL?
+    @State private var showMapPopover = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -597,6 +600,7 @@ struct MemoCard: View {
                 showActions = hovering
             }
         }
+        .quickLookPreview($quickLookURL)
     }
 
     private var headerView: some View {
@@ -635,6 +639,14 @@ struct MemoCard: View {
                             ? String(localized: "Unpin", comment: "Context menu item to unpin memo")
                             : String(localized: "Pin", comment: "Context menu item to pin memo"),
                         systemImage: memo.pinned ? "pin.slash" : "pin")
+                }
+
+                Button {
+                    onEdit()
+                } label: {
+                    Label(
+                        String(localized: "Edit", comment: "Context menu item to edit memo"),
+                        systemImage: "pencil")
                 }
                 
                 Button {
@@ -734,6 +746,14 @@ struct MemoCard: View {
                             }
                             .frame(width: 120, height: 120)
                             .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                Task {
+                                    if let local = await ImageStorageHelper.shared.ensureLocalImage(for: attachmentURLs) {
+                                        quickLookURL = local
+                                    }
+                                }
+                            }
                         } else {
                             HStack(spacing: 8) {
                                 Image(systemName: "doc.fill")
@@ -788,6 +808,23 @@ struct MemoCard: View {
             RoundedRectangle(cornerRadius: 8)
                 .fill(LiquidGlassTheme.colors.tertiaryBackground)
         )
+        .onTapGesture {
+            showMapPopover = true
+        }
+        .popover(isPresented: $showMapPopover) {
+            VStack {
+                let coordinate = CLLocationCoordinate2D(latitude: location.latitude, longitude: location.longitude)
+                Map(initialPosition: .region(MKCoordinateRegion(
+                    center: coordinate,
+                    span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+                ))) {
+                    Marker(location.placeholder ?? String(localized: "Location", comment: "Map marker label"), coordinate: coordinate)
+                }
+                .frame(width: 300, height: 250)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+            }
+            .padding(8)
+        }
         .padding(.bottom, 12)
         .padding(.leading, 16)
     }

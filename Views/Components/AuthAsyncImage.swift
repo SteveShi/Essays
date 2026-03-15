@@ -109,7 +109,8 @@ actor ImageStorageHelper {
             if url.isFileURL { return url }
 
             // 检查磁盘缓存
-            let safeName = "\(abs(url.absoluteString.hashValue)).img"
+            let ext = url.pathExtension.isEmpty ? "png" : url.pathExtension
+            let safeName = "\(abs(url.absoluteString.hashValue)).\(ext)"
             let localFile = cacheDir.appendingPathComponent(safeName)
             
             if FileManager.default.fileExists(atPath: localFile.path) {

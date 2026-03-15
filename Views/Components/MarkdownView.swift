@@ -7,6 +7,7 @@ struct MemoMarkdownContent: View {
 
     var body: some View {
         MarkdownView(content)
+            .textSelection(.enabled)
             .foregroundStyle(LiquidGlassTheme.colors.text)
             .tint(LiquidGlassTheme.colors.accent)
             .fixedSize(horizontal: false, vertical: true)
