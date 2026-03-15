@@ -1,3 +1,4 @@
+#if os(macOS)
 import AppKit
 import KeyboardShortcuts
 
@@ -23,3 +24,14 @@ final class HotkeyManager: ObservableObject {
         KeyboardShortcuts.removeAllHandlers()
     }
 }
+#else
+import Foundation
+
+@MainActor
+final class HotkeyManager: ObservableObject {
+    static let shared = HotkeyManager()
+    private init() {}
+    func start() {}
+    func stop() {}
+}
+#endif

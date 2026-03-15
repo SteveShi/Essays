@@ -1,9 +1,17 @@
 import SwiftUI
+#if os(macOS)
 import AppKit
+#else
+import UIKit
+#endif
 
 @main
 struct EssaysApp: App {
+#if os(macOS)
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+#else
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+#endif
     @State private var appState = AppState()
     @AppStorage("theme") private var theme = "system"
     
@@ -20,14 +28,21 @@ struct EssaysApp: App {
             ContentView()
                 .environment(appState)
                 .preferredColorScheme(preferredColorScheme)
+                #if os(macOS)
                 .frame(minWidth: 900, minHeight: 600)
+                #endif
                 .task {
+                    #if os(macOS)
                     HotkeyManager.shared.start()
+                    #endif
+                    #if os(macOS)
                     if #available(macOS 26.0, *) {
                         await MemosAIAssistant.shared.initialize()
                     }
+                    #endif
                 }
         }
+#if os(macOS)
         .windowToolbarStyle(.unified(showsTitle: true))
         .commands {
             CommandGroup(replacing: .newItem) {
@@ -51,16 +66,20 @@ struct EssaysApp: App {
                 .keyboardShortcut("s", modifiers: [.command, .control])
             }
         }
+#endif
         
+        #if os(macOS)
         Settings {
             SettingsView()
                 .environment(appState)
                 .preferredColorScheme(preferredColorScheme)
         }
+        #endif
     }
 }
 
 
+#if os(macOS)
 class AppDelegate: NSObject, NSApplicationDelegate {
     var statusItem: NSStatusItem!
 
@@ -97,6 +116,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 }
+#else
+class AppDelegate: NSObject, UIApplicationDelegate {
+    func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
+        return true
+    }
+}
+#endif
 
 extension Notification.Name {
     static let createNewMemo = Notification.Name("createNewMemo")

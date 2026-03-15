@@ -50,17 +50,9 @@ struct MemoDetailView: View {
             commentInputView
         }
         .navigationTitle(String(localized: "Memo Details", comment: "Detail view title"))
-        .toolbar {
-            ToolbarItem(placement: .navigation) {
-                Button {
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                        appState.selectedMemoForDetail = nil
-                    }
-                } label: {
-                    Image(systemName: "chevron.left")
-                }
-            }
-        }
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
     }
 
     @State private var quickLookURL: URL?

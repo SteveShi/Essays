@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+#if os(macOS)
 import AppKit
 
 @MainActor
@@ -148,3 +149,10 @@ struct QuickInputWindowView: View {
         }
     }
 }
+#else
+@MainActor
+class QuickInputPanelManager: NSObject {
+    static let shared = QuickInputPanelManager()
+    func togglePanel() {}
+}
+#endif

@@ -1,5 +1,9 @@
 import SwiftUI
 import CoreLocation
+import UniformTypeIdentifiers
+#if os(macOS)
+import AppKit
+#endif
 
 struct ComposeMemoView: View {
     @Environment(AppState.self) var appState
@@ -18,6 +22,7 @@ struct ComposeMemoView: View {
     @State private var isUploading = false
     @State private var attachmentNames: [String] = []
     @State private var suggestedTags: [String] = []
+    @State private var showFilePicker = false
     
     @State private var locationManager = LocationManager()
 
@@ -433,44 +438,73 @@ struct ComposeMemoView: View {
                 currentLocation = newLocation
             }
         }
+        .fileImporter(
+            isPresented: $showFilePicker,
+            allowedContentTypes: [.image],
+            allowsMultipleSelection: true
+        ) { result in
+            switch result {
+            case .success(let urls):
+                handleSelectedURLs(urls)
+            case .failure(let error):
+                self.errorMessage = error.localizedDescription
+            }
+        }
+    }
+    
+    private func handleSelectedURLs(_ urls: [URL]) {
+        isUploading = true
+        Task {
+            for url in urls {
+                // For iOS security scoped resources
+                let _ = url.startAccessingSecurityScopedResource()
+                defer { url.stopAccessingSecurityScopedResource() }
+                
+                do {
+                    let data = try Data(contentsOf: url)
+                    let filename = url.lastPathComponent
+                    let ext = url.pathExtension.lowercased()
+                    let mimeType =
+                        (ext == "jpg" || ext == "jpeg")
+                        ? "image/jpeg"
+                        : (ext == "gif"
+                            ? "image/gif" : (ext == "webp" ? "image/webp" : "image/png"))
+                    let attachment = try await MemosAPIClient.shared.uploadAttachment(
+                        data: data,
+                        filename: filename,
+                        mimeType: mimeType
+                    )
+                    await MainActor.run {
+                        self.uploadedAttachments.append(attachment)
+                    }
+                } catch {
+                    await MainActor.run {
+                        self.errorMessage = error.localizedDescription
+                    }
+                }
+            }
+            await MainActor.run {
+                self.isUploading = false
+            }
+        }
     }
     
     // Removed broken fetchLocation() inline implementation
 
     private func selectImages() {
+        #if os(macOS)
         let panel = NSOpenPanel()
         panel.allowsMultipleSelection = true
         panel.canChooseDirectories = false
         panel.canChooseFiles = true
-        panel.allowedContentTypes = [.image]
+        panel.allowedContentTypes = [UTType.image]
 
         if panel.runModal() == .OK {
-            isUploading = true
-            let urls = panel.urls
-            Task {
-                for url in urls {
-                    do {
-                        let data = try Data(contentsOf: url)
-                        let filename = url.lastPathComponent
-                        let ext = url.pathExtension.lowercased()
-                        let mimeType =
-                            (ext == "jpg" || ext == "jpeg")
-                            ? "image/jpeg"
-                            : (ext == "gif"
-                                ? "image/gif" : (ext == "webp" ? "image/webp" : "image/png"))
-                        let attachment = try await MemosAPIClient.shared.uploadAttachment(
-                            data: data,
-                            filename: filename,
-                            mimeType: mimeType
-                        )
-                        self.uploadedAttachments.append(attachment)
-                    } catch {
-                        self.errorMessage = error.localizedDescription
-                    }
-                }
-                self.isUploading = false
-            }
+            handleSelectedURLs(panel.urls)
         }
+        #else
+        showFilePicker = true
+        #endif
     }
 
     private func uploadPhoto(data: Data) {

@@ -52,17 +52,42 @@ struct ContentView: View {
     private var mainView: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             SidebarView()
+                #if os(macOS)
                 .frame(minWidth: 220, idealWidth: 260, maxWidth: 300)
+                #endif
+        } content: {
+            MemoListView()
+                .navigationTitle(String(localized: "Memos", comment: "Navigation title for the memo list"))
+                .navigationDestination(for: Memo.self) { memo in
+                    MemoDetailView(memo: memo)
+                }
+                .navigationDestination(for: AppState.SidebarSelection.self) { selection in
+                    // In a 3-column split view, selecting from sidebar usually 
+                    // updates the content column. NavigationStack handles the push on iPhone.
+                    MemoListView()
+                }
         } detail: {
-            if let memo = appState.selectedMemoForDetail {
-                MemoDetailView(memo: memo)
-                    .transition(AnyTransition.move(edge: .trailing).combined(with: .opacity))
-            } else {
-                MemoListView()
-                    .transition(AnyTransition.move(edge: .leading).combined(with: .opacity))
+            NavigationStack {
+                if let memo = appState.selectedMemoForDetail {
+                    MemoDetailView(memo: memo)
+                } else {
+                    ContentUnavailableView {
+                        Label(String(localized: "No Memo Selected", comment: "Empty state in detail view"), systemImage: "quote.opening")
+                    } description: {
+                        Text(String(localized: "Select a memo from the list to view its details.", comment: "Empty state description in detail view"))
+                    }
+                    .background(LiquidGlassTheme.colors.background)
+                }
             }
         }
         .navigationSplitViewStyle(.balanced)
+        .onAppear {
+            #if os(iOS)
+            if UIDevice.current.userInterfaceIdiom == .phone {
+                columnVisibility = .all
+            }
+            #endif
+        }
         .task {
             await refreshMemos()
         }

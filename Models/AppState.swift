@@ -12,6 +12,19 @@ class AppState {
         let memos: [Memo]
     }
 
+    enum SidebarSelection: Hashable {
+        case all
+        case today
+        case past7Days
+        case archived
+        case attachments
+        case publicMemos
+        case protectedMemos
+        case privateMemos
+        case tag(String)
+        case date(Date)
+    }
+
     var serverURL: String = ""
     var accessToken: String = ""
     var isOnline: Bool
@@ -74,6 +87,51 @@ class AppState {
     
     // For detail view
     var selectedMemoForDetail: Memo?
+    
+    var sidebarSelection: SidebarSelection? = .all {
+        didSet {
+            updateFiltersFromSelection()
+        }
+    }
+    
+    private func updateFiltersFromSelection() {
+        guard let selection = sidebarSelection else { return }
+        switch selection {
+        case .all:
+            searchText = ""
+            selectedTag = nil
+        case .today:
+            searchText = "created:today"
+            selectedTag = nil
+        case .past7Days:
+            searchText = "created:7d"
+            selectedTag = nil
+        case .archived:
+            searchText = "is:archived"
+            selectedTag = nil
+        case .attachments:
+            searchText = ""
+            selectedTag = nil
+            isGalleryMode = true
+        case .publicMemos:
+            searchText = "visibility:public"
+            selectedTag = nil
+        case .protectedMemos:
+            searchText = "visibility:workspace"
+            selectedTag = nil
+        case .privateMemos:
+            searchText = "visibility:private"
+            selectedTag = nil
+        case .tag(let tagName):
+            searchText = ""
+            selectedTag = tagName
+        case .date(let date):
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd"
+            searchText = "created:\(formatter.string(from: date))"
+            selectedTag = nil
+        }
+    }
 
     private let userDefaults = UserDefaults.standard
     private let serverURLKey = "memos_server_url"

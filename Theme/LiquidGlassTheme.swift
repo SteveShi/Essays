@@ -11,18 +11,26 @@ struct LiquidGlassTheme {
 
 struct ThemeColors {
     let background = Color.clear // Window background is automatically handled by the system
+    #if os(macOS)
     let secondaryBackground = Color(nsColor: .controlBackgroundColor).opacity(0.8)
     let tertiaryBackground = Color(nsColor: .underPageBackgroundColor).opacity(0.6)
-    
     let text = Color(nsColor: .textColor)
     let secondaryText = Color(nsColor: .secondaryLabelColor)
     let tertiaryText = Color(nsColor: .tertiaryLabelColor)
+    let separator = Color(nsColor: .separatorColor).opacity(0.5)
+    let border = Color(nsColor: .gridColor).opacity(0.5)
+    #else
+    let secondaryBackground = Color(.secondarySystemBackground).opacity(0.8)
+    let tertiaryBackground = Color(.tertiarySystemBackground).opacity(0.6)
+    let text = Color.primary
+    let secondaryText = Color.secondary
+    let tertiaryText = Color.secondary.opacity(0.8)
+    let separator = Color(.separator).opacity(0.5)
+    let border = Color(.opaqueSeparator).opacity(0.5)
+    #endif
     
     let accent = Color.accentColor
     let accentHover = Color.accentColor.opacity(0.8)
-    
-    let separator = Color(nsColor: .separatorColor).opacity(0.5)
-    let border = Color(nsColor: .gridColor).opacity(0.5)
     
     let success = Color.green
     let warning = Color.orange
@@ -38,7 +46,12 @@ struct ThemeColors {
     let glassBackground = Color.white.opacity(0.08)
     let glassBorder = Color.white.opacity(0.12)
     
+    #if os(macOS)
     let sidebarBackground = Color(nsColor: .windowBackgroundColor).opacity(0.85) // Lighter sidebar
+    #else
+    let sidebarBackground = Color(.systemBackground).opacity(0.85)
+    #endif
+    
     let cardBackground = Color.clear // Replaced with semantic colors in modifiers
 
     func cardFill(isHovered: Bool, colorScheme: ColorScheme) -> Color {
@@ -48,7 +61,11 @@ struct ThemeColors {
         case .light:
             return isHovered ? Color.white.opacity(0.9) : Color.white.opacity(0.6) // Much brighter in light mode
         @unknown default:
+            #if os(macOS)
             return Color(nsColor: .controlBackgroundColor)
+            #else
+            return Color(.secondarySystemBackground)
+            #endif
         }
     }
     

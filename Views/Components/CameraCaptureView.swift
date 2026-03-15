@@ -32,8 +32,12 @@ struct CameraCaptureView: View {
             
             controls
         }
+        #if os(macOS)
         .frame(width: 480, height: 400)
         .background(VisualEffectView(material: .hudWindow, blendingMode: .behindWindow))
+        #else
+        .background(.ultraThinMaterial)
+        #endif
         .onAppear {
             model.startSession()
         }
@@ -144,6 +148,7 @@ class CameraModel: NSObject, ObservableObject, AVCapturePhotoCaptureDelegate {
     }
 }
 
+#if os(macOS)
 struct CameraPreview: NSViewRepresentable {
     let session: AVCaptureSession
 
@@ -178,3 +183,22 @@ struct VisualEffectView: NSViewRepresentable {
         visualEffectView.blendingMode = blendingMode
     }
 }
+#else
+struct CameraPreview: UIViewRepresentable {
+    let session: AVCaptureSession
+
+    func makeUIView(context: Context) -> UIView {
+        let view = UIView()
+        let layer = AVCaptureVideoPreviewLayer(session: session)
+        layer.videoGravity = .resizeAspectFill
+        view.layer.addSublayer(layer)
+        return view
+    }
+
+    func updateUIView(_ uiView: UIView, context: Context) {
+        if let layer = uiView.layer.sublayers?.first as? AVCaptureVideoPreviewLayer {
+            layer.frame = uiView.bounds
+        }
+    }
+}
+#endif

@@ -2,6 +2,10 @@ import SwiftUI
 import CoreLocation
 import QuickLook
 import MapKit
+import UniformTypeIdentifiers
+#if os(macOS)
+import AppKit
+#endif
 
 struct MemoListView: View {
     @Environment(AppState.self) var appState
@@ -22,6 +26,16 @@ struct MemoListView: View {
     @State private var locationManager = LocationManager()
     @State private var hoveredMemoId: String? = nil
     @Environment(\.colorScheme) private var colorScheme
+    @State private var showQuickFilePicker = false
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    
+    private var isCompact: Bool {
+        #if os(iOS)
+        return horizontalSizeClass == .compact
+        #else
+        return false
+        #endif
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -40,8 +54,8 @@ struct MemoListView: View {
                 // Fixed Quick Capture Box
                 VStack(spacing: 0) {
                     quickCaptureView
-                        .padding(.horizontal, 24)
-                        .padding(.vertical, 16)
+                        .padding(.horizontal, isCompact ? 16 : 24)
+                        .padding(.vertical, isCompact ? 12 : 16)
                     
                     Divider()
                         .opacity(0.3)
@@ -65,7 +79,10 @@ struct MemoListView: View {
                                 }
                             }
                         }
-                        .padding(24)
+                        .padding(isCompact ? 16 : 24)
+                    }
+                    .refreshable {
+                        await refreshMemos()
                     }
                     .onChange(of: appState.scrollToMemoID) { _, newValue in
                         if let id = newValue {
@@ -77,6 +94,18 @@ struct MemoListView: View {
                         }
                     }
                 }
+            }
+        }
+        .fileImporter(
+            isPresented: $showQuickFilePicker,
+            allowedContentTypes: [.image],
+            allowsMultipleSelection: true
+        ) { result in
+            switch result {
+            case .success(let urls):
+                handleQuickSelectedURLs(urls)
+            case .failure(let error):
+                self.appState.errorMessage = error.localizedDescription
             }
         }
         .navigationTitle(String(localized: "Timeline", comment: "Navigation title for the main list view"))
@@ -394,9 +423,12 @@ struct MemoListView: View {
 
             VStack(spacing: 12) {
                 ForEach(appState.pinnedMemosList) { memo in
-                    MemoCard(memo: memo, onEdit: {
-                        memoToEdit = memo
-                    })
+                    NavigationLink(value: memo) {
+                        MemoCard(memo: memo, onEdit: {
+                            memoToEdit = memo
+                        })
+                    }
+                    .buttonStyle(.plain)
                     .id(memo.name)
                 }
             }
@@ -415,9 +447,12 @@ struct MemoListView: View {
 
                     VStack(spacing: 12) {
                         ForEach(group.memos) { memo in
-                            MemoCard(memo: memo, onEdit: {
-                                memoToEdit = memo
-                            })
+                            NavigationLink(value: memo) {
+                                MemoCard(memo: memo, onEdit: {
+                                    memoToEdit = memo
+                                })
+                            }
+                            .buttonStyle(.plain)
                             .id(memo.name)
                         }
                     }
@@ -444,6 +479,11 @@ struct MemoListView: View {
                 attachmentNames: attachmentNames,
                 location: quickCaptureLocation
             )
+            
+            #if os(iOS)
+            let generator = UIImpactFeedbackGenerator(style: .medium)
+            generator.impactOccurred()
+            #endif
             appState.memos.insert(memo, at: 0)
             quickCaptureText = ""
             quickCaptureAttachments = []
@@ -456,36 +496,52 @@ struct MemoListView: View {
 
 
     private func selectQuickImages() {
+        #if os(macOS)
         let panel = NSOpenPanel()
         panel.allowsMultipleSelection = true
         panel.canChooseDirectories = false
         panel.canChooseFiles = true
-        panel.allowedContentTypes = [.image]
+        panel.allowedContentTypes = [UTType.image]
 
         if panel.runModal() == .OK {
-            isQuickUploading = true
-            let urls = panel.urls
-            Task {
-                for url in urls {
-                    do {
-                        let data = try Data(contentsOf: url)
-                        let filename = url.lastPathComponent
-                        let ext = url.pathExtension.lowercased()
-                        let mimeType =
-                            (ext == "jpg" || ext == "jpeg")
-                            ? "image/jpeg"
-                            : (ext == "gif"
-                                ? "image/gif" : (ext == "webp" ? "image/webp" : "image/png"))
-                        let attachment = try await MemosAPIClient.shared.uploadAttachment(
-                            data: data,
-                            filename: filename,
-                            mimeType: mimeType
-                        )
+            handleQuickSelectedURLs(panel.urls)
+        }
+        #else
+        showQuickFilePicker = true
+        #endif
+    }
+    
+    private func handleQuickSelectedURLs(_ urls: [URL]) {
+        isQuickUploading = true
+        Task {
+            for url in urls {
+                let _ = url.startAccessingSecurityScopedResource()
+                defer { url.stopAccessingSecurityScopedResource() }
+                
+                do {
+                    let data = try Data(contentsOf: url)
+                    let filename = url.lastPathComponent
+                    let ext = url.pathExtension.lowercased()
+                    let mimeType =
+                        (ext == "jpg" || ext == "jpeg")
+                        ? "image/jpeg"
+                        : (ext == "gif"
+                            ? "image/gif" : (ext == "webp" ? "image/webp" : "image/png"))
+                    let attachment = try await MemosAPIClient.shared.uploadAttachment(
+                        data: data,
+                        filename: filename,
+                        mimeType: mimeType
+                    )
+                    await MainActor.run {
                         self.quickCaptureAttachments.append(attachment)
-                    } catch {
+                    }
+                } catch {
+                    await MainActor.run {
                         self.appState.errorMessage = error.localizedDescription
                     }
                 }
+            }
+            await MainActor.run {
                 self.isQuickUploading = false
             }
         }
@@ -624,11 +680,6 @@ struct MemoCard: View {
             withAnimation(LiquidGlassTheme.animation.easeOut) {
                 isHovered = hovering
                 showActions = hovering
-            }
-        }
-        .onTapGesture {
-            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                appState.selectedMemoForDetail = memo
             }
         }
         .quickLookPreview($quickLookURL)
@@ -999,8 +1050,12 @@ struct MemoCard: View {
     }
 
     private func copyContent() {
+        #if os(macOS)
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(memo.content, forType: .string)
+        #else
+        UIPasteboard.general.string = memo.content
+        #endif
     }
 
     private func copyLink() {
@@ -1008,8 +1063,12 @@ struct MemoCard: View {
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         let link = "\(base)/m/\(memo.name)"
+        #if os(macOS)
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(link, forType: .string)
+        #else
+        UIPasteboard.general.string = link
+        #endif
     }
 
     private func deleteMemo() async {

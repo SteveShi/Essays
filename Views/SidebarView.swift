@@ -81,56 +81,40 @@ struct SidebarView: View {
             SectionHeader(title: String(localized: "Inbox", comment: "Sidebar section header for main actions"))
             
             VStack(spacing: 4) {
-                SidebarItem(
+                SidebarLinkItem(
+                    selection: .all,
                     icon: "note.text",
                     title: String(localized: "All Memos", comment: "Sidebar item for all memos"),
-                    count: appState.memos.count,
-                    isSelected: appState.selectedTag == nil && appState.searchText.isEmpty
-                ) {
-                    appState.searchText = ""
-                    appState.selectedTag = nil
-                }
+                    count: appState.memos.count
+                )
                 
-                SidebarItem(
+                SidebarLinkItem(
+                    selection: .today,
                     icon: "sun.max",
                     title: String(localized: "Today", comment: "Sidebar item for today's memos"),
-                    count: appState.todayMemosCount,
-                    isSelected: appState.searchText.lowercased().contains("created:today")
-                ) {
-                    appState.searchText = "created:today"
-                    appState.selectedTag = nil
-                }
+                    count: appState.todayMemosCount
+                )
                 
-                SidebarItem(
+                SidebarLinkItem(
+                    selection: .past7Days,
                     icon: "clock.arrow.circlepath",
                     title: String(localized: "Past 7 Days", comment: "Sidebar item for memos in the last week"),
-                    count: appState.recentWeekMemosCount,
-                    isSelected: appState.searchText.lowercased().contains("created:7d")
-                ) {
-                    appState.searchText = "created:7d"
-                    appState.selectedTag = nil
-                }
+                    count: appState.recentWeekMemosCount
+                )
                 
-                SidebarItem(
+                SidebarLinkItem(
+                    selection: .archived,
                     icon: "archivebox",
                     title: String(localized: "Archived", comment: "Sidebar item for archived memos"),
-                    count: appState.archivedMemosCount,
-                    isSelected: appState.searchText.lowercased().contains("is:archived")
-                ) {
-                    appState.searchText = "is:archived"
-                    appState.selectedTag = nil
-                }
+                    count: appState.archivedMemosCount
+                )
 
-                SidebarItem(
+                SidebarLinkItem(
+                    selection: .attachments,
                     icon: "photo.on.rectangle.angled",
                     title: String(localized: "Attachments", comment: "Sidebar item for image gallery"),
-                    count: appState.memos.reduce(0) { $0 + $1.attachments.filter { $0.isImage }.count },
-                    isSelected: appState.isGalleryMode
-                ) {
-                    appState.searchText = ""
-                    appState.selectedTag = nil
-                    appState.isGalleryMode = true
-                }
+                    count: appState.memos.reduce(0) { $0 + $1.attachments.filter { $0.isImage }.count }
+                )
             }
         }
     }
@@ -151,16 +135,7 @@ struct SidebarView: View {
             } else {
                 FlowLayout(spacing: 6) {
                     ForEach(appState.tags.prefix(20)) { tag in
-                        TagChip(
-                            tag: tag,
-                            isSelected: appState.selectedTag == tag.name
-                        ) {
-                            if appState.selectedTag == tag.name {
-                                appState.selectedTag = nil
-                            } else {
-                                appState.selectedTag = tag.name
-                            }
-                        }
+                        TagLinkChip(tag: tag)
                     }
                 }
             }
@@ -172,36 +147,26 @@ struct SidebarView: View {
             SectionHeader(title: String(localized: "Visibility", comment: "Sidebar section header for visibility filters"))
             
             VStack(spacing: 4) {
-                SidebarItem(
+                SidebarLinkItem(
+                    selection: .publicMemos,
                     icon: "globe",
                     title: String(localized: "Public", comment: "Sidebar item for public memos"),
-                    count: appState.publicMemosCount,
-                    isSelected: appState.searchText.lowercased().contains("visibility:public")
-                ) {
-                    appState.searchText = "visibility:public"
-                    appState.selectedTag = nil
-                }
+                    count: appState.publicMemosCount
+                )
                 
-                SidebarItem(
+                SidebarLinkItem(
+                    selection: .protectedMemos,
                     icon: MemoVisibility.protected.icon,
                     title: MemoVisibility.protected.displayName,
-                    count: appState.memos.filter { $0.visibility == .protected }.count,
-                    isSelected: appState.searchText.lowercased().contains("visibility:workspace")
-                        || appState.searchText.lowercased().contains("visibility:protected")
-                ) {
-                    appState.searchText = "visibility:workspace"
-                    appState.selectedTag = nil
-                }
+                    count: appState.memos.filter { $0.visibility == .protected }.count
+                )
 
-                SidebarItem(
+                SidebarLinkItem(
+                    selection: .privateMemos,
                     icon: "lock",
                     title: String(localized: "Private", comment: "Sidebar item for private memos"),
-                    count: appState.privateMemosCount,
-                    isSelected: appState.searchText.lowercased().contains("visibility:private")
-                ) {
-                    appState.searchText = "visibility:private"
-                    appState.selectedTag = nil
-                }
+                    count: appState.privateMemosCount
+                )
             }
         }
     }
@@ -266,31 +231,29 @@ struct SectionHeader: View {
     }
 }
 
-struct SidebarItem: View {
+struct SidebarLinkItem: View {
+    let selection: AppState.SidebarSelection
     let icon: String
     let title: String
     let count: Int
-    let isSelected: Bool
-    let action: () -> Void
     
+    @Environment(AppState.self) var appState
     @State private var isHovered = false
     
     var body: some View {
-        Button(action: action) {
+        @Bindable var appState = appState
+        let isSelected = appState.sidebarSelection == selection
+        
+        NavigationLink(value: selection) {
             HStack(spacing: 12) {
                 Image(systemName: icon)
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(
-                        isSelected
-                            ? LiquidGlassTheme.colors.accent : LiquidGlassTheme.colors.secondaryText
-                    )
+                    .foregroundStyle(isSelected ? LiquidGlassTheme.colors.accent : LiquidGlassTheme.colors.secondaryText)
                     .frame(width: 24)
                 
                 Text(title)
                     .font(LiquidGlassTheme.typography.body)
-                    .foregroundStyle(
-                        isSelected
-                            ? LiquidGlassTheme.colors.text : LiquidGlassTheme.colors.secondaryText)
+                    .foregroundStyle(isSelected ? LiquidGlassTheme.colors.text : LiquidGlassTheme.colors.secondaryText)
                 
                 Spacer()
                 
@@ -300,40 +263,38 @@ struct SidebarItem: View {
                         .foregroundStyle(LiquidGlassTheme.colors.tertiaryText)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
-                        .background(
-                            Capsule()
-                                .fill(Color.primary.opacity(0.06))
-                        )
+                        .background(Capsule().fill(Color.primary.opacity(0.06)))
                 }
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .background(
                 RoundedRectangle(cornerRadius: 10)
-                    .fill(
-                        isSelected
-                            ? LiquidGlassTheme.colors.accent.opacity(0.1)
-                            : (isHovered ? Color.primary.opacity(0.04) : Color.clear))
+                    .fill(isSelected ? LiquidGlassTheme.colors.accent.opacity(0.1) : (isHovered ? Color.primary.opacity(0.04) : Color.clear))
             )
         }
         .buttonStyle(.plain)
+        #if os(macOS)
         .onHover { hovering in
             withAnimation(.easeInOut(duration: 0.2)) {
                 isHovered = hovering
             }
         }
+        #endif
     }
 }
 
-struct TagChip: View {
+struct TagLinkChip: View {
     let tag: Tag
-    let isSelected: Bool
-    let action: () -> Void
-    
+    @Environment(AppState.self) var appState
     @State private var isHovered = false
     
     var body: some View {
-        Button(action: action) {
+        @Bindable var appState = appState
+        let selection = AppState.SidebarSelection.tag(tag.name)
+        let isSelected = appState.sidebarSelection == selection
+        
+        NavigationLink(value: selection) {
             HStack(spacing: 4) {
                 Text(tag.name)
                     .font(LiquidGlassTheme.typography.caption)
@@ -349,20 +310,17 @@ struct TagChip: View {
             .padding(.vertical, 5)
             .background(
                 Capsule()
-                    .fill(isSelected
-                        ? LiquidGlassTheme.colors.accent
-                        : isHovered
-                            ? LiquidGlassTheme.colors.accent.opacity(0.2)
-                            : LiquidGlassTheme.colors.tagBackground
-                    )
+                    .fill(isSelected ? LiquidGlassTheme.colors.accent : (isHovered ? LiquidGlassTheme.colors.accent.opacity(0.2) : LiquidGlassTheme.colors.tagBackground))
             )
         }
         .buttonStyle(.plain)
+        #if os(macOS)
         .onHover { hovering in
             withAnimation(LiquidGlassTheme.animation.easeOut) {
                 isHovered = hovering
             }
         }
+        #endif
     }
 }
 
@@ -589,17 +547,11 @@ struct DayButton: View {
         let components = calendar.dateComponents([.year, .month, .day], from: date)
         let hasMemo = appState.memoDateComponents.contains(components)
         let dateString = DayButton.sharedDateFormatter.string(from: date)
-        let isSelected = appState.searchText == "created:\(dateString)"
+        let selection = AppState.SidebarSelection.date(date)
+        let isSelected = appState.sidebarSelection == selection
         let isToday = calendar.isDateInToday(date)
 
-        return Button {
-            if isSelected {
-                appState.searchText = ""
-            } else {
-                appState.searchText = "created:\(dateString)"
-                appState.selectedTag = nil
-            }
-        } label: {
+        return NavigationLink(value: selection) {
             Text("\(calendar.component(.day, from: date))")
                 .font(
                     .system(

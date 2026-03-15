@@ -1,5 +1,7 @@
 import SwiftUI
+#if os(macOS)
 import KeyboardShortcuts
+#endif
 
 struct SettingsView: View {
     @Environment(AppState.self) var appState
@@ -35,7 +37,9 @@ struct SettingsView: View {
                 }
             
         }
+        #if os(macOS)
         .frame(width: 550, height: 450)
+        #endif
     }
     
     private var generalTab: some View {
@@ -46,18 +50,24 @@ struct SettingsView: View {
                     Text(String(localized: "Light", comment: "Light theme option")).tag("light")
                     Text(String(localized: "Dark", comment: "Dark theme option")).tag("dark")
                 }
+                #if os(macOS)
                 .pickerStyle(.radioGroup)
+                #else
+                .pickerStyle(.segmented)
+                #endif
             } header: {
                 Text(String(localized: "Theme", comment: "Theme section header"))
                     .font(LiquidGlassTheme.typography.headline)
             }
             
+            #if os(macOS)
             Section {
                 KeyboardShortcuts.Recorder(String(localized: "Quick Input Shortcut", comment: "Shortcut picker label"), name: .toggleQuickInput)
             } header: {
                 Text(String(localized: "Shortcuts", comment: "Shortcuts section header"))
                     .font(LiquidGlassTheme.typography.headline)
             }
+            #endif
             
             Section {
                 LabeledContent(String(localized: "Network Status", comment: "Network status label"))

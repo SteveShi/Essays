@@ -3,6 +3,7 @@ options:
   bundleIdPrefix: com.essays.app
   deploymentTarget:
     macOS: "15.0"
+    iOS: "17.0"
   xcodeVersion: "15.3"
   generateEmptyDirectories: true
   defaultConfig: Release
@@ -31,7 +32,6 @@ targets:
       - path: Utilities
       - path: Resources
       - path: EssaysApp.swift
-      - path: Info.plist
     settings:
       base:
         SWIFT_VERSION: "6.0"
@@ -46,6 +46,35 @@ targets:
       properties:
         com.apple.security.app-sandbox: false
         com.apple.security.network.client: true
+    dependencies:
+      - package: MarkdownView
+        product: MarkdownView
+      - package: KeyboardShortcuts
+        product: KeyboardShortcuts
+        
+  EssaysiOS:
+    type: application
+    platform: iOS
+    sources:
+      - path: Models
+      - path: Views
+      - path: Services
+      - path: Theme
+      - path: Utilities
+      - path: Resources
+      - path: EssaysApp.swift
+    settings:
+      base:
+        SWIFT_VERSION: "6.0"
+        SWIFT_STRICT_CONCURRENCY: complete
+        INFOPLIST_FILE: Info-iOS.plist
+        PRODUCT_BUNDLE_IDENTIFIER: com.essays.app.ios
+        PRODUCT_NAME: EssaysiOS
+        TARGETED_DEVICE_FAMILY: "1,2"
+        SDKROOT: iphoneos
+        SUPPORTED_PLATFORMS: "iphoneos iphonesimulator"
+        IPHONEOS_DEPLOYMENT_TARGET: 17.0
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     dependencies:
       - package: MarkdownView
         product: MarkdownView
@@ -84,3 +113,11 @@ schemes:
       config: Debug
       targets:
         - EssaysTests
+  EssaysiOS:
+    build:
+      targets:
+        EssaysiOS: [run, test, profile, analyze, archive]
+    run:
+      config: Debug
+    test:
+      config: Debug

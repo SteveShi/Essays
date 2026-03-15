@@ -1,6 +1,9 @@
 import Foundation
+#if os(macOS)
 import FoundationModels
+#endif
 
+#if os(macOS)
 @available(macOS 26.0, *)
 actor MemosAIAssistant {
     static let shared = MemosAIAssistant()
@@ -151,6 +154,19 @@ actor MemosAIAssistant {
         return response.content
     }
 }
+#else
+actor MemosAIAssistant {
+    static let shared = MemosAIAssistant()
+    private init() {}
+    func initialize() async {}
+    func generateTags(for content: String) async throws -> [String] { return [] }
+    func summarize(_ content: String) async throws -> String { return "" }
+    func improve(_ content: String) async throws -> String { return "" }
+    func expand(_ content: String) async throws -> String { return "" }
+    func generateRelatedIdeas(for content: String) async throws -> [String] { return [] }
+    func answerQuestion(_ question: String, context: [String]) async throws -> String { return "" }
+}
+#endif
 
 enum AIError: Error, LocalizedError {
     case notInitialized

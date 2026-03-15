@@ -1,7 +1,9 @@
 import SwiftUI
 import SwiftData
 
+#if os(macOS)
 @available(macOS 26.0, *)
+#endif
 struct AIAssistantView: View {
     let memo: Memo
     @Environment(\.dismiss) private var dismiss
@@ -149,15 +151,21 @@ struct AIAssistantView: View {
                         
                         Button {
                             let text = resultTags.isEmpty ? result : resultTags.map { "#\($0)" }.joined(separator: " ")
+                            #if os(macOS)
                             NSPasteboard.general.clearContents()
                             NSPasteboard.general.setString(text, forType: .string)
+                            #else
+                            UIPasteboard.general.string = text
+                            #endif
                         } label: {
                             Image(systemName: "doc.on.doc")
                                 .font(.system(size: 11))
                                 .foregroundColor(.secondary)
                         }
                         .buttonStyle(.plain)
+                        #if os(macOS)
                         .help(String(localized: "Copy to Clipboard", comment: "Copy AI result"))
+                        #endif
                     }
                     
                     if !resultTags.isEmpty {
@@ -199,11 +207,11 @@ struct AIAssistantView: View {
                         .font(.system(size: 11))
                         .foregroundColor(.orange)
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
             }
         }
+        #if os(macOS)
         .frame(width: 320)
+        #endif
         .background(.ultraThinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
