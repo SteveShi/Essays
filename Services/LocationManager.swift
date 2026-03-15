@@ -19,11 +19,21 @@ class LocationManager: NSObject, CLLocationManagerDelegate {
     }
 
     func requestLocation() {
+        location = nil // 重置之前的定位，确保能触发 onChange
         isFetching = true
         error = nil
         
-        if manager.authorizationStatus == .notDetermined {
+        let status = manager.authorizationStatus
+        
+        switch status {
+        case .notDetermined:
             manager.requestWhenInUseAuthorization()
+        case .denied, .restricted:
+            error = String(localized: "Location access denied. Please enable it in System Settings.", comment: "Error message for denied location access")
+            isFetching = false
+            return
+        default:
+            break
         }
         
         manager.requestLocation()

@@ -169,7 +169,7 @@ struct ComposeMemoView: View {
                 }
             }
             
-            if let error = errorMessage {
+            if let error = errorMessage ?? locationManager.error {
                 HStack(spacing: 8) {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .foregroundColor(LiquidGlassTheme.colors.error)

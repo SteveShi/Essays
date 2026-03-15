@@ -46,6 +46,7 @@ targets:
       properties:
         com.apple.security.app-sandbox: false
         com.apple.security.network.client: true
+        com.apple.security.personal-information.location: true
     dependencies:
       - package: MarkdownView
         product: MarkdownView
