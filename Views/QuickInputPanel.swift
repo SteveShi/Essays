@@ -62,12 +62,13 @@ struct QuickInputWindowView: View {
     @State private var isSaving = false
     @FocusState private var isFocused: Bool
     
-    @State private var locationManager = LocationManager()
+    private var locationManager = LocationManager.shared
     @State private var currentLocation: Location?
+    @State private var myRequestID: UUID?
     
     var body: some View {
         VStack(spacing: 12) {
-            TextField("Capture a thought... (Press Esc to cancel)", text: $text, axis: .vertical)
+            TextField(String(localized: "Capture a thought... (Press Esc to cancel)", comment: "Placeholder for quick thought capture"), text: $text, axis: .vertical)
                 .textFieldStyle(.plain)
                 .font(.system(size: 16))
                 .lineLimit(1...8)
@@ -128,9 +129,11 @@ struct QuickInputWindowView: View {
                 
                 HStack(spacing: 12) {
                     Button {
-                        locationManager.requestLocation()
+                        let id = UUID()
+                        myRequestID = id
+                        locationManager.requestLocation(id: id)
                     } label: {
-                        if locationManager.isFetching {
+                        if locationManager.isFetching && locationManager.lastRequestID == myRequestID {
                             ProgressView()
                                 .scaleEffect(0.5)
                                 .frame(width: 14, height: 14)
@@ -142,13 +145,14 @@ struct QuickInputWindowView: View {
                     .buttonStyle(.plain)
                     .foregroundColor(currentLocation != nil ? .accentColor : .secondary)
                     
-                    Button("Save") {
-                    saveMemo()
+                    Button(String(localized: "Save", comment: "Label for save button")) {
+                        saveMemo()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(LiquidGlassTheme.colors.accent)
+                    .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSaving)
+                    .keyboardShortcut(.return, modifiers: .command)
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(LiquidGlassTheme.colors.accent)
-                .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSaving)
-                .keyboardShortcut(.return, modifiers: .command)
             }
             .padding(.horizontal)
             .padding(.bottom)
@@ -165,11 +169,14 @@ struct QuickInputWindowView: View {
             }
         }
         .onChange(of: locationManager.location) { _, newLocation in
-            if let newLocation = newLocation {
+            if let newLocation = newLocation, locationManager.lastRequestID == myRequestID {
                 withAnimation {
                     currentLocation = newLocation
                 }
             }
+        }
+        .onDisappear {
+            locationManager.clear()
         }
     }
     

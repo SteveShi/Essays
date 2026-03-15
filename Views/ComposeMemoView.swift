@@ -5,7 +5,11 @@ struct ComposeMemoView: View {
     @Environment(AppState.self) var appState
     @Environment(\.dismiss) private var dismiss
     
-    var editingMemo: Memo?
+    var editingMemo: Memo? = nil
+    
+    init(editingMemo: Memo? = nil) {
+        self.editingMemo = editingMemo
+    }
     
     @State private var content: String = ""
     @State private var visibility: MemoVisibility = .private
@@ -19,7 +23,8 @@ struct ComposeMemoView: View {
     @State private var attachmentNames: [String] = []
     @State private var suggestedTags: [String] = []
     
-    @State private var locationManager = LocationManager()
+    private var locationManager = LocationManager.shared
+    @State private var myRequestID: UUID?
 
     @State private var showMemoPicker = false
     @State private var showCamera = false
@@ -61,9 +66,12 @@ struct ComposeMemoView: View {
             }
         }
         .onChange(of: locationManager.location, initial: false) { _, newLocation in
-            if let newLocation = newLocation {
+            if let newLocation = newLocation, locationManager.lastRequestID == myRequestID {
                 currentLocation = newLocation
             }
+        }
+        .onDisappear {
+            locationManager.clear()
         }
     }
     
@@ -272,9 +280,11 @@ struct ComposeMemoView: View {
                 }
 
                 Button {
-                    locationManager.requestLocation()
+                    let id = UUID()
+                    myRequestID = id
+                    locationManager.requestLocation(id: id)
                 } label: {
-                    if locationManager.isFetching {
+                    if locationManager.isFetching && locationManager.lastRequestID == myRequestID {
                         ProgressView()
                             .scaleEffect(0.5)
                             .frame(width: 12, height: 12)
@@ -284,6 +294,11 @@ struct ComposeMemoView: View {
                     }
                 }
                 .buttonStyle(.plain)
+                .onChange(of: locationManager.error) { _, newError in
+                    if let newError = newError, locationManager.lastRequestID == myRequestID {
+                        errorMessage = newError
+                    }
+                }
                 .foregroundColor(
                     currentLocation != nil
                         ? LiquidGlassTheme.colors.accent : LiquidGlassTheme.colors.secondaryText

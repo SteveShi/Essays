@@ -6,26 +6,31 @@ import Observation
 @MainActor
 @Observable
 class LocationManager: NSObject, CLLocationManagerDelegate {
+    static let shared = LocationManager()
+    
     private let manager = CLLocationManager()
     
     var location: Location?
     var isFetching = false
     var error: String?
+    var lastRequestID: UUID?
+    private var timeoutTask: Task<Void, Never>?
     
-    private var retryCount = 0
-    private let maxRetries = 2
-
-    override init() {
+    private override init() {
         super.init()
         manager.delegate = self
-        manager.desiredAccuracy = kCLLocationAccuracyBest // 提高精度以更好地解析 POI
+        manager.desiredAccuracy = kCLLocationAccuracyBest
     }
 
-    func requestLocation() {
-        location = nil // 重置之前的定位
+    func requestLocation(id: UUID? = nil) {
+        lastRequestID = id
+        if isFetching {
+            print("Already fetching, updated request ID.")
+            return
+        }
+        
         isFetching = true
         error = nil
-        retryCount = 0 // 开始新请求时重置重试计数
         
         let status = manager.authorizationStatus
         
@@ -40,18 +45,38 @@ class LocationManager: NSObject, CLLocationManagerDelegate {
             break
         }
         
-        manager.requestLocation()
+        // 确保是一个全新的开始
+        manager.stopUpdatingLocation()
+        manager.startUpdatingLocation()
+        
+        // 设置一个安全超时，防止一直转圈
+        timeoutTask?.cancel()
+        timeoutTask = Task {
+            try? await Task.sleep(for: .seconds(20))
+            if !Task.isCancelled {
+                await MainActor.run {
+                    if self.isFetching {
+                        print("Location request timed out.")
+                        self.manager.stopUpdatingLocation()
+                        self.isFetching = false
+                        self.error = String(localized: "Location request timed out. Please try again.", comment: "Error message for location timeout")
+                    }
+                }
+            }
+        }
     }
 
     nonisolated func locationManager(
         _ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]
     ) {
-        if let first = locations.last { // 使用最新的定位点
+        if let first = locations.last {
+            manager.stopUpdatingLocation()
+            
             Task {
                 await MainActor.run {
-                    self.retryCount = 0 // 成功获取位置，重置重试计数
+                    self.timeoutTask?.cancel()
+                    self.timeoutTask = nil
                 }
-                
                 let lat = first.coordinate.latitude
                 let lon = first.coordinate.longitude
                 
@@ -107,28 +132,31 @@ class LocationManager: NSObject, CLLocationManagerDelegate {
         let nsError = error as NSError
         
         Task { @MainActor in
-            // kCLErrorDomain 0 (locationUnknown) 是临时性错误，尝试重试
-            if nsError.domain == kCLErrorDomain && nsError.code == 0 && self.retryCount < self.maxRetries {
-                self.retryCount += 1
-                print("Location unknown, retrying (\(self.retryCount)/\(self.maxRetries))...")
-                // 延迟一秒后重试
-                try? await Task.sleep(nanoseconds: 1_000_000_000)
-                if self.isFetching { // 确保用户没取消
-                    self.manager.requestLocation()
-                }
+            if nsError.domain == kCLErrorDomain && nsError.code == 0 {
+                // Location unknown - startUpdatingLocation will keep trying.
+                print("Location unknown, still searching...")
                 return
             }
             
-            let description: String
-            if nsError.domain == kCLErrorDomain && nsError.code == 0 {
-                description = String(localized: "Unable to retrieve location. Please try again in a few seconds.", comment: "Location unknown after retries")
-            } else {
-                description = error.localizedDescription
-            }
+            // 停止更新并报错
+            self.timeoutTask?.cancel()
+            self.timeoutTask = nil
+            self.manager.stopUpdatingLocation()
             
+            let description = error.localizedDescription
             print("Location manager failed: \(description)")
             self.error = description
             self.isFetching = false
         }
+    }
+    
+    func clear() {
+        timeoutTask?.cancel()
+        timeoutTask = nil
+        location = nil
+        error = nil
+        isFetching = false
+        lastRequestID = nil
+        manager.stopUpdatingLocation()
     }
 }
