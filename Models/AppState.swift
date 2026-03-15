@@ -244,7 +244,7 @@ class AppState {
     @MainActor
     func archiveMemo(_ memo: Memo) async {
         do {
-            let updated = try await MemosAPIClient.shared.archiveMemo(id: memo.numericID, memoName: memo.name)
+            _ = try await MemosAPIClient.shared.archiveMemo(id: memo.numericID, memoName: memo.name)
             // Update local state
             if let index = memos.firstIndex(where: { $0.id == memo.id }) {
                 memos[index].state = .archived
@@ -276,7 +276,7 @@ class AppState {
             let body: [String: Any] = ["name": resourceName, "state": "NORMAL"]
             request.httpBody = try? JSONSerialization.data(withJSONObject: body)
             
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (_, response) = try await URLSession.shared.data(for: request)
             guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else { return }
             
             // Update local state
