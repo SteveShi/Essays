@@ -42,17 +42,18 @@ class LocationManager: NSObject, CLLocationManagerDelegate {
                     let geocoder = CLGeocoder()
                     let placemarks = try await geocoder.reverseGeocodeLocation(first)
                     if let placemark = placemarks.first {
-                        let components = [
-                            placemark.thoroughfare,
-                            placemark.subThoroughfare,
-                            placemark.locality,
-                            placemark.administrativeArea,
-                            placemark.postalCode,
-                            placemark.country,
-                        ].compactMap { $0 }.filter { !$0.isEmpty }
-
-                        if !components.isEmpty {
-                            addressString = components.joined(separator: ", ")
+                        // 优先获取地标名称/道路名称
+                        let name = placemark.name ?? placemark.thoroughfare
+                        let locality = placemark.locality ?? placemark.administrativeArea
+                        
+                        if let name = name {
+                            if let locality = locality, name != locality {
+                                addressString = "\(name), \(locality)"
+                            } else {
+                                addressString = name
+                            }
+                        } else {
+                            addressString = locality
                         }
                     }
                 } catch {

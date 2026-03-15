@@ -368,13 +368,12 @@ struct ComposeMemoView: View {
                 HStack(spacing: 4) {
                     Image(systemName: "mappin.and.ellipse")
                         .font(.system(size: 10))
-                    let coordStr =
-                        "[\(String(format: "%.4f", location.latitude)), \(String(format: "%.4f", location.longitude))]"
                     if let placeholder = location.placeholder, !placeholder.isEmpty {
-                        Text("\(coordStr) \(placeholder)")
+                        Text(placeholder)
                             .font(LiquidGlassTheme.typography.caption)
                             .lineLimit(1)
                     } else {
+                        let coordStr = "[\(String(format: "%.4f", location.latitude)), \(String(format: "%.4f", location.longitude))]"
                         Text(coordStr)
                             .font(LiquidGlassTheme.typography.caption)
                             .lineLimit(1)
