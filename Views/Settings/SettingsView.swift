@@ -10,7 +10,7 @@ struct SettingsView: View {
     @AppStorage("theme") private var theme = "system"
     @AppStorage("enableAIFeatures") private var enableAIFeatures = true
     @AppStorage("targetTranslationLanguage") private var targetTranslationLanguage = "auto"
-    @AppStorage("quickInputShortcut") private var quickInputShortcut = 1
+    @ObservedObject private var hotkeyManager = HotkeyManager.shared
     
     var body: some View {
         TabView {
@@ -53,10 +53,20 @@ struct SettingsView: View {
             }
             
             Section {
-                Picker(String(localized: "Quick Input Shortcut", comment: "Shortcut picker label"), selection: $quickInputShortcut) {
-                    Text(String(localized: "⌘ + ⌥ + N", comment: "Shortcut label option 1")).tag(1)
-                    Text(String(localized: "⌘ + ⇧ + N", comment: "Shortcut label option 2")).tag(2)
+                LabeledContent(String(localized: "Quick Input Shortcut", comment: "Shortcut picker label")) {
+                    HStack(spacing: 8) {
+                        KeyRecorderView(config: $hotkeyManager.config)
+                        Button(String(localized: "Reset", comment: "Reset hotkey to default")) {
+                            hotkeyManager.resetToDefault()
+                        }
+                        .buttonStyle(.borderless)
+                        .foregroundColor(.secondary)
+                        .font(LiquidGlassTheme.typography.caption)
+                    }
                 }
+                Text(String(localized: "Click the shortcut field and press your desired key combination.", comment: "Hotkey recorder hint"))
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             } header: {
                 Text(String(localized: "Shortcuts", comment: "Shortcuts section header"))
                     .font(LiquidGlassTheme.typography.headline)
@@ -251,4 +261,110 @@ struct SettingsView: View {
     }
     
 
+}
+
+// MARK: - KeyRecorderView
+
+/// 显示当前快捷键，点击后进入录制模式，用户按下新组合键即保存
+struct KeyRecorderView: View {
+    @Binding var config: HotkeyConfig
+
+    @State private var isRecording = false
+
+    var body: some View {
+        KeyRecorderField(config: $config, isRecording: $isRecording)
+            .frame(width: 140, height: 26)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(isRecording
+                        ? LiquidGlassTheme.colors.accent.opacity(0.12)
+                        : Color.primary.opacity(0.06))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6)
+                            .stroke(
+                                isRecording
+                                    ? LiquidGlassTheme.colors.accent
+                                    : Color.primary.opacity(0.15),
+                                lineWidth: 1
+                            )
+                    )
+            )
+    }
+}
+
+/// NSViewRepresentable：捕获键盘输入并回调 HotkeyConfig
+struct KeyRecorderField: NSViewRepresentable {
+    @Binding var config: HotkeyConfig
+    @Binding var isRecording: Bool
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    func makeNSView(context: Context) -> RecorderNSTextField {
+        let field = RecorderNSTextField()
+        field.coordinator = context.coordinator
+        field.isBordered = false
+        field.backgroundColor = .clear
+        field.isEditable = false
+        field.isSelectable = false
+        field.alignment = .center
+        field.font = .monospacedSystemFont(ofSize: 13, weight: .medium)
+        return field
+    }
+
+    func updateNSView(_ nsView: RecorderNSTextField, context: Context) {
+        nsView.stringValue = isRecording
+            ? String(localized: "Press shortcut…", comment: "Hotkey recorder prompt")
+            : config.displayString
+        nsView.textColor = isRecording ? NSColor.controlAccentColor : NSColor.labelColor
+    }
+
+    @MainActor
+    class Coordinator: NSObject {
+        var parent: KeyRecorderField
+        init(_ parent: KeyRecorderField) { self.parent = parent }
+
+        func handle(event: NSEvent) -> Bool {
+            // 忽略纯 modifier 键
+            guard let chars = event.charactersIgnoringModifiers, !chars.isEmpty,
+                  event.modifierFlags.intersection([.command, .option, .shift, .control]).isEmpty == false
+            else { return false }
+
+            let newConfig = HotkeyConfig(
+                key: chars.uppercased(),
+                modifierFlags: event.modifierFlags
+                    .intersection([.command, .option, .shift, .control]).rawValue
+            )
+            self.parent.config = newConfig
+            self.parent.isRecording = false
+            return true
+        }
+    }
+}
+
+/// 自定义 NSTextField 子类，响应点击进入录制模式，并拦截键盘事件
+final class RecorderNSTextField: NSTextField {
+    weak var coordinator: KeyRecorderField.Coordinator?
+
+    override func mouseDown(with event: NSEvent) {
+        coordinator.flatMap { _ in
+            DispatchQueue.main.async {
+                self.coordinator?.parent.isRecording.toggle()
+            }
+        }
+    }
+
+    override func keyDown(with event: NSEvent) {
+        guard let coord = coordinator, coord.parent.isRecording else {
+            super.keyDown(with: event)
+            return
+        }
+        if event.keyCode == 53 { // Esc — 取消录制
+            coord.parent.isRecording = false
+            return
+        }
+        _ = coord.handle(event: event)
+    }
+
+    override var acceptsFirstResponder: Bool { true }
+    override func becomeFirstResponder() -> Bool { true }
 }
