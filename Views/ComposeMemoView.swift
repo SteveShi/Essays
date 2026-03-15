@@ -34,7 +34,7 @@ struct ComposeMemoView: View {
             
             Divider()
             
-            if !uploadedAttachments.isEmpty {
+            if currentLocation != nil || !uploadedAttachments.isEmpty {
                 uploadPreview
                 Divider()
             }
@@ -49,6 +49,9 @@ struct ComposeMemoView: View {
                 // 恢复已有附件和定位，防止保存时被空值覆盖
                 uploadedAttachments = memo.attachments
                 currentLocation = memo.location
+            } else {
+                // 仅在新建模式下自动请求定位
+                locationManager.requestLocation()
             }
             isContentFocused = true
         }
@@ -58,6 +61,12 @@ struct ComposeMemoView: View {
         .sheet(isPresented: $showCamera) {
             CameraCaptureView { data in
                 uploadPhoto(data: data)
+            }
+        }
+        .onChange(of: locationManager.location, initial: false) { _, newLocation in
+            // 仅在用户主动请求定位或新建模式下更新
+            if newLocation != nil, editingMemo == nil || currentLocation == nil {
+                currentLocation = newLocation
             }
         }
     }
@@ -381,56 +390,45 @@ struct ComposeMemoView: View {
                 .foregroundColor(LiquidGlassTheme.colors.secondaryText)
                 .padding(.horizontal, 16)
                 .padding(.bottom, 8)
+            if currentLocation != nil && !uploadedAttachments.isEmpty {
+                Divider()
             }
 
-            Divider()
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                LazyHStack(spacing: 8) {
-                    ForEach(uploadedAttachments) { attachment in
-                        ZStack(alignment: .topTrailing) {
-                            if attachment.isImage {
-                                let attachmentURLs = attachment.resolvedURLs(
-                                    serverURL: appState.serverURL)
-                                AuthAsyncImage(urls: attachmentURLs) { image in
-                                    image
-                                        .resizable()
-                                        .aspectRatio(contentMode: .fill)
-                                } placeholder: {
-                                    Rectangle()
-                                        .fill(LiquidGlassTheme.colors.tertiaryBackground)
+            if !uploadedAttachments.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    LazyHStack(spacing: 8) {
+                        ForEach(uploadedAttachments) { attachment in
+                            ZStack(alignment: .topTrailing) {
+                                if attachment.isImage {
+                                    let attachmentURLs = attachment.resolvedURLs(
+                                        serverURL: appState.serverURL)
+                                    AuthAsyncImage(urls: attachmentURLs) { image in
+                                        image
+                                            .resizable()
+                                            .aspectRatio(contentMode: .fill)
+                                    } placeholder: {
+                                        Rectangle()
+                                            .fill(LiquidGlassTheme.colors.tertiaryBackground)
+                                    }
+                                    .frame(width: 80, height: 80)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
                                 }
-                                .frame(width: 80, height: 80)
-                                .clipShape(RoundedRectangle(cornerRadius: 8))
-                            }
 
-                            Button {
-                                uploadedAttachments.removeAll { $0.id == attachment.id }
-                            } label: {
-                                Image(systemName: "xmark.circle.fill")
-                                    .symbolRenderingMode(.palette)
-                                    .foregroundStyle(.white, .black.opacity(0.6))
+                                Button {
+                                    uploadedAttachments.removeAll { $0.id == attachment.id }
+                                } label: {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .symbolRenderingMode(.palette)
+                                        .foregroundStyle(.white, .black.opacity(0.6))
+                                }
+                                .buttonStyle(.plain)
+                                .padding(4)
                             }
-                            .buttonStyle(.plain)
-                            .padding(4)
                         }
                     }
+                    .padding(12)
                 }
-                .padding(12)
-            }
-            .background(LiquidGlassTheme.colors.secondaryBackground.opacity(0.5))
-        }
-        .onAppear {
-            if editingMemo == nil {
-                // 仅在新建模式下自动请求定位
-                locationManager.requestLocation()
-            }
-            // 编辑模式的 location 已在主 onAppear 中由 editingMemo 恢复
-        }
-        .onChange(of: locationManager.location, initial: false) { _, newLocation in
-            // 仅在用户主动请求定位或新建模式下更新
-            if newLocation != nil, editingMemo == nil || currentLocation == nil {
-                currentLocation = newLocation
+                .background(LiquidGlassTheme.colors.secondaryBackground.opacity(0.5))
             }
         }
     }
