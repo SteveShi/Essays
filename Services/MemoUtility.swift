@@ -28,7 +28,21 @@ enum MemoUtility {
                 }
             }
         }
-        
         return Array(tags).sorted()
+    }
+
+    /// 从文本中移除标签 (#标签)
+    static func stripTags(from content: String) -> String {
+        let pattern = "(?<=^|\\s)#([^\\s#]+)(?=$|\\s)"
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else {
+            return content
+        }
+        
+        let range = NSRange(content.startIndex..., in: content)
+        var result = regex.stringByReplacingMatches(in: content, options: [], range: range, withTemplate: "")
+        
+        // 清理多余空格
+        result = result.replacingOccurrences(of: "  +", with: " ", options: .regularExpression)
+        return result.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

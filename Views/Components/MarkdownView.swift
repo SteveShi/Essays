@@ -10,6 +10,7 @@ struct MemoMarkdownContent: View {
             .textSelection(.enabled)
             .foregroundStyle(LiquidGlassTheme.colors.text)
             .tint(LiquidGlassTheme.colors.accent)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .fixedSize(horizontal: false, vertical: true)
     }
 }

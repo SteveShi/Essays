@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2026-03-15
+
+### Added
+- 🖼️ **Attachments Gallery**: Introducing a dedicated "Attachments" view in the sidebar to browse all image memos in a beautiful grid layout.
+- 🎨 **Enhanced Localization**: Comprehensive audit and 100% removal of hardcoded strings across Settings, Timeline, Detail views, and AI Assistant.
+
+### Changed
+- 🧹 **Project Cleanup**: Streamlined the project structure by removing unused legacy directories and build logs.
+- 📌 **Sidebar Navigation**: Improved the responsiveness of sidebar filters and navigation states.
+
+### Fixed
+- 🏷️ **Tag Display Logic**: Resolved an issue where tags were displayed redundantly in the memo detail view.
+- 🛠️ **Gallery State Handling**: Fixed a bug where the gallery mode could be unintentionally reset by other sidebar filters.
+
 ## [1.5.0] - 2026-03-15
 
 ### Added

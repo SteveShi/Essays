@@ -58,7 +58,13 @@ struct ContentView: View {
             SidebarView()
                 .frame(minWidth: 220, idealWidth: 260, maxWidth: 300)
         } detail: {
-            MemoListView()
+            if let memo = appState.selectedMemoForDetail {
+                MemoDetailView(memo: memo)
+                    .transition(AnyTransition.move(edge: .trailing).combined(with: .opacity))
+            } else {
+                MemoListView()
+                    .transition(AnyTransition.move(edge: .leading).combined(with: .opacity))
+            }
         }
         .navigationSplitViewStyle(.balanced)
         .task {

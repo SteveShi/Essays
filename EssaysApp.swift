@@ -78,6 +78,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         registerGlobalHotkey()
     }
     
+    @MainActor
     private func setupMenuBar() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = statusItem.button {

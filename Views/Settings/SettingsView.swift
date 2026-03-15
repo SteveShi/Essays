@@ -54,8 +54,8 @@ struct SettingsView: View {
             
             Section {
                 Picker(String(localized: "Quick Input Shortcut", comment: "Shortcut picker label"), selection: $quickInputShortcut) {
-                    Text("⌘ + ⌥ + N").tag(1)
-                    Text("⌘ + ⇧ + N").tag(2)
+                    Text(String(localized: "⌘ + ⌥ + N", comment: "Shortcut label option 1")).tag(1)
+                    Text(String(localized: "⌘ + ⇧ + N", comment: "Shortcut label option 2")).tag(2)
                 }
             } header: {
                 Text(String(localized: "Shortcuts", comment: "Shortcuts section header"))

@@ -33,11 +33,24 @@ class AppState {
     var errorMessage: String?
     var selectedMemo: Memo?
     var searchText: String = "" {
-        didSet { scheduleFilteredUpdate() }
+        didSet { 
+            scheduleFilteredUpdate()
+            selectedMemoForDetail = nil
+            isGalleryMode = false
+        }
     }
     private var updateTask: Task<Void, Error>?
     var selectedTag: String? {
-        didSet { updateFilteredMemosState() }
+        didSet { 
+            updateFilteredMemosState()
+            selectedMemoForDetail = nil
+            isGalleryMode = false
+        }
+    }
+    var isGalleryMode: Bool = false {
+        didSet {
+            updateFilteredMemosState()
+        }
     }
     var showArchived: Bool = false
     var isLoggedIn: Bool = false
@@ -54,6 +67,13 @@ class AppState {
     private(set) var recentWeekMemosCount: Int = 0
     private(set) var publicMemosCount: Int = 0
     private(set) var privateMemosCount: Int = 0
+    private(set) var archivedMemosCount: Int = 0
+    
+    // For navigation jumping
+    var scrollToMemoID: String?
+    
+    // For detail view
+    var selectedMemoForDetail: Memo?
 
     private let userDefaults = UserDefaults.standard
     private let serverURLKey = "memos_server_url"
@@ -84,6 +104,9 @@ class AppState {
     private func loadLocalCachedMemos() {
         let cached = LocalDatabase.shared.fetchAllMemos()
         if !cached.isEmpty {
+            for memo in cached {
+                memo.extractTagsFromContent()
+            }
             self.memos = cached
         }
     }
@@ -136,9 +159,11 @@ class AppState {
             self.recentWeekMemosCount = 0
         }
         
-        // 统计公开和私有数量
-        self.publicMemosCount = memos.filter { $0.visibility == MemoVisibility.`public` }.count
-        self.privateMemosCount = memos.filter { $0.visibility == MemoVisibility.`private` }.count
+        // 统计公开和私有数量 (仅统计 NORMAL 状态)
+        let normalMemos = memos.filter { $0.state == .normal }
+        self.publicMemosCount = normalMemos.filter { $0.visibility == MemoVisibility.`public` }.count
+        self.privateMemosCount = normalMemos.filter { $0.visibility == MemoVisibility.`private` }.count
+        self.archivedMemosCount = memos.filter { $0.state == .archived }.count
     }
 
     /// 在搜索、标签过滤或数据变动时调用的过滤状态更新（主要针对当前视图显示）
@@ -146,9 +171,18 @@ class AppState {
     func updateFilteredMemosState() {
         let allFiltered = computeFilteredMemos()
         self.filteredMemos = allFiltered
-        self.pinnedMemosList = allFiltered.filter { $0.pinned }
-
-        let unpinned = allFiltered.filter { !$0.pinned }
+        
+        // Timeline normally only shows NORMAL memos even if filtered, 
+        // unless explicitly searching for archived
+        let visibleMemos: [Memo]
+        if searchText.lowercased().contains("is:archived") {
+            visibleMemos = allFiltered
+        } else {
+            visibleMemos = allFiltered.filter { $0.state == .normal }
+        }
+        
+        self.pinnedMemosList = visibleMemos.filter { $0.pinned }
+        let unpinned = visibleMemos.filter { !$0.pinned }
         let calendar = Calendar.current
 
         // Grouping for the timeline
@@ -203,15 +237,63 @@ class AppState {
         accessToken = ""
         currentUser = nil
         isLoggedIn = false
-        memos = []
         tags = []
+        selectedMemoForDetail = nil
+    }
+    
+    @MainActor
+    func archiveMemo(_ memo: Memo) async {
+        do {
+            let updated = try await MemosAPIClient.shared.archiveMemo(id: memo.numericID, memoName: memo.name)
+            // Update local state
+            if let index = memos.firstIndex(where: { $0.id == memo.id }) {
+                memos[index].state = .archived
+                // SwiftData auto-saves via mainContext if configured, 
+                // but we trigger an update for observation
+                updateFilteredMemosState()
+            }
+        } catch {
+            self.errorMessage = error.localizedDescription
+        }
+    }
+    
+    @MainActor
+    func unarchiveMemo(_ memo: Memo) async {
+        do {
+            // Unarchiving is essentially patching state back to NORMAL
+            // We can reuse updateMemo or add a specific unarchive in API client
+            // For now, let's use updateMemo with state update (I need to ensure updateMemo supports state)
+            let resourceName = memo.name
+            let encodedName = resourceName.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? resourceName
+            
+            guard let url = URL(string: "\(serverURL)/api/v1/\(encodedName)?updateMask=state") else { return }
+            
+            var request = URLRequest(url: url)
+            request.httpMethod = "PATCH"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+            
+            let body: [String: Any] = ["name": resourceName, "state": "NORMAL"]
+            request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+            
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else { return }
+            
+            // Update local state
+            if let index = memos.firstIndex(where: { $0.id == memo.id }) {
+                memos[index].state = .normal
+                updateFilteredMemosState()
+            }
+        } catch {
+            self.errorMessage = error.localizedDescription
+        }
     }
     
     private func computeFilteredMemos() -> [Memo] {
         print(
             "Computing filters: total memos: \(memos.count), searchText: '\(searchText)', selectedTag: '\(selectedTag ?? "nil")'")
         var result = memos
-        let (keywordTerms, pinnedFilter, visibilityFilter, createdFilter) = parseSearchFilters(from: searchText)
+        let (keywordTerms, pinnedFilter, visibilityFilter, stateFilter, createdFilter) = parseSearchFilters(from: searchText)
         
         if let pinnedFilter {
             result = result.filter { $0.pinned == pinnedFilter }
@@ -254,11 +336,26 @@ class AppState {
             print("After tag filter: \(result.count)")
         }
         
+        if let stateFilter {
+            result = result.filter { $0.state == stateFilter }
+        } else if !searchText.lowercased().contains("is:archived") {
+            // Default to normal if not searching for archived
+            result = result.filter { $0.state == .normal }
+        }
+        
+        if isGalleryMode {
+            // Gallery mode shows all memos with image attachments
+            result = memos.filter { memo in
+                memo.attachments.contains { $0.isImage }
+            }
+            print("Gallery mode filtered: \(result.count)")
+        }
+
         print("Final filtered memos: \(result.count)")
         return result.sorted { $0.pinned && !$1.pinned || ($0.pinned == $1.pinned && $0.createdAt > $1.createdAt) }
     }
     
-    private func parseSearchFilters(from rawSearch: String) -> ([String], Bool?, MemoVisibility?, CreatedFilter?) {
+    private func parseSearchFilters(from rawSearch: String) -> ([String], Bool?, MemoVisibility?, MemoState?, CreatedFilter?) {
         // We should split by whitespace, but allow for combining spaces inside quotes if needed.
         // For simplicity, sticking to the whitespace split but ignoring empty.
         let terms = rawSearch.split(whereSeparator: \.isWhitespace).map { String($0) }
@@ -266,11 +363,16 @@ class AppState {
         var keywordTerms: [String] = []
         var pinnedFilter: Bool?
         var visibilityFilter: MemoVisibility?
+        var stateFilter: MemoState?
         var createdFilter: CreatedFilter?
         
         for term in terms {
             let normalized = term.lowercased()
             switch normalized {
+            case "is:archived":
+                stateFilter = .archived
+            case "is:normal":
+                stateFilter = .normal
             case "pinned:true":
                 pinnedFilter = true
             case "pinned:false":
@@ -310,7 +412,7 @@ class AppState {
             }
         }
         
-        return (keywordTerms, pinnedFilter, visibilityFilter, createdFilter)
+        return (keywordTerms, pinnedFilter, visibilityFilter, stateFilter, createdFilter)
     }
 
     private enum CreatedFilter {

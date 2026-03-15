@@ -112,13 +112,24 @@ struct SidebarView: View {
                 }
                 
                 SidebarItem(
-                    icon: "pin.fill",
-                    title: String(localized: "Pinned", comment: "Sidebar item for pinned memos"),
-                    count: appState.pinnedMemosList.count,
-                    isSelected: appState.searchText.lowercased().contains("pinned:true")
+                    icon: "archivebox",
+                    title: String(localized: "Archived", comment: "Sidebar item for archived memos"),
+                    count: appState.archivedMemosCount,
+                    isSelected: appState.searchText.lowercased().contains("is:archived")
                 ) {
-                    appState.searchText = "pinned:true"
+                    appState.searchText = "is:archived"
                     appState.selectedTag = nil
+                }
+
+                SidebarItem(
+                    icon: "photo.on.rectangle.angled",
+                    title: String(localized: "Attachments", comment: "Sidebar item for image gallery"),
+                    count: appState.memos.reduce(0) { $0 + $1.attachments.filter { $0.isImage }.count },
+                    isSelected: appState.isGalleryMode
+                ) {
+                    appState.searchText = ""
+                    appState.selectedTag = nil
+                    appState.isGalleryMode = true
                 }
             }
         }

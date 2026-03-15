@@ -25,34 +25,58 @@ struct MemoListView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Fixed Quick Capture Box
-            VStack(spacing: 0) {
-                quickCaptureView
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 16)
-                
-                Divider()
-                    .opacity(0.3)
-            }
-            .background(.ultraThinMaterial)
-            .zIndex(1)
-            
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 24) {
-                    if appState.filteredMemos.isEmpty {
-                        emptyStateView
-                            .padding(.top, 40)
-                    } else {
-                        if !appState.pinnedMemosList.isEmpty {
-                            pinnedSection
+            if appState.isGalleryMode {
+                AttachmentsGridView()
+                    .toolbar {
+                        ToolbarItem(placement: .navigation) {
+                            Button {
+                                appState.isGalleryMode = false
+                            } label: {
+                                Image(systemName: "chevron.left")
+                            }
                         }
+                    }
+            } else {
+                // Fixed Quick Capture Box
+                VStack(spacing: 0) {
+                    quickCaptureView
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 16)
+                    
+                    Divider()
+                        .opacity(0.3)
+                }
+                .background(.ultraThinMaterial)
+                .zIndex(1)
+                
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 24) {
+                            if appState.filteredMemos.isEmpty {
+                                emptyStateView
+                                    .padding(.top, 40)
+                            } else {
+                                if !appState.pinnedMemosList.isEmpty {
+                                    pinnedSection
+                                }
 
-                        if !appState.timelineGroups.isEmpty {
-                            memosSection
+                                if !appState.timelineGroups.isEmpty {
+                                    memosSection
+                                }
+                            }
+                        }
+                        .padding(24)
+                    }
+                    .onChange(of: appState.scrollToMemoID) { _, newValue in
+                        if let id = newValue {
+                            withAnimation {
+                                proxy.scrollTo(id, anchor: .top)
+                            }
+                            // Reset after scroll
+                            appState.scrollToMemoID = nil
                         }
                     }
                 }
-                .padding(24)
             }
         }
         .navigationTitle(String(localized: "Timeline", comment: "Navigation title for the main list view"))
@@ -373,6 +397,7 @@ struct MemoListView: View {
                     MemoCard(memo: memo, onEdit: {
                         memoToEdit = memo
                     })
+                    .id(memo.name)
                 }
             }
         }
@@ -393,6 +418,7 @@ struct MemoListView: View {
                             MemoCard(memo: memo, onEdit: {
                                 memoToEdit = memo
                             })
+                            .id(memo.name)
                         }
                     }
                 }
@@ -600,6 +626,11 @@ struct MemoCard: View {
                 showActions = hovering
             }
         }
+        .onTapGesture {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                appState.selectedMemoForDetail = memo
+            }
+        }
         .quickLookPreview($quickLookURL)
     }
 
@@ -628,6 +659,22 @@ struct MemoCard: View {
                             localized: "Pending Sync", comment: "Tooltip for pending sync status"))
             }
 
+            if memo.commentCount > 0 {
+                HStack(spacing: 3) {
+                    Image(systemName: "bubble.left")
+                        .font(.system(size: 10))
+                                Text(String(localized: "\(memo.commentCount)", comment: "Comment count value"))
+                        .font(.system(size: 10, weight: .medium))
+                }
+                .foregroundColor(LiquidGlassTheme.colors.secondaryText)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(
+                    Capsule()
+                        .fill(LiquidGlassTheme.colors.secondaryBackground.opacity(0.5))
+                )
+            }
+
             Spacer()
 
             Menu {
@@ -647,6 +694,22 @@ struct MemoCard: View {
                     Label(
                         String(localized: "Edit", comment: "Context menu item to edit memo"),
                         systemImage: "pencil")
+                }
+                
+                Button {
+                    Task {
+                        if memo.state == .archived {
+                            await appState.unarchiveMemo(memo)
+                        } else {
+                            await appState.archiveMemo(memo)
+                        }
+                    }
+                } label: {
+                    Label(
+                        memo.state == .archived
+                            ? String(localized: "Restore", comment: "Context menu item to restore memo")
+                            : String(localized: "Archive", comment: "Context menu item to archive memo"),
+                        systemImage: memo.state == .archived ? "arrow.up.bin" : "archivebox")
                 }
                 
                 Button {
@@ -831,8 +894,8 @@ struct MemoCard: View {
 
     private var relationsView: some View {
         VStack(alignment: .leading, spacing: 8) {
-            let outgoing = memo.relations.filter { $0.memo == memo.name }
-            let incoming = memo.relations.filter { $0.relatedMemo == memo.name }
+            let outgoing = memo.relations.filter { $0.memo == memo.name && $0.type != .comment }
+            let incoming = memo.relations.filter { $0.relatedMemo == memo.name && $0.type != .comment }
 
             if !outgoing.isEmpty {
                 relationBlock(
@@ -853,7 +916,7 @@ struct MemoCard: View {
             HStack(spacing: 6) {
                 Image(systemName: icon)
                     .font(.system(size: 10))
-                Text("\(title) (\(items.count))")
+                Text(String(localized: "\(title) (\(items.count))", comment: "Section title with item count"))
                     .font(LiquidGlassTheme.typography.caption)
             }
             .foregroundColor(LiquidGlassTheme.colors.tertiaryText)
@@ -890,6 +953,10 @@ struct MemoCard: View {
                             RoundedRectangle(cornerRadius: 6).fill(
                                 LiquidGlassTheme.colors.tertiaryBackground)
                         )
+                        .onTapGesture {
+                            appState.scrollToMemoID = targetName
+                        }
+                        .help(String(localized: "Jump to this memo", comment: "Tooltip for jumping to referenced memo"))
                     } else {
                         HStack {
                             Image(systemName: "doc.text")

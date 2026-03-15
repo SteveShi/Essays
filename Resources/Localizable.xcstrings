@@ -1,6 +1,16 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "(%@)" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "(%@)"
+          }
+        }
+      }
+    },
     "[%@, %@]" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -205,6 +215,7 @@
       }
     },
     "⌘ + ⇧ + N" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -215,6 +226,7 @@
       }
     },
     "⌘ + ⌥ + N" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -513,6 +525,51 @@
         }
       }
     },
+    "Archive" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Archive"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "归档"
+          }
+        }
+      }
+    },
+    "Archived" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Archived"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已归档"
+          }
+        }
+      }
+    },
+    "Attachments" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "附件"
+          }
+        }
+      }
+    },
     "Attachments (%lld)" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -713,6 +770,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "代码块"
+          }
+        }
+      }
+    },
+    "Comment" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "评论"
+          }
+        }
+      }
+    },
+    "Comments" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Comments"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "评论"
           }
         }
       }
@@ -1047,6 +1132,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "扩展内容"
+          }
+        }
+      }
+    },
+    "Failed to create comment relation" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "创建评论关联失败"
           }
         }
       }
@@ -1447,6 +1543,17 @@
         }
       }
     },
+    "Memo Details" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Memo详情"
+          }
+        }
+      }
+    },
     "Memos on GitHub" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1505,6 +1612,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "记录闪念"
+          }
+        }
+      }
+    },
+    "No comments yet" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No comments yet"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无评论"
           }
         }
       }
@@ -2604,6 +2728,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "工作区"
+          }
+        }
+      }
+    },
+    "Write a comment..." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Write a comment..."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "写一条评论"
           }
         }
       }

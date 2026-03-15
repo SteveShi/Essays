@@ -11,6 +11,7 @@ final class Memo: Identifiable {
     var visibilityRaw: String
     var pinned: Bool
     var tags: [String]
+    var stateRaw: String = "NORMAL"
     var isPendingSync: Bool = false
 
     // Relationships
@@ -25,6 +26,11 @@ final class Memo: Identifiable {
         get { MemoVisibility(rawValue: visibilityRaw) ?? .private }
         set { visibilityRaw = newValue.rawValue }
     }
+    
+    var state: MemoState {
+        get { MemoState(rawValue: stateRaw) ?? .normal }
+        set { stateRaw = newValue.rawValue }
+    }
 
     init(
         name: String = "",
@@ -34,6 +40,7 @@ final class Memo: Identifiable {
         updatedAt: Date = Date(),
         visibility: MemoVisibility = .private,
         pinned: Bool = false,
+        state: MemoState = .normal,
         tags: [String] = [],
         attachments: [Attachment] = [],
         location: Location? = nil,
@@ -51,7 +58,12 @@ final class Memo: Identifiable {
         self.attachments = attachments
         self.location = location
         self.relations = relations
+        self.stateRaw = state.rawValue
         self.isPendingSync = isPendingSync
+    }
+    
+    var commentCount: Int {
+        relations.filter { $0.type == .comment }.count
     }
     func extractTagsFromContent() {
         self.tags = MemoUtility.extractTags(from: self.content)
@@ -59,8 +71,13 @@ final class Memo: Identifiable {
 }
 
 extension Memo {
+    var contentWithoutTags: String {
+        MemoUtility.stripTags(from: content)
+    }
+
     var truncatedContent: String {
-        let lines = content.components(separatedBy: "\n")
+        let strippedContent = contentWithoutTags
+        let lines = strippedContent.components(separatedBy: "\n")
         let limitedLines = lines.prefix(10)
         let joined = limitedLines.joined(separator: "\n")
         if joined.count > 500 {
@@ -243,4 +260,9 @@ final class Attachment: Identifiable {
     func resolvedURL(serverURL: String) -> URL? {
         resolvedURLs(serverURL: serverURL).first
     }
+}
+
+enum MemoState: String, Codable, CaseIterable, Sendable {
+    case normal = "NORMAL"
+    case archived = "ARCHIVED"
 }
