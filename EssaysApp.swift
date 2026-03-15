@@ -6,7 +6,6 @@ struct EssaysApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @State private var appState = AppState()
     @AppStorage("theme") private var theme = "system"
-    @Environment(\.openSettings) private var openSettingsAction
     
     private var preferredColorScheme: ColorScheme? {
         switch theme {
@@ -29,7 +28,9 @@ struct EssaysApp: App {
                     }
                 }
                 .onReceive(NotificationCenter.default.publisher(for: .openSettings)) { _ in
-                    openSettingsAction()
+                    #if os(macOS)
+                    NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+                    #endif
                 }
         }
         .windowToolbarStyle(.unified(showsTitle: true))
