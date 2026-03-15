@@ -6,6 +6,7 @@ struct EssaysApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @State private var appState = AppState()
     @AppStorage("theme") private var theme = "system"
+    @Environment(\.openSettings) private var openSettingsAction
     
     private var preferredColorScheme: ColorScheme? {
         switch theme {
@@ -26,6 +27,9 @@ struct EssaysApp: App {
                     if #available(macOS 26.0, *) {
                         await MemosAIAssistant.shared.initialize()
                     }
+                }
+                .onReceive(NotificationCenter.default.publisher(for: .openSettings)) { _ in
+                    openSettingsAction()
                 }
         }
         .windowToolbarStyle(.unified(showsTitle: true))

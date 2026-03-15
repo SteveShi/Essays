@@ -32,7 +32,8 @@ struct HotkeyConfig: Codable, Equatable {
 final class HotkeyManager: ObservableObject {
     static let shared = HotkeyManager()
 
-    private var monitor: Any?
+    private var globalMonitor: Any?
+    private var localMonitor: Any?
     private let userDefaultsKey = "quickInputHotkey"
 
     @Published var config: HotkeyConfig {
@@ -53,7 +54,8 @@ final class HotkeyManager: ObservableObject {
     func start() {
         stop()
         let cfg = config
-        monitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { event in
+        
+        let handler: (NSEvent) -> Void = { event in
             let requiredModifiers = cfg.modifiers.intersection([.command, .option, .shift, .control])
             let eventModifiers = event.modifierFlags.intersection([.command, .option, .shift, .control])
             let keyMatches = event.charactersIgnoringModifiers?.uppercased() == cfg.key
@@ -63,10 +65,28 @@ final class HotkeyManager: ObservableObject {
                 }
             }
         }
+        
+        globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { event in
+            handler(event)
+        }
+        
+        localMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            let requiredModifiers = cfg.modifiers.intersection([.command, .option, .shift, .control])
+            let eventModifiers = event.modifierFlags.intersection([.command, .option, .shift, .control])
+            let keyMatches = event.charactersIgnoringModifiers?.uppercased() == cfg.key
+            if eventModifiers == requiredModifiers && keyMatches {
+                DispatchQueue.main.async {
+                    QuickInputPanelManager.shared.togglePanel()
+                }
+                return nil // 拦截事件，避免触发应用内部的其它快捷键或输入响声
+            }
+            return event
+        }
     }
 
     func stop() {
-        if let m = monitor { NSEvent.removeMonitor(m); monitor = nil }
+        if let m = globalMonitor { NSEvent.removeMonitor(m); globalMonitor = nil }
+        if let m = localMonitor { NSEvent.removeMonitor(m); localMonitor = nil }
     }
 
     private func restart() { start() }

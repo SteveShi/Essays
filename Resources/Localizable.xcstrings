@@ -1843,6 +1843,17 @@
         }
       }
     },
+    "Press shortcut" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按下快捷键"
+          }
+        }
+      }
+    },
     "Private" : {
       "extractionState" : "manual",
       "localizations" : {
