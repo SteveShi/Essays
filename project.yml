@@ -49,6 +49,8 @@ targets:
     dependencies:
       - package: MarkdownView
         product: MarkdownView
+      - package: KeyboardShortcuts
+        product: KeyboardShortcuts
 
   EssaysTests:
     type: bundle.unit-test
@@ -67,6 +69,9 @@ packages:
   MarkdownView:
     url: https://github.com/mudkipme/MarkdownView
     branch: main
+  KeyboardShortcuts:
+    url: https://github.com/sindresorhus/KeyboardShortcuts
+    from: 2.0.0
 
 schemes:
   Essays:
