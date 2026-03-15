@@ -11,6 +11,9 @@ class LocationManager: NSObject, CLLocationManagerDelegate {
     var location: Location?
     var isFetching = false
     var error: String?
+    
+    private var retryCount = 0
+    private let maxRetries = 2
 
     override init() {
         super.init()
@@ -22,6 +25,7 @@ class LocationManager: NSObject, CLLocationManagerDelegate {
         location = nil // 重置之前的定位
         isFetching = true
         error = nil
+        retryCount = 0 // 开始新请求时重置重试计数
         
         let status = manager.authorizationStatus
         
@@ -44,6 +48,10 @@ class LocationManager: NSObject, CLLocationManagerDelegate {
     ) {
         if let first = locations.last { // 使用最新的定位点
             Task {
+                await MainActor.run {
+                    self.retryCount = 0 // 成功获取位置，重置重试计数
+                }
+                
                 let lat = first.coordinate.latitude
                 let lon = first.coordinate.longitude
                 
@@ -96,8 +104,28 @@ class LocationManager: NSObject, CLLocationManagerDelegate {
     }
 
     nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        let description = error.localizedDescription
+        let nsError = error as NSError
+        
         Task { @MainActor in
+            // kCLErrorDomain 0 (locationUnknown) 是临时性错误，尝试重试
+            if nsError.domain == kCLErrorDomain && nsError.code == 0 && self.retryCount < self.maxRetries {
+                self.retryCount += 1
+                print("Location unknown, retrying (\(self.retryCount)/\(self.maxRetries))...")
+                // 延迟一秒后重试
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                if self.isFetching { // 确保用户没取消
+                    self.manager.requestLocation()
+                }
+                return
+            }
+            
+            let description: String
+            if nsError.domain == kCLErrorDomain && nsError.code == 0 {
+                description = String(localized: "Unable to retrieve location. Please try again in a few seconds.", comment: "Location unknown after retries")
+            } else {
+                description = error.localizedDescription
+            }
+            
             print("Location manager failed: \(description)")
             self.error = description
             self.isFetching = false
