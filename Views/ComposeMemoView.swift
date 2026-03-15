@@ -24,6 +24,8 @@ struct ComposeMemoView: View {
     @State private var showMemoPicker = false
     @State private var showCamera = false
 
+    @AppStorage("autoFetchLocation") private var autoFetchLocation = true
+    
     var body: some View {
         VStack(spacing: 0) {
             headerView
@@ -49,8 +51,8 @@ struct ComposeMemoView: View {
                 // 恢复已有附件和定位，防止保存时被空值覆盖
                 uploadedAttachments = memo.attachments
                 currentLocation = memo.location
-            } else {
-                // 仅在新建模式下自动请求定位
+            } else if autoFetchLocation {
+                // 仅在新建模式且开启设置时自动请求定位
                 locationManager.requestLocation()
             }
             isContentFocused = true

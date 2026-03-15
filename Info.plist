@@ -30,6 +30,8 @@
     <string>NSApplication</string>
     <key>NSCameraUsageDescription</key>
     <string>We need camera access to let you take photos and attach them to your memos.</string>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>We use your location to automatically add geotags to your memos, making it easier to remember where you captured your thoughts.</string>
     <key>NSAppTransportSecurity</key>
     <dict>
         <key>NSAllowsArbitraryLoads</key>
