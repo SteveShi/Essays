@@ -11,7 +11,6 @@ struct SettingsView: View {
     @AppStorage("theme") private var theme = "system"
     @AppStorage("enableAIFeatures") private var enableAIFeatures = true
     @AppStorage("targetTranslationLanguage") private var targetTranslationLanguage = "auto"
-    @AppStorage("autoFetchLocation") private var autoFetchLocation = true
     
     var body: some View {
         TabView {
@@ -77,8 +76,6 @@ struct SettingsView: View {
                 }
 
                 Toggle(String(localized: "Auto-save drafts", comment: "Toggle for auto-save"), isOn: $autoSave)
-                Toggle(String(localized: "Auto-fetch Location", comment: "Toggle for auto-fetching location"), isOn: $autoFetchLocation)
-                    .help(String(localized: "Automatically request location when creating a new memo.", comment: "Help text for auto-fetch location"))
             } header: {
                 Text(String(localized: "Behavior", comment: "Behavior section header"))
                     .font(LiquidGlassTheme.typography.headline)

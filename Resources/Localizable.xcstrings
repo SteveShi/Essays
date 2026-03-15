@@ -2844,28 +2844,6 @@
           }
         }
       }
-    },
-    "Auto-fetch Location": {
-      "comment": "Toggle for auto-fetching location",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "自动获取定位"
-          }
-        }
-      }
-    },
-    "Automatically request location when creating a new memo.": {
-      "comment": "Help text for auto-fetch location",
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "创建新闪念时自动请求获取地理位置。"
-          }
-        }
-      }
     }
   },
   "version": "1.0"
