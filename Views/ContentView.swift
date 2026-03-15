@@ -5,7 +5,6 @@ struct ContentView: View {
     @State private var showComposeSheet = false
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @AppStorage("theme") private var theme = "system"
-    @Environment(\.openSettings) private var openSettings
 
     private var preferredColorScheme: ColorScheme? {
         switch theme {
@@ -26,9 +25,6 @@ struct ContentView: View {
         .preferredColorScheme(preferredColorScheme)
         .onReceive(NotificationCenter.default.publisher(for: .createNewMemo)) { _ in
             showComposeSheet = true
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .openSettings)) { _ in
-            openSettings()
         }
         .environment(appState)
         .sheet(isPresented: $showComposeSheet) {

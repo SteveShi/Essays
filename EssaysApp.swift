@@ -27,11 +27,6 @@ struct EssaysApp: App {
                         await MemosAIAssistant.shared.initialize()
                     }
                 }
-                .onReceive(NotificationCenter.default.publisher(for: .openSettings)) { _ in
-                    #if os(macOS)
-                    NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-                    #endif
-                }
         }
         .windowToolbarStyle(.unified(showsTitle: true))
         .commands {
@@ -93,8 +88,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let event = NSApp.currentEvent!
         if event.type == .rightMouseUp {
             let menu = NSMenu()
-            menu.addItem(NSMenuItem(title: String(localized: "Settings"), action: #selector(openSettings), keyEquivalent: ","))
-            menu.addItem(NSMenuItem.separator())
             menu.addItem(NSMenuItem(title: String(localized: "Quit Essays"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
             statusItem.menu = menu
             statusItem.button?.performClick(nil)
@@ -103,34 +96,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             QuickInputPanelManager.shared.togglePanel()
         }
     }
-
-    @MainActor
-    @objc func openSettings() {
-        NotificationCenter.default.post(name: .openSettings, object: nil)
-    }
 }
 
 extension Notification.Name {
     static let createNewMemo = Notification.Name("createNewMemo")
     static let focusSearch = Notification.Name("focusSearch")
     static let toggleSidebar = Notification.Name("toggleSidebar")
-    static let openSettings = Notification.Name("openSettings")
     static let toggleQuickInput = Notification.Name("toggleQuickInput")
-}
-
-struct OpenSettingsKey: EnvironmentKey {
-    static let defaultValue: @Sendable () -> Void = {
-        #if os(macOS)
-            Task { @MainActor in
-                NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-            }
-        #endif
-    }
-}
-
-extension EnvironmentValues {
-    var openSettings: @Sendable () -> Void {
-        get { self[OpenSettingsKey.self] }
-        set { self[OpenSettingsKey.self] = newValue }
-    }
 }

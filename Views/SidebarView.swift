@@ -236,14 +236,6 @@ struct SidebarView: View {
             
             Menu {
                 Button {
-                    NotificationCenter.default.post(name: .openSettings, object: nil)
-                } label: {
-                    Label(String(localized: "Settings", comment: "Menu item for settings"), systemImage: "gear")
-                }
-                
-                Divider()
-                
-                Button {
                     appState.clearCredentials()
                 } label: {
                     Label(String(localized: "Sign Out", comment: "Menu item for signing out"), systemImage: "rectangle.portrait.and.arrow.right")
