@@ -1,5 +1,4 @@
 import AppKit
-import Carbon.HIToolbox // 只用 keycode 常量，不用 Carbon 热键 API
 
 // MARK: - Hotkey 数据模型
 
