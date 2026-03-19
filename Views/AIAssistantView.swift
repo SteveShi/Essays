@@ -48,7 +48,7 @@ struct AIAssistantView: View {
     
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 0) {
                 // Header
                 HStack {
                     Image(systemName: "wand.and.stars")
@@ -79,10 +79,13 @@ struct AIAssistantView: View {
                         .font(.system(size: 12))
                         .foregroundColor(.secondary)
                         .lineLimit(2)
-                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .padding(.horizontal, 16)
                 .padding(.vertical, 8)
+                .padding(.horizontal, 12)
+                .background(Color.primary.opacity(0.05))
+                .cornerRadius(6)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
                 
                 Divider().opacity(0.3)
                 
