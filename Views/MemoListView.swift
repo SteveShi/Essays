@@ -689,6 +689,11 @@ struct MemoCard: View {
                 showActions = hovering
             }
         }
+        .onTapGesture {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                appState.selectedMemoForDetail = memo
+            }
+        }
         .quickLookPreview($quickLookURL)
     }
 
