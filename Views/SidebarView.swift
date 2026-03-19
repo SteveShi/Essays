@@ -245,18 +245,13 @@ struct SidebarLinkItem: View {
     }
     
     var body: some View {
-        #if os(iOS)
-        NavigationLink(value: selection) {
-            itemContent
-        }
-        .buttonStyle(.plain)
-        #else
         Button {
             appState.sidebarSelection = selection
         } label: {
             itemContent
         }
         .buttonStyle(.plain)
+        #if os(macOS)
         .onHover { hovering in
             withAnimation(.easeInOut(duration: 0.2)) {
                 isHovered = hovering
@@ -310,18 +305,13 @@ struct TagLinkChip: View {
     }
     
     var body: some View {
-        #if os(iOS)
-        NavigationLink(value: selection) {
-            chipContent
-        }
-        .buttonStyle(.plain)
-        #else
         Button {
             appState.sidebarSelection = selection
         } label: {
             chipContent
         }
         .buttonStyle(.plain)
+        #if os(macOS)
         .onHover { hovering in
             withAnimation(LiquidGlassTheme.animation.easeOut) {
                 isHovered = hovering
@@ -580,13 +570,6 @@ struct DayButton: View {
         let isSelected = appState.sidebarSelection == selection
         let isToday = calendar.isDateInToday(date)
 
-        #if os(iOS)
-        return NavigationLink(value: selection) {
-            dayLabel(isCurrentMonth: isCurrentMonth, isSelected: isSelected, isToday: isToday, hasMemo: hasMemo)
-        }
-        .buttonStyle(.plain)
-        .disabled(!hasMemo && !isToday && !isSelected)
-        #else
         return Button {
             appState.sidebarSelection = selection
         } label: {
@@ -594,7 +577,6 @@ struct DayButton: View {
         }
         .buttonStyle(.plain)
         .disabled(!hasMemo && !isToday && !isSelected)
-        #endif
     }
 
     private func dayLabel(isCurrentMonth: Bool, isSelected: Bool, isToday: Bool, hasMemo: Bool) -> some View {
