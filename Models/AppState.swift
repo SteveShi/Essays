@@ -88,6 +88,9 @@ class AppState {
     // For detail view
     var selectedMemoForDetail: Memo?
     
+    // For NavigationSplitView column control (iPhone navigation)
+    var columnVisibility: NavigationSplitViewVisibility = .all
+    
     var sidebarSelection: SidebarSelection? = .all {
         didSet {
             updateFiltersFromSelection()

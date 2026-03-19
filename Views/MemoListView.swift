@@ -692,6 +692,7 @@ struct MemoCard: View {
         .onTapGesture {
             withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
                 appState.selectedMemoForDetail = memo
+                appState.columnVisibility = .detailOnly
             }
         }
         .quickLookPreview($quickLookURL)

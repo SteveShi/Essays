@@ -3,7 +3,6 @@ import SwiftUI
 struct ContentView: View {
     @Environment(AppState.self) var appState
     @State private var showComposeSheet = false
-    @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @AppStorage("theme") private var theme = "system"
 
     private var preferredColorScheme: ColorScheme? {
@@ -51,7 +50,7 @@ struct ContentView: View {
 
     private var mainView: some View {
         @Bindable var appState = appState
-        return NavigationSplitView(columnVisibility: $columnVisibility) {
+        return NavigationSplitView(columnVisibility: $appState.columnVisibility) {
             SidebarView()
                 #if os(macOS)
                 .frame(minWidth: 220, idealWidth: 260, maxWidth: 300)
@@ -60,29 +59,16 @@ struct ContentView: View {
             MemoListView()
                 #if os(macOS)
                 .frame(minWidth: 320, idealWidth: 360)
-                #else
-                .navigationTitle(String(localized: "Timeline", comment: "Navigation title for the main list view"))
-                .navigationDestination(for: Memo.self) { memo in
-                    MemoDetailView(memo: memo)
-                }
-                .navigationDestination(for: AppState.SidebarSelection.self) { selection in
-                    MemoListView()
-                }
                 #endif
         } detail: {
-            #if os(iOS)
-            NavigationStack {
-                detailColumn
-            }
-            #else
             detailColumn
-            #endif
         }
         .navigationSplitViewStyle(.balanced)
         .onAppear {
             #if os(iOS)
             if UIDevice.current.userInterfaceIdiom == .phone {
-                columnVisibility = .all
+                // iPhone: default to showing the list column (not sidebar)
+                appState.columnVisibility = .doubleColumn
             }
             #endif
         }

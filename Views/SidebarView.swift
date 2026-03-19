@@ -247,6 +247,7 @@ struct SidebarLinkItem: View {
     var body: some View {
         Button {
             appState.sidebarSelection = selection
+            appState.columnVisibility = .doubleColumn
         } label: {
             itemContent
         }
@@ -307,6 +308,7 @@ struct TagLinkChip: View {
     var body: some View {
         Button {
             appState.sidebarSelection = selection
+            appState.columnVisibility = .doubleColumn
         } label: {
             chipContent
         }
@@ -572,6 +574,7 @@ struct DayButton: View {
 
         return Button {
             appState.sidebarSelection = selection
+            appState.columnVisibility = .doubleColumn
         } label: {
             dayLabel(isCurrentMonth: isCurrentMonth, isSelected: isSelected, isToday: isToday, hasMemo: hasMemo)
         }
