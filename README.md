@@ -30,6 +30,9 @@ All AI processing happens **locally on your Mac**, ensuring your thoughts and da
 
 ## Installation
 
+### Direct Download
+Download the latest `.dmg` or `.app` from the [Releases](https://github.com/lpgneg19/Essays/releases) page.
+
 ### Homebrew
 Install via Homebrew tap:
 ```bash
@@ -39,8 +42,9 @@ brew install --cask essays
 
 ### Build from Source
 1. Clone the repository.
-2. Open `Essays.xcodeproj` in Xcode.
-3. Build and Run (`Cmd + R`).
+2. Install [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`).
+3. Run `xcodegen generate` in the project root.
+4. Open `Essays.xcodeproj` and run.
 
 ## Configuration
 

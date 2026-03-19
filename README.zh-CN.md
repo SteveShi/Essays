@@ -30,6 +30,9 @@
 
 ## 安装指南
 
+### 直接下载
+从 [Releases](https://github.com/lpgneg19/Essays/releases) 页面下载最新的 `.dmg` 或 `.app` 文件。
+
 ### Homebrew
 通过 Homebrew tap 安装：
 ```bash
@@ -39,8 +42,9 @@ brew install --cask essays
 
 ### 从源码编译
 1. 克隆本仓库。
-2. 使用 Xcode 打开 `Essays.xcodeproj`。
-3. 编译并运行 (`Cmd + R`)。
+2. 安装 [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`)。
+3. 在项目根目录运行 `xcodegen generate`。
+4. 使用 Xcode 打开 `Essays.xcodeproj` 并运行。
 
 ## 配置说明
 
