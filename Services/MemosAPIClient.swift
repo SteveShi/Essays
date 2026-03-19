@@ -535,6 +535,7 @@ class MemosAPIClient {
         
         if let location = location {
             body["location"] = [
+                "placeholder": location.placeholder ?? "",
                 "latitude": location.latitude,
                 "longitude": location.longitude,
             ]
@@ -583,6 +584,7 @@ class MemosAPIClient {
         
         if let location = location {
             body["location"] = [
+                "placeholder": location.placeholder ?? "",
                 "latitude": location.latitude,
                 "longitude": location.longitude,
             ]

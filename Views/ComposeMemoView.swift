@@ -9,7 +9,11 @@ struct ComposeMemoView: View {
     @Environment(AppState.self) var appState
     @Environment(\.dismiss) private var dismiss
     
-    var editingMemo: Memo?
+    var editingMemo: Memo? = nil
+    
+    init(editingMemo: Memo? = nil) {
+        self.editingMemo = editingMemo
+    }
     
     @State private var content: String = ""
     @State private var visibility: MemoVisibility = .private
@@ -24,11 +28,12 @@ struct ComposeMemoView: View {
     @State private var suggestedTags: [String] = []
     @State private var showFilePicker = false
     
-    @State private var locationManager = LocationManager()
+    private var locationManager = LocationManager.shared
+    @State private var myRequestID: UUID?
 
     @State private var showMemoPicker = false
     @State private var showCamera = false
-
+    
     var body: some View {
         VStack(spacing: 0) {
             headerView
@@ -39,7 +44,7 @@ struct ComposeMemoView: View {
             
             Divider()
             
-            if !uploadedAttachments.isEmpty {
+            if currentLocation != nil || !uploadedAttachments.isEmpty {
                 uploadPreview
                 Divider()
             }
@@ -64,6 +69,14 @@ struct ComposeMemoView: View {
             CameraCaptureView { data in
                 uploadPhoto(data: data)
             }
+        }
+        .onChange(of: locationManager.location, initial: false) { _, newLocation in
+            if let newLocation = newLocation, locationManager.lastRequestID == myRequestID {
+                currentLocation = newLocation
+            }
+        }
+        .onDisappear {
+            locationManager.clear()
         }
     }
     
@@ -169,7 +182,7 @@ struct ComposeMemoView: View {
                 }
             }
             
-            if let error = errorMessage {
+            if let error = errorMessage ?? locationManager.error {
                 HStack(spacing: 8) {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .foregroundColor(LiquidGlassTheme.colors.error)
@@ -272,9 +285,11 @@ struct ComposeMemoView: View {
                 }
 
                 Button {
-                    locationManager.requestLocation()
+                    let id = UUID()
+                    myRequestID = id
+                    locationManager.requestLocation(id: id)
                 } label: {
-                    if locationManager.isFetching {
+                    if locationManager.isFetching && locationManager.lastRequestID == myRequestID {
                         ProgressView()
                             .scaleEffect(0.5)
                             .frame(width: 12, height: 12)
@@ -284,6 +299,11 @@ struct ComposeMemoView: View {
                     }
                 }
                 .buttonStyle(.plain)
+                .onChange(of: locationManager.error) { _, newError in
+                    if let newError = newError, locationManager.lastRequestID == myRequestID {
+                        errorMessage = newError
+                    }
+                }
                 .foregroundColor(
                     currentLocation != nil
                         ? LiquidGlassTheme.colors.accent : LiquidGlassTheme.colors.secondaryText
@@ -364,13 +384,12 @@ struct ComposeMemoView: View {
                 HStack(spacing: 4) {
                     Image(systemName: "mappin.and.ellipse")
                         .font(.system(size: 10))
-                    let coordStr =
-                        "[\(String(format: "%.4f", location.latitude)), \(String(format: "%.4f", location.longitude))]"
                     if let placeholder = location.placeholder, !placeholder.isEmpty {
-                        Text("\(coordStr) \(placeholder)")
+                        Text(placeholder)
                             .font(LiquidGlassTheme.typography.caption)
                             .lineLimit(1)
                     } else {
+                        let coordStr = "[\(String(format: "%.4f", location.latitude)), \(String(format: "%.4f", location.longitude))]"
                         Text(coordStr)
                             .font(LiquidGlassTheme.typography.caption)
                             .lineLimit(1)
@@ -388,54 +407,45 @@ struct ComposeMemoView: View {
                 .padding(.bottom, 8)
             }
 
-            Divider()
+            if currentLocation != nil && !uploadedAttachments.isEmpty {
+                Divider()
+            }
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                LazyHStack(spacing: 8) {
-                    ForEach(uploadedAttachments) { attachment in
-                        ZStack(alignment: .topTrailing) {
-                            if attachment.isImage {
-                                let attachmentURLs = attachment.resolvedURLs(
-                                    serverURL: appState.serverURL)
-                                AuthAsyncImage(urls: attachmentURLs) { image in
-                                    image
-                                        .resizable()
-                                        .aspectRatio(contentMode: .fill)
-                                } placeholder: {
-                                    Rectangle()
-                                        .fill(LiquidGlassTheme.colors.tertiaryBackground)
+            if !uploadedAttachments.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    LazyHStack(spacing: 8) {
+                        ForEach(uploadedAttachments) { attachment in
+                            ZStack(alignment: .topTrailing) {
+                                if attachment.isImage {
+                                    let attachmentURLs = attachment.resolvedURLs(
+                                        serverURL: appState.serverURL)
+                                    AuthAsyncImage(urls: attachmentURLs) { image in
+                                        image
+                                            .resizable()
+                                            .aspectRatio(contentMode: .fill)
+                                    } placeholder: {
+                                        Rectangle()
+                                            .fill(LiquidGlassTheme.colors.tertiaryBackground)
+                                    }
+                                    .frame(width: 80, height: 80)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
                                 }
-                                .frame(width: 80, height: 80)
-                                .clipShape(RoundedRectangle(cornerRadius: 8))
-                            }
 
-                            Button {
-                                uploadedAttachments.removeAll { $0.id == attachment.id }
-                            } label: {
-                                Image(systemName: "xmark.circle.fill")
-                                    .symbolRenderingMode(.palette)
-                                    .foregroundStyle(.white, .black.opacity(0.6))
+                                Button {
+                                    uploadedAttachments.removeAll { $0.id == attachment.id }
+                                } label: {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .symbolRenderingMode(.palette)
+                                        .foregroundStyle(.white, .black.opacity(0.6))
+                                }
+                                .buttonStyle(.plain)
+                                .padding(4)
                             }
-                            .buttonStyle(.plain)
-                            .padding(4)
                         }
                     }
+                    .padding(12)
                 }
-                .padding(12)
-            }
-            .background(LiquidGlassTheme.colors.secondaryBackground.opacity(0.5))
-        }
-        .onAppear {
-            if editingMemo == nil {
-                // 仅在新建模式下自动请求定位
-                locationManager.requestLocation()
-            }
-            // 编辑模式的 location 已在主 onAppear 中由 editingMemo 恢复
-        }
-        .onChange(of: locationManager.location, initial: false) { _, newLocation in
-            // 仅在用户主动请求定位或新建模式下更新
-            if newLocation != nil, editingMemo == nil || currentLocation == nil {
-                currentLocation = newLocation
+                .background(LiquidGlassTheme.colors.secondaryBackground.opacity(0.5))
             }
         }
         .fileImporter(

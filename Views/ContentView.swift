@@ -57,7 +57,10 @@ struct ContentView: View {
                 #endif
         } content: {
             MemoListView()
-                .navigationTitle(String(localized: "Memos", comment: "Navigation title for the memo list"))
+                #if os(macOS)
+                .frame(minWidth: 320, idealWidth: 360)
+                #else
+                .navigationTitle(String(localized: "Timeline", comment: "Navigation title for the main list view"))
                 .navigationDestination(for: Memo.self) { memo in
                     MemoDetailView(memo: memo)
                 }
@@ -66,19 +69,26 @@ struct ContentView: View {
                     // updates the content column. NavigationStack handles the push on iPhone.
                     MemoListView()
                 }
+                #endif
         } detail: {
-            NavigationStack {
+            ZStack {
                 if let memo = appState.selectedMemoForDetail {
                     MemoDetailView(memo: memo)
+                        .id(memo.id) // Ensure view refreshes for different memos
                 } else {
                     ContentUnavailableView {
-                        Label(String(localized: "No Memo Selected", comment: "Empty state in detail view"), systemImage: "quote.opening")
+                        Label(String(localized: "Select a Memo", comment: "Placeholder when no memo is selected"), systemImage: "note.text")
                     } description: {
-                        Text(String(localized: "Select a memo from the list to view its details.", comment: "Empty state description in detail view"))
+                        Text(String(localized: "Choose a memo from the list to view its details.", comment: "Instructional text under the placeholder"))
                     }
+                    #if os(iOS)
                     .background(LiquidGlassTheme.colors.background)
+                    #endif
                 }
             }
+            #if os(iOS)
+            .navigationStack() // Using the same approach as ios-port if applicable, or wrapping
+            #endif
         }
         .navigationSplitViewStyle(.balanced)
         .onAppear {

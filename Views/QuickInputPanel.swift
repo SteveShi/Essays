@@ -2,6 +2,7 @@ import SwiftUI
 import SwiftData
 #if os(macOS)
 import AppKit
+import CoreLocation
 
 @MainActor
 class QuickInputPanelManager: NSObject {
@@ -12,7 +13,7 @@ class QuickInputPanelManager: NSObject {
         if panel == nil {
             let contentView = QuickInputWindowView()
             let newPanel = QuickInputPanel(
-                contentRect: NSRect(x: 0, y: 0, width: 450, height: 160),
+                contentRect: NSRect(x: 0, y: 0, width: 450, height: 180),
                 styleMask: [.nonactivatingPanel, .titled, .fullSizeContentView, .hudWindow],
                 backing: .buffered,
                 defer: false
@@ -62,14 +63,49 @@ struct QuickInputWindowView: View {
     @State private var isSaving = false
     @FocusState private var isFocused: Bool
     
+    private var locationManager = LocationManager.shared
+    @State private var currentLocation: Location?
+    @State private var myRequestID: UUID?
+    
     var body: some View {
         VStack(spacing: 12) {
-            TextField("Capture a thought... (Press Esc to cancel)", text: $text, axis: .vertical)
+            TextField(String(localized: "Capture a thought... (Press Esc to cancel)", comment: "Placeholder for quick thought capture"), text: $text, axis: .vertical)
                 .textFieldStyle(.plain)
                 .font(.system(size: 16))
                 .lineLimit(1...8)
                 .focused($isFocused)
                 .padding()
+            
+            if let location = currentLocation {
+                HStack(spacing: 4) {
+                    Image(systemName: "mappin.and.ellipse")
+                        .font(.system(size: 10))
+                    
+                    if let placeholder = location.placeholder, !placeholder.isEmpty {
+                        Text(placeholder)
+                    } else {
+                        Text(String(format: "%.4f, %.4f", location.latitude, location.longitude))
+                    }
+                    
+                    Button {
+                        currentLocation = nil
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 10))
+                    }
+                    .buttonStyle(.plain)
+                }
+                .font(.system(size: 11))
+                .foregroundColor(.secondary)
+                .padding(.horizontal)
+            }
+            
+            if let error = locationManager.error {
+                Text(error)
+                    .font(.system(size: 10))
+                    .foregroundColor(.red)
+                    .padding(.horizontal)
+            }
             
             HStack {
                 Menu {
@@ -92,13 +128,32 @@ struct QuickInputWindowView: View {
                 
                 Spacer()
                 
-                Button("Save") {
-                    saveMemo()
+                HStack(spacing: 12) {
+                    Button {
+                        let id = UUID()
+                        myRequestID = id
+                        locationManager.requestLocation(id: id)
+                    } label: {
+                        if locationManager.isFetching && locationManager.lastRequestID == myRequestID {
+                            ProgressView()
+                                .scaleEffect(0.5)
+                                .frame(width: 14, height: 14)
+                        } else {
+                            Image(systemName: "mappin.and.ellipse")
+                                .font(.system(size: 14))
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundColor(currentLocation != nil ? .accentColor : .secondary)
+                    
+                    Button(String(localized: "Save", comment: "Label for save button")) {
+                        saveMemo()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(LiquidGlassTheme.colors.accent)
+                    .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSaving)
+                    .keyboardShortcut(.return, modifiers: .command)
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(LiquidGlassTheme.colors.accent)
-                .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSaving)
-                .keyboardShortcut(.return, modifiers: .command)
             }
             .padding(.horizontal)
             .padding(.bottom)
@@ -113,6 +168,16 @@ struct QuickInputWindowView: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 isFocused = true
             }
+        }
+        .onChange(of: locationManager.location) { _, newLocation in
+            if let newLocation = newLocation, locationManager.lastRequestID == myRequestID {
+                withAnimation {
+                    currentLocation = newLocation
+                }
+            }
+        }
+        .onDisappear {
+            locationManager.clear()
         }
     }
     
@@ -130,11 +195,12 @@ struct QuickInputWindowView: View {
                     visibility: visibility,
                     tags: tags,
                     attachmentNames: [],
-                    location: nil
+                    location: currentLocation
                 )
                 
                 await MainActor.run {
                     self.text = ""
+                    self.currentLocation = nil
                     self.isSaving = false
                     QuickInputPanelManager.shared.togglePanel() // Hide
                     

@@ -95,7 +95,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func setupMenuBar() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = statusItem.button {
-            button.image = NSImage(systemSymbolName: "pencil.line", accessibilityDescription: "Essays Quick Input")
+            button.image = NSImage(systemSymbolName: "pencil.line", accessibilityDescription: String(localized: "Essays Quick Input", comment: "Accessibility description for menu bar icon"))
             button.action = #selector(statusBarButtonClicked(sender:))
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
             button.target = self

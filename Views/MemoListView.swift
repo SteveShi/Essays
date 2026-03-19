@@ -16,6 +16,7 @@ struct MemoListView: View {
     @State private var quickCaptureText: String = ""
     @State private var quickCaptureVisibility: MemoVisibility = .private
     @State private var isQuickCaptureSaving = false
+    @State private var quickCaptureRequestID: UUID?
     @State private var quickCaptureAttachments: [Attachment] = []
     @State private var quickCaptureLocation: Location? = nil
     @State private var showQuickMemoPicker = false
@@ -23,7 +24,7 @@ struct MemoListView: View {
     @State private var isQuickUploading = false
     @AppStorage("enableAIFeatures") private var enableAIFeatures = true
     
-    @State private var locationManager = LocationManager()
+    private var locationManager = LocationManager.shared
     @State private var hoveredMemoId: String? = nil
     @Environment(\.colorScheme) private var colorScheme
     @State private var showQuickFilePicker = false
@@ -203,11 +204,13 @@ struct MemoListView: View {
                             HStack(spacing: 4) {
                                 Image(systemName: "mappin.and.ellipse")
                                     .font(.system(size: 10))
-                                Text(
-                                    String(
-                                        format: "%.4f, %.4f", location.latitude, location.longitude)
-                                )
-                                .font(LiquidGlassTheme.typography.caption)
+                                if let placeholder = location.placeholder, !placeholder.isEmpty {
+                                    Text(placeholder)
+                                        .font(LiquidGlassTheme.typography.caption)
+                                } else {
+                                    Text(String(format: "%.4f, %.4f", location.latitude, location.longitude))
+                                        .font(LiquidGlassTheme.typography.caption)
+                                }
                                 Button {
                                     quickCaptureLocation = nil
                                 } label: {
@@ -281,9 +284,11 @@ struct MemoListView: View {
                         }
 
                         Button {
-                            locationManager.requestLocation()
+                            let id = UUID()
+                            quickCaptureRequestID = id
+                            locationManager.requestLocation(id: id)
                         } label: {
-                            if locationManager.isFetching {
+                            if locationManager.isFetching && locationManager.lastRequestID == quickCaptureRequestID {
                                 Label(
                                     String(
                                         localized: "Fetching Location...",
@@ -381,7 +386,7 @@ struct MemoListView: View {
             )
         }
         .onChange(of: locationManager.location, initial: false) { _, newLocation in
-            if newLocation != nil {
+            if let newLocation = newLocation, locationManager.lastRequestID == quickCaptureRequestID {
                 withAnimation(LiquidGlassTheme.animation.spring) {
                     quickCaptureLocation = newLocation
                 }
@@ -488,6 +493,8 @@ struct MemoListView: View {
             quickCaptureText = ""
             quickCaptureAttachments = []
             quickCaptureLocation = nil
+            quickCaptureRequestID = nil
+            locationManager.clear()
         } catch {
             appState.errorMessage = error.localizedDescription
         }
@@ -903,13 +910,13 @@ struct MemoCard: View {
             Image(systemName: "mappin.and.ellipse")
                 .font(.system(size: 11, weight: .medium))
 
-            let coordStr =
-                "[\(String(format: "%.2f°", location.latitude)), \(String(format: "%.2f°", location.longitude))]"
             if let placeholder = location.placeholder, !placeholder.isEmpty {
-                Text("\(coordStr) \(placeholder)")
+                Text(placeholder)
                     .font(LiquidGlassTheme.typography.caption)
                     .lineLimit(1)
             } else {
+                let coordStr =
+                    "[\(String(format: "%.2f°", location.latitude)), \(String(format: "%.2f°", location.longitude))]"
                 Text(coordStr)
                     .font(LiquidGlassTheme.typography.caption)
                     .lineLimit(1)
