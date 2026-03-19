@@ -30,6 +30,14 @@ All AI processing happens **locally on your Mac**, ensuring your thoughts and da
 
 ## Installation
 
+### Homebrew
+Install via Homebrew tap:
+```bash
+brew tap lpgneg19/tap
+brew install --cask essays
+```
+
+### Build from Source
 1. Clone the repository.
 2. Open `Essays.xcodeproj` in Xcode.
 3. Build and Run (`Cmd + R`).

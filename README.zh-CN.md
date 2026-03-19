@@ -30,6 +30,14 @@
 
 ## 安装指南
 
+### Homebrew
+通过 Homebrew tap 安装：
+```bash
+brew tap lpgneg19/tap
+brew install --cask essays
+```
+
+### 从源码编译
 1. 克隆本仓库。
 2. 使用 Xcode 打开 `Essays.xcodeproj`。
 3. 编译并运行 (`Cmd + R`)。
