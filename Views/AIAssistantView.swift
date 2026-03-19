@@ -8,12 +8,6 @@ struct AIAssistantView: View {
     let memo: Memo
     @Environment(\.dismiss) private var dismiss
     
-    @State private var result: String = ""
-    @State private var resultTags: [String] = []
-    @State private var isProcessing = false
-    @State private var currentAction: AIAction?
-    @State private var errorMessage: String?
-    
     enum AIAction: String, CaseIterable {
         case summarize
         case improve
@@ -53,195 +47,203 @@ struct AIAssistantView: View {
     }
     
     var body: some View {
-        VStack(spacing: 0) {
-            // Header
-            HStack {
-                Image(systemName: "wand.and.stars")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.linearGradient(
-                        colors: [.purple, .blue, .cyan],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ))
-                
-                Text(String(localized: "AI Assistant", comment: "AI assistant panel title"))
-                    .font(.system(size: 14, weight: .semibold))
-                
-                Spacer()
-                
-                if isProcessing {
-                    ProgressView()
-                        .controlSize(.small)
+        NavigationStack {
+            VStack(spacing: 0) {
+                // Header
+                HStack {
+                    Image(systemName: "wand.and.stars")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.linearGradient(
+                            colors: [.purple, .blue, .cyan],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ))
+                    
+                    Text(String(localized: "AI Assistant", comment: "AI assistant panel title"))
+                        .font(.system(size: 14, weight: .semibold))
+                    
+                    Spacer()
                 }
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            
-            Divider().opacity(0.3)
-            
-            // Content preview
-            Text(memo.content)
-                .font(.system(size: 12))
-                .foregroundColor(.secondary)
-                .lineLimit(2)
-                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-            
-            Divider().opacity(0.3)
-            
-            // Action buttons
-            VStack(spacing: 2) {
-                ForEach(AIAction.allCases, id: \.self) { action in
-                    Button {
-                        Task {
-                            await performAction(action)
-                        }
-                    } label: {
-                        HStack(spacing: 10) {
-                            Image(systemName: action.icon)
-                                .font(.system(size: 12, weight: .medium))
-                                .frame(width: 20)
-                                .foregroundColor(.accentColor)
-                            
-                            VStack(alignment: .leading, spacing: 1) {
-                                Text(action.title)
-                                    .font(.system(size: 13, weight: .medium))
-                                    .foregroundColor(.primary)
-                                
-                                Text(action.description)
-                                    .font(.system(size: 11))
-                                    .foregroundColor(.secondary)
-                            }
-                            
-                            Spacer()
-                            
-                            if currentAction == action && isProcessing {
-                                ProgressView()
-                                    .controlSize(.mini)
-                            } else {
-                                Image(systemName: "chevron.right")
-                                    .font(.system(size: 10, weight: .medium))
-                                    .foregroundStyle(.tertiary)
-                            }
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(isProcessing)
-                }
-            }
-            .padding(.vertical, 4)
-            
-            // Result area
-            if !result.isEmpty || !resultTags.isEmpty {
+                .padding(.vertical, 12)
+                
                 Divider().opacity(0.3)
                 
-                VStack(alignment: .leading, spacing: 8) {
+                // Content preview
+                Text(memo.content)
+                    .font(.system(size: 12))
+                    .foregroundColor(.secondary)
+                    .lineLimit(2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                
+                Divider().opacity(0.3)
+                
+                // Action Links
+                ScrollView {
+                    VStack(spacing: 2) {
+                        ForEach(AIAction.allCases, id: \.self) { action in
+                            NavigationLink(value: action) {
+                                HStack(spacing: 12) {
+                                    Image(systemName: action.icon)
+                                        .font(.system(size: 14, weight: .medium))
+                                        .frame(width: 24)
+                                        .foregroundColor(.accentColor)
+                                    
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(action.title)
+                                            .font(.system(size: 13, weight: .medium))
+                                            .foregroundColor(.primary)
+                                        
+                                        Text(action.description)
+                                            .font(.system(size: 11))
+                                            .foregroundColor(.secondary)
+                                    }
+                                    
+                                    Spacer()
+                                    
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 12, weight: .medium))
+                                        .foregroundStyle(.tertiary)
+                                }
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 10)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.vertical, 8)
+                }
+            }
+            .navigationDestination(for: AIAction.self) { action in
+                AIAssistantDetailView(memo: memo, action: action)
+            }
+        }
+        #if os(macOS)
+        .frame(width: 340, height: 440)
+        #endif
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+}
+
+#if os(macOS)
+@available(macOS 26.0, *)
+#endif
+struct AIAssistantDetailView: View {
+    let memo: Memo
+    let action: AIAssistantView.AIAction
+    
+    @State private var result: String = ""
+    @State private var resultTags: [String] = []
+    @State private var isProcessing = true
+    @State private var errorMessage: String?
+    
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                if isProcessing {
                     HStack {
-                        Text(
-                            (currentAction?.title ?? "").isEmpty ? "" : (currentAction?.title ?? ""))
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundColor(.secondary)
-                            .textCase(.uppercase)
-                        
                         Spacer()
-                        
-                        Button {
-                            let text = resultTags.isEmpty ? result : resultTags.map { "#\($0)" }.joined(separator: " ")
-                            #if os(macOS)
-                            NSPasteboard.general.clearContents()
-                            NSPasteboard.general.setString(text, forType: .string)
-                            #else
-                            UIPasteboard.general.string = text
-                            #endif
-                        } label: {
-                            Image(systemName: "doc.on.doc")
-                                .font(.system(size: 11))
+                        VStack(spacing: 16) {
+                            ProgressView()
+                                .controlSize(.regular)
+                            Text(String(localized: "AI is thinking...", comment: "AI processing indicator"))
+                                .font(.system(size: 13, weight: .medium))
                                 .foregroundColor(.secondary)
                         }
-                        .buttonStyle(.plain)
-                        #if os(macOS)
-                        .help(String(localized: "Copy to Clipboard", comment: "Copy AI result"))
-                        #endif
+                        .padding(.top, 60)
+                        Spacer()
                     }
-                    
+                } else if let error = errorMessage {
+                    HStack(spacing: 8) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundColor(.red)
+                        Text(error)
+                            .font(.system(size: 13))
+                            .foregroundColor(.red)
+                    }
+                    .padding()
+                } else {
                     if !resultTags.isEmpty {
-                        FlowLayoutAI(spacing: 6) {
+                        FlowLayoutAI(spacing: 8) {
                             ForEach(resultTags, id: \.self) { tag in
                                 Text("#\(tag)")
-                                    .font(.system(size: 12, weight: .medium))
+                                    .font(.system(size: 13, weight: .medium))
                                     .foregroundColor(.accentColor)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 3)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 4)
                                     .background(
                                         Capsule()
                                             .fill(Color.accentColor.opacity(0.1))
                                     )
                             }
                         }
+                        .padding(16)
                     } else {
                         Text(result)
-                            .font(.system(size: 12))
+                            .font(.system(size: 13))
+                            .lineSpacing(4)
                             .foregroundColor(.primary)
                             .textSelection(.enabled)
+                            .padding(16)
                     }
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                .frame(maxHeight: 150)
             }
-            
-            // Error
-            if let error = errorMessage {
-                Divider().opacity(0.3)
-                
-                HStack(spacing: 6) {
-                    Image(systemName: "exclamationmark.triangle")
-                        .font(.system(size: 11))
-                        .foregroundColor(.orange)
-                    
-                    Text(error)
-                        .font(.system(size: 11))
-                        .foregroundColor(.orange)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .navigationTitle(action.title)
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                if !isProcessing && errorMessage == nil {
+                    Button {
+                        let text = resultTags.isEmpty ? result : resultTags.map { "#\($0)" }.joined(separator: " ")
+                        #if os(macOS)
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(text, forType: .string)
+                        #else
+                        UIPasteboard.general.string = text
+                        #endif
+                    } label: {
+                        Image(systemName: "doc.on.doc")
+                    }
+                    #if os(macOS)
+                    .help(String(localized: "Copy to Clipboard", comment: "Copy AI result"))
+                    #endif
                 }
             }
         }
-        #if os(macOS)
-        .frame(width: 320)
-        #endif
-        .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-    }
-    
-    private func performAction(_ action: AIAction) async {
-        currentAction = action
-        isProcessing = true
-        result = ""
-        resultTags = []
-        errorMessage = nil
-        
-        do {
-            switch action {
-            case .summarize:
-                result = try await MemosAIAssistant.shared.summarize(memo.content)
-            case .improve:
-                result = try await MemosAIAssistant.shared.improve(memo.content)
-            case .expand:
-                result = try await MemosAIAssistant.shared.expand(memo.content)
-            case .generateTags:
-                resultTags = try await MemosAIAssistant.shared.generateTags(for: memo.content)
-            case .relatedIdeas:
-                let ideas = try await MemosAIAssistant.shared.generateRelatedIdeas(for: memo.content)
-                result = ideas.enumerated().map { "\($0.offset + 1). \($0.element)" }.joined(separator: "\n")
+        .task {
+            isProcessing = true
+            result = ""
+            resultTags = []
+            errorMessage = nil
+            
+            do {
+                switch action {
+                case .summarize:
+                    result = try await MemosAIAssistant.shared.summarize(memo.content)
+                case .improve:
+                    result = try await MemosAIAssistant.shared.improve(memo.content)
+                case .expand:
+                    result = try await MemosAIAssistant.shared.expand(memo.content)
+                case .generateTags:
+                    resultTags = try await MemosAIAssistant.shared.generateTags(for: memo.content)
+                case .relatedIdeas:
+                    let ideas = try await MemosAIAssistant.shared.generateRelatedIdeas(for: memo.content)
+                    result = ideas.enumerated().map { "\($0.offset + 1). \($0.element)" }.joined(separator: "\n")
+                }
+            } catch {
+                errorMessage = error.localizedDescription
             }
-        } catch {
-            errorMessage = error.localizedDescription
+            
+            isProcessing = false
         }
-        
-        isProcessing = false
     }
 }
 
