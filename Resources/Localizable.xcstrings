@@ -2855,6 +2855,40 @@
           }
         }
       }
+    },
+    "Select a Memo" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Select a Memo"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择一条便签"
+          }
+        }
+      }
+    },
+    "Choose a memo from the list to view its details." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose a memo from the list to view its details."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从列表中选择一条便签以查看其详情。"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

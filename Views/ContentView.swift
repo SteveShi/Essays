@@ -53,13 +53,19 @@ struct ContentView: View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             SidebarView()
                 .frame(minWidth: 220, idealWidth: 260, maxWidth: 300)
+        } content: {
+            MemoListView()
+                .frame(minWidth: 320, idealWidth: 360)
         } detail: {
             if let memo = appState.selectedMemoForDetail {
                 MemoDetailView(memo: memo)
-                    .transition(AnyTransition.move(edge: .trailing).combined(with: .opacity))
+                    .id(memo.id) // Ensure view refreshes for different memos
             } else {
-                MemoListView()
-                    .transition(AnyTransition.move(edge: .leading).combined(with: .opacity))
+                ContentUnavailableView {
+                    Label(String(localized: "Select a Memo", comment: "Placeholder when no memo is selected"), systemImage: "note.text")
+                } description: {
+                    Text(String(localized: "Choose a memo from the list to view its details.", comment: "Instructional text under the placeholder"))
+                }
             }
         }
         .navigationSplitViewStyle(.balanced)
