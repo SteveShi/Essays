@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.2] - 2026-03-20
+
+### Fixed
+- 🖥️ **macOS Sidebar Refinement**: Fixed an issue where the sidebar would automatically collapse after selecting an item. The sidebar now remains visible in the three-column layout as expected on macOS and iPadOS.
+
 ## [2.0.1] - 2026-03-20
 
 ### Changed

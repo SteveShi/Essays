@@ -296,7 +296,11 @@ struct SidebarLinkItem: View {
     var body: some View {
         Button {
             appState.sidebarSelection = selection
-            appState.columnVisibility = .doubleColumn
+            #if os(iOS)
+            if UIDevice.current.userInterfaceIdiom == .phone {
+                appState.columnVisibility = .doubleColumn
+            }
+            #endif
         } label: {
             itemContent
         }
@@ -357,7 +361,11 @@ struct TagLinkChip: View {
     var body: some View {
         Button {
             appState.sidebarSelection = selection
-            appState.columnVisibility = .doubleColumn
+            #if os(iOS)
+            if UIDevice.current.userInterfaceIdiom == .phone {
+                appState.columnVisibility = .doubleColumn
+            }
+            #endif
         } label: {
             chipContent
         }
@@ -623,7 +631,11 @@ struct DayButton: View {
 
         return Button {
             appState.sidebarSelection = selection
-            appState.columnVisibility = .doubleColumn
+            #if os(iOS)
+            if UIDevice.current.userInterfaceIdiom == .phone {
+                appState.columnVisibility = .doubleColumn
+            }
+            #endif
         } label: {
             dayLabel(isCurrentMonth: isCurrentMonth, isSelected: isSelected, isToday: isToday, hasMemo: hasMemo)
         }
