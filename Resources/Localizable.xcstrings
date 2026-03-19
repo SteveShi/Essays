@@ -435,6 +435,17 @@
         }
       }
     },
+    "AI is thinking..." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "助手思考中……"
+          }
+        }
+      }
+    },
     "AI Ready" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -731,6 +742,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "先记下来，不用整理，稍后再回看"
+          }
+        }
+      }
+    },
+    "Choose a memo from the list to view its details." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose a memo from the list to view its details."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从列表中选择一条便签以查看其详情。"
           }
         }
       }
@@ -1426,6 +1454,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "服务器 URL 无效"
+          }
+        }
+      }
+    },
+    "Key" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "键"
           }
         }
       }
@@ -2127,6 +2166,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "搜索想法、标签、关键词..."
+          }
+        }
+      }
+    },
+    "Select a Memo" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Select a Memo"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择一条便签"
           }
         }
       }
@@ -2852,40 +2908,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "繁體中文"
-          }
-        }
-      }
-    },
-    "Select a Memo" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Select a Memo"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "选择一条便签"
-          }
-        }
-      }
-    },
-    "Choose a memo from the list to view its details." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Choose a memo from the list to view its details."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "从列表中选择一条便签以查看其详情。"
           }
         }
       }
