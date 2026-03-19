@@ -4,9 +4,13 @@
 
 ## Features
 
+- 📱 **Universal App**: Full native support for macOS, iPadOS, and iOS, providing a seamless experience across all your devices.
+- 🔀 **Three-Column Navigation**: A responsive, standard `NavigationSplitView` ensuring optimal use of screen real estate (Sidebar, Timeline, and Details).
 - ✨ **Premium Native UI**: A "LiquidGlass" aesthetic with glassmorphism, thin materials, and subtle micro-animations.
 - 🤖 **Apple AI Assistant**: Integrated Foundation Models for on-device text processing and intelligence.
-- 🚀 **Quick Capture**: A pinned input box at the top of your timeline for instant thought recording.
+- 🚀 **Quick Capture & Global Shortcuts**: Record thoughts instantly from anywhere on your Mac using customizable global hotkeys.
+- 🖼️ **Attachments Gallery**: A dedicated grid view in the sidebar to easily browse all your image memos.
+- 🔍 **Rich Media Previews**: Native Apple Quick Look for image attachments and interactive MapKit popovers for location tags.
 - 📅 **Interactive Calendar**: A reactive Monthly Calendar directly in the sidebar to filter your daily logs.
 - 🕒 **Timeline View**: A beautifully organized chronological feed of your memos, grouped by date.
 - 🌍 **Fully Localized**: Complete support for English and Simplified Chinese.
