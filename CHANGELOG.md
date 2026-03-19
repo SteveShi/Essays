@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.3] - 2026-03-20
+
+### Changed
+- 📐 **Adaptive AI Assistant Interface**: The AI Assistant popover now correctly adapts its height based on the content. Short memo previews no longer display excessive empty space, while the interface can still expand appropriately when showing detailed results.
+
 ## [2.0.2] - 2026-03-20
 
 ### Fixed

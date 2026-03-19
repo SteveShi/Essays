@@ -90,48 +90,51 @@ struct AIAssistantView: View {
                 Divider().opacity(0.3)
                 
                 // Action Links
-                ScrollView {
-                    VStack(spacing: 2) {
-                        ForEach(AIAction.allCases, id: \.self) { action in
-                            NavigationLink(value: action) {
-                                HStack(spacing: 12) {
-                                    Image(systemName: action.icon)
-                                        .font(.system(size: 14, weight: .medium))
-                                        .frame(width: 24)
-                                        .foregroundColor(.accentColor)
+                VStack(spacing: 0) {
+                    ForEach(AIAction.allCases, id: \.self) { action in
+                        NavigationLink(value: action) {
+                            HStack(spacing: 12) {
+                                Image(systemName: action.icon)
+                                    .font(.system(size: 14, weight: .medium))
+                                    .frame(width: 24)
+                                    .foregroundColor(.accentColor)
+                                
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(action.title)
+                                        .font(.system(size: 13, weight: .medium))
+                                        .foregroundColor(.primary)
                                     
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(action.title)
-                                            .font(.system(size: 13, weight: .medium))
-                                            .foregroundColor(.primary)
-                                        
-                                        Text(action.description)
-                                            .font(.system(size: 11))
-                                            .foregroundColor(.secondary)
-                                    }
-                                    
-                                    Spacer()
-                                    
-                                    Image(systemName: "chevron.right")
-                                        .font(.system(size: 12, weight: .medium))
-                                        .foregroundStyle(.tertiary)
+                                    Text(action.description)
+                                        .font(.system(size: 11))
+                                        .foregroundColor(.secondary)
                                 }
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 10)
-                                .contentShape(Rectangle())
+                                
+                                Spacer()
+                                
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundStyle(.tertiary)
                             }
-                            .buttonStyle(.plain)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 10)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        
+                        if action != AIAction.allCases.last {
+                            Divider().padding(.leading, 52).opacity(0.2)
                         }
                     }
-                    .padding(.vertical, 8)
                 }
+                .padding(.vertical, 4)
             }
             .navigationDestination(for: AIAction.self) { action in
                 AIAssistantDetailView(memo: memo, action: action)
             }
         }
         #if os(macOS)
-        .frame(width: 340, height: 440)
+        .frame(width: 320)
+        .frame(minHeight: 100, maxHeight: 600)
         #endif
         .background(.ultraThinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 12))
