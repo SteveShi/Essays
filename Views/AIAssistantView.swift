@@ -70,13 +70,19 @@ struct AIAssistantView: View {
                 Divider().opacity(0.3)
                 
                 // Content preview
-                Text(memo.content)
-                    .font(.system(size: 12))
-                    .foregroundColor(.secondary)
-                    .lineLimit(2)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
+                HStack(spacing: 8) {
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(Color.accentColor.opacity(0.5))
+                        .frame(width: 3)
+                    
+                    Text(memo.content)
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary)
+                        .lineLimit(2)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
                 
                 Divider().opacity(0.3)
                 
