@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.1] - 2026-03-20
+
+### Changed
+- 🤖 **AI Assistant Interface**: Redesigned the AI Assistant results panel. Clicking on an AI action now pushes a beautifully animated, full-screen, native sub-view instead of a cramped dialog. This ensures comfortable reading for longer summaries or multiple ideas, completely with native text selection and a dedicated copy button.
+
+### Fixed
+- 🐛 **AI Context Selection**: Fixed an issue where the AI Assistant popup would incorrectly process the first memo in your timeline rather than the currently selected note. It now perfectly captures context from your active workspace.
+- 🌐 **Localization Improvements**: Added missing Chinese localization strings for interface keys ('Key').
+
 ## [2.0.0] - 2026-03-19
 
 ### Added
