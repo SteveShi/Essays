@@ -70,7 +70,7 @@ targets:
         SWIFT_STRICT_CONCURRENCY: complete
         INFOPLIST_FILE: Info-iOS.plist
         PRODUCT_BUNDLE_IDENTIFIER: com.essays.app.ios
-        PRODUCT_NAME: EssaysiOS
+        PRODUCT_NAME: Essays
         TARGETED_DEVICE_FAMILY: "1,2"
         SDKROOT: iphoneos
         SUPPORTED_PLATFORMS: "iphoneos iphonesimulator"
