@@ -50,7 +50,8 @@ struct ContentView: View {
     }
 
     private var mainView: some View {
-        NavigationSplitView(columnVisibility: $columnVisibility) {
+        @Bindable var appState = appState
+        return NavigationSplitView(columnVisibility: $columnVisibility) {
             SidebarView()
                 #if os(macOS)
                 .frame(minWidth: 220, idealWidth: 260, maxWidth: 300)
@@ -65,29 +66,16 @@ struct ContentView: View {
                     MemoDetailView(memo: memo)
                 }
                 .navigationDestination(for: AppState.SidebarSelection.self) { selection in
-                    // In a 3-column split view, selecting from sidebar usually 
-                    // updates the content column. NavigationStack handles the push on iPhone.
                     MemoListView()
                 }
                 #endif
         } detail: {
-            ZStack {
-                if let memo = appState.selectedMemoForDetail {
-                    MemoDetailView(memo: memo)
-                        .id(memo.id) // Ensure view refreshes for different memos
-                } else {
-                    ContentUnavailableView {
-                        Label(String(localized: "Select a Memo", comment: "Placeholder when no memo is selected"), systemImage: "note.text")
-                    } description: {
-                        Text(String(localized: "Choose a memo from the list to view its details.", comment: "Instructional text under the placeholder"))
-                    }
-                    #if os(iOS)
-                    .background(LiquidGlassTheme.colors.background)
-                    #endif
-                }
-            }
             #if os(iOS)
-            .navigationStack() // Using the same approach as ios-port if applicable, or wrapping
+            NavigationStack {
+                detailColumn
+            }
+            #else
+            detailColumn
             #endif
         }
         .navigationSplitViewStyle(.balanced)
@@ -100,6 +88,23 @@ struct ContentView: View {
         }
         .task {
             await refreshMemos()
+        }
+    }
+
+    @ViewBuilder
+    private var detailColumn: some View {
+        if let memo = appState.selectedMemoForDetail {
+            MemoDetailView(memo: memo)
+                .id(memo.id)
+        } else {
+            ContentUnavailableView {
+                Label(String(localized: "Select a Memo", comment: "Placeholder when no memo is selected"), systemImage: "note.text")
+            } description: {
+                Text(String(localized: "Choose a memo from the list to view its details.", comment: "Instructional text under the placeholder"))
+            }
+            #if os(iOS)
+            .background(LiquidGlassTheme.colors.background)
+            #endif
         }
     }
 

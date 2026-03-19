@@ -240,47 +240,59 @@ struct SidebarLinkItem: View {
     @Environment(AppState.self) var appState
     @State private var isHovered = false
     
+    private var isSelected: Bool {
+        appState.sidebarSelection == selection
+    }
+    
     var body: some View {
-        @Bindable var appState = appState
-        let isSelected = appState.sidebarSelection == selection
-        
+        #if os(iOS)
         NavigationLink(value: selection) {
-            HStack(spacing: 12) {
-                Image(systemName: icon)
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(isSelected ? LiquidGlassTheme.colors.accent : LiquidGlassTheme.colors.secondaryText)
-                    .frame(width: 24)
-                
-                Text(title)
-                    .font(LiquidGlassTheme.typography.body)
-                    .foregroundStyle(isSelected ? LiquidGlassTheme.colors.text : LiquidGlassTheme.colors.secondaryText)
-                
-                Spacer()
-                
-                if count > 0 {
-                    Text("\(count)")
-                        .font(LiquidGlassTheme.typography.caption)
-                        .foregroundStyle(LiquidGlassTheme.colors.tertiaryText)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(Capsule().fill(Color.primary.opacity(0.06)))
-                }
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(isSelected ? LiquidGlassTheme.colors.accent.opacity(0.1) : (isHovered ? Color.primary.opacity(0.04) : Color.clear))
-            )
+            itemContent
         }
         .buttonStyle(.plain)
-        #if os(macOS)
+        #else
+        Button {
+            appState.sidebarSelection = selection
+        } label: {
+            itemContent
+        }
+        .buttonStyle(.plain)
         .onHover { hovering in
             withAnimation(.easeInOut(duration: 0.2)) {
                 isHovered = hovering
             }
         }
         #endif
+    }
+    
+    private var itemContent: some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(isSelected ? LiquidGlassTheme.colors.accent : LiquidGlassTheme.colors.secondaryText)
+                .frame(width: 24)
+            
+            Text(title)
+                .font(LiquidGlassTheme.typography.body)
+                .foregroundStyle(isSelected ? LiquidGlassTheme.colors.text : LiquidGlassTheme.colors.secondaryText)
+            
+            Spacer()
+            
+            if count > 0 {
+                Text("\(count)")
+                    .font(LiquidGlassTheme.typography.caption)
+                    .foregroundStyle(LiquidGlassTheme.colors.tertiaryText)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Capsule().fill(Color.primary.opacity(0.06)))
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(isSelected ? LiquidGlassTheme.colors.accent.opacity(0.1) : (isHovered ? Color.primary.opacity(0.04) : Color.clear))
+        )
     }
 }
 
@@ -289,38 +301,53 @@ struct TagLinkChip: View {
     @Environment(AppState.self) var appState
     @State private var isHovered = false
     
+    private var selection: AppState.SidebarSelection {
+        .tag(tag.name)
+    }
+    
+    private var isSelected: Bool {
+        appState.sidebarSelection == selection
+    }
+    
     var body: some View {
-        @Bindable var appState = appState
-        let selection = AppState.SidebarSelection.tag(tag.name)
-        let isSelected = appState.sidebarSelection == selection
-        
+        #if os(iOS)
         NavigationLink(value: selection) {
-            HStack(spacing: 4) {
-                Text(tag.name)
-                    .font(LiquidGlassTheme.typography.caption)
-                
-                if tag.count > 0 {
-                    Text("\(tag.count)")
-                        .font(LiquidGlassTheme.typography.caption2)
-                        .opacity(0.7)
-                }
-            }
-            .foregroundColor(isSelected ? .white : LiquidGlassTheme.colors.accent)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(
-                Capsule()
-                    .fill(isSelected ? LiquidGlassTheme.colors.accent : (isHovered ? LiquidGlassTheme.colors.accent.opacity(0.2) : LiquidGlassTheme.colors.tagBackground))
-            )
+            chipContent
         }
         .buttonStyle(.plain)
-        #if os(macOS)
+        #else
+        Button {
+            appState.sidebarSelection = selection
+        } label: {
+            chipContent
+        }
+        .buttonStyle(.plain)
         .onHover { hovering in
             withAnimation(LiquidGlassTheme.animation.easeOut) {
                 isHovered = hovering
             }
         }
         #endif
+    }
+    
+    private var chipContent: some View {
+        HStack(spacing: 4) {
+            Text(tag.name)
+                .font(LiquidGlassTheme.typography.caption)
+            
+            if tag.count > 0 {
+                Text("\(tag.count)")
+                    .font(LiquidGlassTheme.typography.caption2)
+                    .opacity(0.7)
+            }
+        }
+        .foregroundColor(isSelected ? .white : LiquidGlassTheme.colors.accent)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .background(
+            Capsule()
+                .fill(isSelected ? LiquidGlassTheme.colors.accent : (isHovered ? LiquidGlassTheme.colors.accent.opacity(0.2) : LiquidGlassTheme.colors.tagBackground))
+        )
     }
 }
 
@@ -542,44 +569,60 @@ struct DayButton: View {
     let calendar: Calendar
     @Environment(AppState.self) var appState
 
+    private var selection: AppState.SidebarSelection {
+        .date(date)
+    }
+
     var body: some View {
         let isCurrentMonth = calendar.isDate(date, equalTo: currentMonth, toGranularity: .month)
         let components = calendar.dateComponents([.year, .month, .day], from: date)
         let hasMemo = appState.memoDateComponents.contains(components)
-        let dateString = DayButton.sharedDateFormatter.string(from: date)
-        let selection = AppState.SidebarSelection.date(date)
         let isSelected = appState.sidebarSelection == selection
         let isToday = calendar.isDateInToday(date)
 
+        #if os(iOS)
         return NavigationLink(value: selection) {
-            Text("\(calendar.component(.day, from: date))")
-                .font(
-                    .system(
-                        size: 12, weight: isSelected || isToday ? .semibold : .regular,
-                        design: .rounded)
-                )
-                .frame(width: 24, height: 24)
-                .foregroundStyle(
-                    isCurrentMonth
-                        ? (isSelected
-                            ? .white
-                            : (isToday
-                                ? LiquidGlassTheme.colors.accent
-                                : LiquidGlassTheme.colors.text))
-                        : LiquidGlassTheme.colors.tertiaryText.opacity(0.3)
-                )
-                .background(
-                    ZStack {
-                        if isSelected {
-                            Circle().fill(LiquidGlassTheme.colors.accent)
-                        } else if hasMemo {
-                            Circle().fill(LiquidGlassTheme.colors.accent.opacity(0.15))
-                        }
-                    }
-                )
+            dayLabel(isCurrentMonth: isCurrentMonth, isSelected: isSelected, isToday: isToday, hasMemo: hasMemo)
         }
         .buttonStyle(.plain)
         .disabled(!hasMemo && !isToday && !isSelected)
+        #else
+        return Button {
+            appState.sidebarSelection = selection
+        } label: {
+            dayLabel(isCurrentMonth: isCurrentMonth, isSelected: isSelected, isToday: isToday, hasMemo: hasMemo)
+        }
+        .buttonStyle(.plain)
+        .disabled(!hasMemo && !isToday && !isSelected)
+        #endif
+    }
+
+    private func dayLabel(isCurrentMonth: Bool, isSelected: Bool, isToday: Bool, hasMemo: Bool) -> some View {
+        Text("\(calendar.component(.day, from: date))")
+            .font(
+                .system(
+                    size: 12, weight: isSelected || isToday ? .semibold : .regular,
+                    design: .rounded)
+            )
+            .frame(width: 24, height: 24)
+            .foregroundStyle(
+                isCurrentMonth
+                    ? (isSelected
+                        ? .white
+                        : (isToday
+                            ? LiquidGlassTheme.colors.accent
+                            : LiquidGlassTheme.colors.text))
+                    : LiquidGlassTheme.colors.tertiaryText.opacity(0.3)
+            )
+            .background(
+                ZStack {
+                    if isSelected {
+                        Circle().fill(LiquidGlassTheme.colors.accent)
+                    } else if hasMemo {
+                        Circle().fill(LiquidGlassTheme.colors.accent.opacity(0.15))
+                    }
+                }
+            )
     }
     
     private static let sharedDateFormatter: DateFormatter = {
