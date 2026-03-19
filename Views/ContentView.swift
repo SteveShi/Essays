@@ -61,12 +61,6 @@ struct ContentView: View {
                 .frame(minWidth: 320, idealWidth: 360)
                 #else
                 .navigationTitle(String(localized: "Timeline", comment: "Navigation title for the main list view"))
-                .navigationDestination(for: Memo.self) { memo in
-                    MemoDetailView(memo: memo)
-                        .onAppear {
-                            appState.selectedMemoForDetail = memo
-                        }
-                }
                 #endif
         } detail: {
             detailColumn

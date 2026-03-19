@@ -640,10 +640,21 @@ struct MemoCard: View {
 
     var body: some View {
         #if os(iOS)
-        NavigationLink(value: memo) {
+        if UIDevice.current.userInterfaceIdiom == .phone {
+            NavigationLink(destination: MemoDetailView(memo: memo).onAppear {
+                appState.selectedMemoForDetail = memo
+            }) {
+                cardContent
+            }
+            .buttonStyle(.plain)
+        } else {
             cardContent
+                .onTapGesture {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                        appState.selectedMemoForDetail = memo
+                    }
+                }
         }
-        .buttonStyle(.plain)
         #else
         cardContent
             .onTapGesture {
