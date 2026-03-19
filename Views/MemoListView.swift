@@ -639,6 +639,22 @@ struct MemoCard: View {
     @State private var showMapPopover = false
 
     var body: some View {
+        #if os(iOS)
+        NavigationLink(value: memo) {
+            cardContent
+        }
+        .buttonStyle(.plain)
+        #else
+        cardContent
+            .onTapGesture {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                    appState.selectedMemoForDetail = memo
+                }
+            }
+        #endif
+    }
+    
+    private var cardContent: some View {
         VStack(alignment: .leading, spacing: 12) {
             headerView
 
@@ -687,12 +703,6 @@ struct MemoCard: View {
             withAnimation(LiquidGlassTheme.animation.easeOut) {
                 isHovered = hovering
                 showActions = hovering
-            }
-        }
-        .onTapGesture {
-            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                appState.selectedMemoForDetail = memo
-                appState.columnVisibility = .detailOnly
             }
         }
         .quickLookPreview($quickLookURL)

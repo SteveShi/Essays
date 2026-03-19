@@ -6,6 +6,34 @@ struct SidebarView: View {
     
     var body: some View {
         @Bindable var appState = appState
+        #if os(iOS)
+        List(selection: $appState.sidebarSelection) {
+            Section(String(localized: "Inbox", comment: "Sidebar section header for main actions")) {
+                sidebarLabel(.all, icon: "note.text", title: String(localized: "All Memos", comment: "Sidebar item for all memos"), count: appState.memos.count)
+                sidebarLabel(.today, icon: "sun.max", title: String(localized: "Today", comment: "Sidebar item for today's memos"), count: appState.todayMemosCount)
+                sidebarLabel(.past7Days, icon: "clock.arrow.circlepath", title: String(localized: "Past 7 Days", comment: "Sidebar item for memos in the last week"), count: appState.recentWeekMemosCount)
+                sidebarLabel(.archived, icon: "archivebox", title: String(localized: "Archived", comment: "Sidebar item for archived memos"), count: appState.archivedMemosCount)
+                sidebarLabel(.attachments, icon: "photo.on.rectangle.angled", title: String(localized: "Attachments", comment: "Sidebar item for image gallery"), count: appState.memos.reduce(0) { $0 + $1.attachments.filter { $0.isImage }.count })
+            }
+            
+            if !appState.tags.isEmpty {
+                Section(String(localized: "Tags", comment: "Sidebar section header for tags")) {
+                    ForEach(appState.tags.prefix(20)) { tag in
+                        sidebarLabel(.tag(tag.name), icon: "tag", title: tag.name, count: tag.count)
+                    }
+                }
+            }
+            
+            Section(String(localized: "Visibility", comment: "Sidebar section header for visibility filters")) {
+                sidebarLabel(.publicMemos, icon: "globe", title: String(localized: "Public", comment: "Sidebar item for public memos"), count: appState.publicMemosCount)
+                sidebarLabel(.protectedMemos, icon: MemoVisibility.protected.icon, title: MemoVisibility.protected.displayName, count: appState.memos.filter { $0.visibility == .protected }.count)
+                sidebarLabel(.privateMemos, icon: "lock", title: String(localized: "Private", comment: "Sidebar item for private memos"), count: appState.privateMemosCount)
+            }
+        }
+        .listStyle(.sidebar)
+        .navigationTitle(String(localized: "Essays", comment: "Application name"))
+        .searchable(text: $appState.searchText, prompt: String(localized: "Search ideas, tags, keywords...", comment: "Search bar placeholder"))
+        #else
         VStack(spacing: 0) {
             headerSection
             
@@ -30,7 +58,28 @@ struct SidebarView: View {
         .onReceive(NotificationCenter.default.publisher(for: .focusSearch)) { _ in
             isSearchFocused = true
         }
+        #endif
     }
+    
+    // iOS List row helper
+    #if os(iOS)
+    private func sidebarLabel(_ selection: AppState.SidebarSelection, icon: String, title: String, count: Int) -> some View {
+        Label {
+            HStack {
+                Text(title)
+                Spacer()
+                if count > 0 {
+                    Text("\(count)")
+                        .foregroundStyle(.secondary)
+                        .font(.callout)
+                }
+            }
+        } icon: {
+            Image(systemName: icon)
+        }
+        .tag(selection)
+    }
+    #endif
     
     private var headerSection: some View {
         @Bindable var appState = appState
