@@ -24,7 +24,19 @@ class MemosAPIClient {
     private init() {}
     
     func configure(serverURL: String, accessToken: String) {
-        var normalizedURL = serverURL.trimmingCharacters(in: .whitespaces)
+        var normalizedURL = serverURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // Ensure protocol prefix
+        if !normalizedURL.isEmpty {
+            if !normalizedURL.lowercased().hasPrefix("http://") && !normalizedURL.lowercased().hasPrefix("https://") {
+                if normalizedURL.lowercased().contains("localhost") || normalizedURL.range(of: "^[0-9.]+$", options: .regularExpression) != nil {
+                    normalizedURL = "http://" + normalizedURL
+                } else {
+                    normalizedURL = "https://" + normalizedURL
+                }
+            }
+        }
+        
         if normalizedURL.hasSuffix("/") {
             normalizedURL.removeLast()
         }
@@ -247,12 +259,19 @@ class MemosAPIClient {
         }
     }
 
-    func checkServerStatus() async throws -> ServerInfo {
-        guard let url = buildURL("/api/v1/status") else {
+    struct WorkspaceProfile: Decodable {
+        let name: String
+        let owner: String
+        let version: String
+    }
+
+    func checkServerStatus() async throws -> String {
+        guard let url = buildURL("/api/v1/workspace/profile") else {
             throw MemosAPIError.invalidURL
         }
         let request = buildRequest(url: url)
-        return try await performRequest(request)
+        let profile: WorkspaceProfile = try await performRequest(request)
+        return profile.version
     }
     
     func signIn(username: String, password: String) async throws -> User {

@@ -104,6 +104,7 @@ extension Memo {
 
 @Model
 final class Relation: Identifiable {
+    @Attribute(.unique) var relationID: String
     var memo: String
     var relatedMemo: String
     var typeRaw: String
@@ -119,6 +120,7 @@ final class Relation: Identifiable {
         self.relatedMemo = relatedMemo
         self.typeRaw = type.rawValue
         self.parentMemo = parentMemo
+        self.relationID = "\(memo)-\(relatedMemo)-\(type.rawValue)"
     }
 
     var id: String {

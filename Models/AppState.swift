@@ -27,7 +27,14 @@ class AppState {
 
     var serverURL: String = ""
     var accessToken: String = ""
-    var isOnline: Bool
+    var isOnline: Bool { NetworkMonitor.shared.isConnected }
+    var isServerReachable: Bool = false
+    var lastConnectionError: String? = nil
+    
+    /// Returns true if either the network monitor reports a connection OR we successfully reached the server.
+    var isConnected: Bool {
+        return isOnline || isServerReachable
+    }
     var appVersion: String {
         let version =
             Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
@@ -142,21 +149,62 @@ class AppState {
     private let currentUserKey = "memos_current_user"
     
     init() {
-        self.isOnline = NetworkMonitor.shared.isConnected
         loadSavedCredentials()
         loadLocalCachedMemos()  // 优先加载本地缓存
-        setupNetworkMonitoring()
+        setupConnectivityActions()
+        checkServerReachability()
+        startServerStatusTimer()
         updateFilteredMemosState()  // Initial computation
     }
 
-    private func setupNetworkMonitoring() {
-        _ = withObservationTracking {
-            NetworkMonitor.shared.isConnected
-        } onChange: { [weak self] in
+    private func setupConnectivityActions() {
+        NetworkMonitor.shared.onConnectedChange = { [weak self] isConnected in
             Task { @MainActor in
-                self?.isOnline = NetworkMonitor.shared.isConnected
-                if NetworkMonitor.shared.isConnected {
+                // Independently check server reachability whenever connectivity changes
+                self?.checkServerReachability()
+                if isConnected {
                     self?.syncPendingMemos()
+                }
+            }
+        }
+    }
+
+    private func startServerStatusTimer() {
+        Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                self?.checkServerReachability()
+            }
+        }
+    }
+
+    @MainActor
+    func checkServerReachability() {
+        guard !serverURL.isEmpty else { 
+            self.lastConnectionError = String(localized: "Server URL not configured")
+            return 
+        }
+        
+        Task {
+            do {
+                MemosAPIClient.shared.configure(serverURL: serverURL, accessToken: accessToken)
+                _ = try await MemosAPIClient.shared.checkServerStatus()
+                await MainActor.run {
+                    self.isServerReachable = true
+                    self.lastConnectionError = nil
+                }
+            } catch MemosAPIError.serverError(let json) where json.contains("\"code\":") {
+                // If it's a valid Memos JSON error (like 404/401), the server IS reachable!
+                print("Server reachable (but returned status error): \(json)")
+                await MainActor.run {
+                    self.isServerReachable = true
+                    self.lastConnectionError = nil
+                }
+            } catch {
+                let errorDescription = error.localizedDescription
+                print("Server reachability check failed: \(errorDescription)")
+                await MainActor.run {
+                    self.isServerReachable = false
+                    self.lastConnectionError = errorDescription
                 }
             }
         }
@@ -286,6 +334,10 @@ class AppState {
         if let user = currentUser,
            let userData = try? JSONEncoder().encode(user) {
             userDefaults.set(userData, forKey: currentUserKey)
+        }
+        
+        Task { @MainActor in
+            checkServerReachability()
         }
     }
     

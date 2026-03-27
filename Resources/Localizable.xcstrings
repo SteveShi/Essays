@@ -853,6 +853,17 @@
         }
       }
     },
+    "Connection Status" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "连接状态"
+          }
+        }
+      }
+    },
     "Copy Content" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1454,17 +1465,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "服务器 URL 无效"
-          }
-        }
-      }
-    },
-    "Key" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "键"
           }
         }
       }
@@ -2217,6 +2217,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "服务器错误：%@"
+          }
+        }
+      }
+    },
+    "Server Offline" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "服务器离线"
           }
         }
       }

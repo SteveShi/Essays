@@ -74,15 +74,27 @@ struct SettingsView: View {
                 {
                     HStack(spacing: 6) {
                         Circle()
-                            .fill(appState.isOnline ? Color.green : Color.red)
+                            .fill(!appState.isConnected ? Color.red : (appState.isServerReachable ? Color.green : Color.orange))
                             .frame(width: 8, height: 8)
                         Text(
-                            appState.isOnline
-                                ? String(localized: "Online", comment: "Network status: Online")
-                                : String(localized: "Offline", comment: "Network status: Offline")
+                            !appState.isConnected
+                                ? String(localized: "Offline", comment: "Network status: Offline")
+                                : (appState.isServerReachable
+                                    ? String(localized: "Online", comment: "Network status: Online")
+                                    : String(localized: "Server Offline", comment: "Network status: Server unreachable"))
                         )
                         .foregroundColor(.secondary)
                     }
+                    .onTapGesture {
+                        appState.checkServerReachability()
+                    }
+                }
+                
+                if let error = appState.lastConnectionError {
+                    Text(error)
+                        .font(.caption2)
+                        .foregroundColor(.red)
+                        .padding(.leading, 4)
                 }
 
                 Toggle(String(localized: "Auto-save drafts", comment: "Toggle for auto-save"), isOn: $autoSave)

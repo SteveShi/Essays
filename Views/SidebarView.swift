@@ -239,12 +239,15 @@ struct SidebarView: View {
                     .foregroundColor(LiquidGlassTheme.colors.text)
                 
                 Text(
-                    appState.isOnline
-                        ? String(localized: "Online", comment: "Network status: Online")
-                        : String(localized: "Offline", comment: "Network status: Offline"))
+                    !appState.isConnected
+                        ? String(localized: "Offline", comment: "Network status: Offline")
+                        : (appState.isServerReachable
+                            ? String(localized: "Online", comment: "Network status: Online")
+                            : String(localized: "Server Offline", comment: "Network status: Server unreachable")))
                     .font(LiquidGlassTheme.typography.caption)
-                .foregroundColor(appState.isOnline ? .green : .secondary)
+                .foregroundColor(!appState.isConnected ? .secondary : (appState.isServerReachable ? .green : .orange))
             }
+            .help(appState.lastConnectionError ?? String(localized: "Connection Status", comment: "Tooltip for connection status label"))
             
             Spacer()
             

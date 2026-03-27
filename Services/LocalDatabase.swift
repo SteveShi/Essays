@@ -21,11 +21,28 @@ final class LocalDatabase {
             let storeURL = databaseURL.appendingPathComponent("Essays.store")
             let config = ModelConfiguration(url: storeURL)
             
-            container = try ModelContainer(for: Memo.self, Attachment.self, Relation.self, Location.self, configurations: config)
+            do {
+                container = try ModelContainer(for: Memo.self, Attachment.self, Relation.self, Location.self, configurations: config)
+            } catch {
+                print("Failed to initialize ModelContainer, attempting to recreate store: \(error)")
+                // If initialization fails (likely due to schema change), delete the store and try again
+                try? FileManager.default.removeItem(at: storeURL)
+                container = try ModelContainer(for: Memo.self, Attachment.self, Relation.self, Location.self, configurations: config)
+            }
+            
             context = container.mainContext
             print("SwiftData initialized at: \(storeURL.path)")
         } catch {
-            fatalError("Failed to initialize SwiftData: \(error)")
+            print("Final SwiftData initialization error: \(error)")
+            // If it still fails, we have a bigger problem, but we'll try to fallback to a temporary in-memory store
+            do {
+                let config = ModelConfiguration(isStoredInMemoryOnly: true)
+                container = try ModelContainer(for: Memo.self, Attachment.self, Relation.self, Location.self, configurations: config)
+                context = container.mainContext
+                print("Falling back to in-memory store")
+            } catch {
+                fatalError("Failed to initialize SwiftData completely: \(error)")
+            }
         }
     }
     

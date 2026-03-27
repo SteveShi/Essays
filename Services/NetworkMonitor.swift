@@ -11,11 +11,17 @@ final class NetworkMonitor {
     private let queue = DispatchQueue(label: "NetworkMonitor")
     
     var isConnected: Bool = true
+    var onConnectedChange: ((Bool) -> Void)?
     
     private init() {
         monitor.pathUpdateHandler = { [weak self] path in
+            let status = path.status == .satisfied
+            
             Task { @MainActor in
-                self?.isConnected = path.status == .satisfied
+                if self?.isConnected != status {
+                    self?.isConnected = status
+                    self?.onConnectedChange?(status)
+                }
             }
         }
         monitor.start(queue: queue)

@@ -4,6 +4,30 @@ All notable changes to this project will be documented in this file.
 
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.4] - 2026-03-28
+
+### Added
+- 🔍 **Connectivity Diagnostics**: Added detailed connection error feedback in Sidebar and Settings tooltips.
+
+### Fixed
+- 🌐 **Auto URL Normalization**: Resolved "permanent offline" status by automatically adding `http://` or `https://` to server addresses.
+- 🔗 **Relation Deduplication**: Fixed an issue where memo references were duplicated many times in offline mode by adding unique constraints to the Relation model.
+
+### Improved
+- 🤖 **Automated Connectivity**: The app now automatically detects and reflects server status changes without requiring manual refresh.
+
+---
+
+### 新增
+- 🔍 **联网诊断**: 在侧边栏和设置页面的提示中增加了详细的联网错误反馈。
+
+### 修复
+- 🌐 **自动 URL 修复**: 通过自动补全服务器地址的 `http://` 或 `https://` 协议头，解决了“持续显示离线”的问题。
+- 🔗 **引用去重**: 通过在引用关系模型中增加唯一性约束，修复了离线模式下引用关系重复显示数百次的问题。
+
+### 改进
+- 🤖 **自动化联网**: 应用现在能够自动探测并反应服务器状态变化，无需手动点击刷新。
+
 ## [2.0.3] - 2026-03-20
 
 ### Changed
