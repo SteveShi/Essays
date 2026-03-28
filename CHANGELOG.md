@@ -4,6 +4,28 @@ All notable changes to this project will be documented in this file.
 
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2026-03-28
+
+### Added
+- 🛡️ **Database Auto-Recovery**: Implemented a self-healing mechanism that automatically detects persistent startup crashes and resets the local database if a crash loop is detected, eliminating the need for manual cache deletion.
+
+### Fixed
+- 🚀 **Full Pagination Sync**: Fully implemented the Memos API v1 pagination protocol (`nextPageToken`). The app now fetches your entire memo collection regardless of size, fixing the previous 100-item limit.
+- 🧱 **SwiftData Stability**: Resolved critical `EXC_BREAKPOINT` and unique constraint violation crashes by implementing a "Naked Insertion" and "Clean Room Transfer" strategy for global synchronization.
+- 🧪 **Empty Sync Robustness**: Fixed a bug where deleting all memos from the server caused decoding failures and "ghost data" to reappear from the local cache.
+- 🧹 **Concurrency Safety**: Refined internal API calls to achieve perfect Swift 6 strict concurrency compliance and removed redundant `await` calls.
+
+---
+
+### 新增
+- 🛡️ **数据库自愈机制**: 实现了自动修复机制，能够自动检测持续的启动崩溃。如果检测到崩溃循环，将自动重置本地数据库，用户不再需要手动删除缓存文件。
+
+### 修复
+- 🚀 **全量分页同步**: 完整实现了 Memos API v1 的分页协议 (`nextPageToken`)。应用现在可以同步您的全部笔记（无论数量多少），修复了之前仅能获取前 100 条的限制。
+- 🧱 **SwiftData 稳定性**: 通过实现“赤裸插入”和“净室迁移”的全局同步策略，解决了导致崩溃的 `EXC_BREAKPOINT` 和唯一性约束冲突问题。
+- 🧪 **空数据集同步**: 修复了当服务器端删空所有笔记时，由于解码失败导致本地缓存“借尸还魂”显示旧数据的 Bug。
+- 🧹 **并发安全**: 优化了内部 API 调用，实现了 Swift 6 严格并发检查的完全合规，并移除了冗余的 `await` 调用。
+
 ## [2.0.4] - 2026-03-28
 
 ### Added

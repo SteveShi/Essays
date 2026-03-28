@@ -978,9 +978,10 @@ struct MemoCard: View {
     }
 
     private var relationsView: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            let outgoing = memo.relations.filter { $0.memo == memo.name && $0.type != .comment }
-            let incoming = memo.relations.filter { $0.relatedMemo == memo.name && $0.type != .comment }
+        let relations = memo.validRelations
+        return VStack(alignment: .leading, spacing: 8) {
+            let outgoing = relations.filter { $0.memo == memo.name && $0.type != .comment }
+            let incoming = relations.filter { $0.relatedMemo == memo.name && $0.type != .comment }
 
             if !outgoing.isEmpty {
                 relationBlock(

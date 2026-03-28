@@ -63,7 +63,38 @@ final class Memo: Identifiable {
     }
     
     var commentCount: Int {
-        relations.filter { $0.type == .comment }.count
+        // Defensive check: ensure the memo is still valid and connected to a context
+        guard let context = modelContext else { return 0 }
+        
+        let memoName = self.name
+        let commentType = Relation.RelationType.comment.rawValue
+        
+        // Direct fetch count is much safer than iterating the relations collection,
+        // as it avoids 'zombie' objects that might still linger in the relationship array.
+        let descriptor = FetchDescriptor<Relation>(
+            predicate: #Predicate<Relation> { rel in
+                rel.memo == memoName && rel.typeRaw == commentType
+            }
+        )
+        
+        return (try? context.fetchCount(descriptor)) ?? 0
+    }
+
+    /// A safe collection of relations that are currently valid and attached to a context
+    var validRelations: [Relation] {
+        guard let context = modelContext else { return [] }
+        
+        let memoName = self.name
+        
+        // Fetch relations directly from the context to ensure object validity.
+        // This avoids crashes when the in-memory 'relations' array contains references to deleted objects.
+        let descriptor = FetchDescriptor<Relation>(
+            predicate: #Predicate<Relation> { rel in
+                rel.memo == memoName || rel.relatedMemo == memoName
+            }
+        )
+        
+        return (try? context.fetch(descriptor)) ?? []
     }
     func extractTagsFromContent() {
         self.tags = MemoUtility.extractTags(from: self.content)
@@ -123,9 +154,7 @@ final class Relation: Identifiable {
         self.relationID = "\(memo)-\(relatedMemo)-\(type.rawValue)"
     }
 
-    var id: String {
-        "\(memo)-\(relatedMemo)-\(typeRaw)"
-    }
+    var id: String { relationID }
 
     enum RelationType: String, Codable, CaseIterable, Sendable {
         case reference = "REFERENCE"

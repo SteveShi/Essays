@@ -150,7 +150,8 @@ class MemosAPIClient {
     }
     
     struct MemoResponse: Decodable {
-        let memos: [MemoData]
+        let memos: [MemoData]?
+        let nextPageToken: String?
     }
 
     struct MemoAttachmentResponse: Decodable {
@@ -325,107 +326,70 @@ class MemosAPIClient {
         return response.user
     }
     
+    /// Implementation of full pagination sync.
+    /// Fetches ALL memos from the server by following 'nextPageToken' before saving to local database.
     func fetchMemos() async throws -> [Memo] {
-        guard var urlComponents = URLComponents(string: "\(baseURL)/api/v1/memos") else {
-            throw MemosAPIError.invalidURL
-        }
+        var allMemosData: [MemoData] = []
+        var nextPageToken: String? = nil
         
-        urlComponents.queryItems = [
-            URLQueryItem(name: "view", value: "MEMO_VIEW_FULL"),
-            URLQueryItem(name: "pageSize", value: "100")
-        ]
-
-        guard let url = urlComponents.url else {
-            throw MemosAPIError.invalidURL
-        }
-
-        let request = buildRequest(url: url)
+        print("Starting full memo sync...")
         
-        do {
-            let (data, response) = try await session.data(for: request)
-            guard let httpResponse = response as? HTTPURLResponse,
-                (200...299).contains(httpResponse.statusCode)
-            else {
-                throw MemosAPIError.invalidResponse
+        repeat {
+            guard var urlComponents = URLComponents(string: "\(baseURL)/api/v1/memos") else {
+                throw MemosAPIError.invalidURL
             }
-
-            let memosData: [MemoData]
-            let decoder = makeDecoder()
-
-            if let memoResponse = try? decoder.decode(MemoResponse.self, from: data) {
-                memosData = memoResponse.memos
-            } else if let directMemos = try? decoder.decode([MemoData].self, from: data) {
-                memosData = directMemos
-            } else {
-                // Last ditch effort: decode and print error
-                do {
-                    _ = try decoder.decode([MemoData].self, from: data)
-                    memosData = []  // Should not reach here
-                } catch {
-                    print("Decoding failed for even direct array: \(error)")
-                    if let json = String(data: data, encoding: .utf8) {
-                        print("JSON sample: \(json.prefix(1000))")
-                    }
-                    throw MemosAPIError.decodingError(error)
-                }
+            
+            var queryItems = [
+                URLQueryItem(name: "view", value: "MEMO_VIEW_FULL"),
+                URLQueryItem(name: "pageSize", value: "200")
+            ]
+            
+            if let token = nextPageToken, !token.isEmpty {
+                queryItems.append(URLQueryItem(name: "pageToken", value: token))
             }
-
-            let memos = memosData.map { data in
-                let visibility = MemoVisibility(rawValue: data.visibility) ?? .private
-                let location = data.location.map {
-                    Location(
-                        placeholder: $0.placeholder, latitude: $0.latitude, longitude: $0.longitude)
+            
+            urlComponents.queryItems = queryItems
+            
+            guard let url = urlComponents.url else { throw MemosAPIError.invalidURL }
+            let request = buildRequest(url: url)
+            
+            do {
+                let (data, response) = try await session.data(for: request)
+                guard let httpResponse = response as? HTTPURLResponse,
+                      (200...299).contains(httpResponse.statusCode) else {
+                    throw MemosAPIError.invalidResponse
                 }
-                let attachments = ((data.attachments ?? []) + (data.resources ?? [])).map {
-                    Attachment(
-                        name: $0.name, filename: $0.filename, type: $0.type, size: $0.sizeInt,
-                        content: $0.content, externalLink: $0.externalLink,
-                        createTime: $0.createTime)
-                }
-                let relations = (data.relations ?? []).map {
-                    Relation(
-                        memo: $0.memo.value, relatedMemo: $0.relatedMemo.value,
-                        type: Relation.RelationType(rawValue: $0.type) ?? .unspecified)
-                }
-
-                let memoModel = Memo(
-                    name: data.name,
-                    numericID: data.extractedId,
-                    content: data.content,
-                    createdAt: data.createTime,
-                    updatedAt: data.updateTime,
-                    visibility: visibility,
-                    pinned: data.pinned ?? false,
-            state: MemoState(rawValue: data.state ?? "NORMAL") ?? .normal,
-            tags: data.tags ?? [],
-            attachments: attachments,
-            location: location,
-            relations: relations,
-                )
                 
-                // V0.26 fix: API tags array is often empty, manually extract from content
-                if memoModel.tags.isEmpty {
-                    memoModel.extractTagsFromContent()
+                let decoder = makeDecoder()
+                
+                // Handle different possible response formats
+                if let memoResponse = try? decoder.decode(MemoResponse.self, from: data) {
+                    allMemosData.append(contentsOf: memoResponse.memos ?? [])
+                    nextPageToken = memoResponse.nextPageToken
+                    print("Fetched page. Current total count: \(allMemosData.count). Next token: \(nextPageToken ?? "none")")
+                } else if let directMemos = try? decoder.decode([MemoData].self, from: data) {
+                    // Legacy or direct array response doesn't support pagination in the body
+                    allMemosData.append(contentsOf: directMemos)
+                    nextPageToken = nil
+                } else {
+                    // Critical failure in decoding
+                    throw MemosAPIError.decodingError(NSError(domain: "MemosAPIClient", code: 0, 
+                                                            userInfo: [NSLocalizedDescriptionKey: "Failed to decode memo response"]))
                 }
-
-                return memoModel
+            } catch {
+                print("Pagination fetch failed: \(error). Aborting sync to protect local data.")
+                // 🚨 CRITICAL: We THROW here to abort the sync. 
+                // This ensures LocalDatabase.saveMemos is NEVER called with a partial list.
+                throw error
             }
-
-            // Background save to local database
-            Task { @MainActor in
-                LocalDatabase.shared.saveMemos(memos)
-            }
-
-            return memos
-        } catch {
-            // If network error or decoding error, try local cache
-            print("Fetch failed or decoding failed: \(error)")
-            let cached = LocalDatabase.shared.fetchAllMemos()
-            if !cached.isEmpty {
-                return cached
-            }
-            throw error  // Rethrow if no cache available
-        }
+        } while nextPageToken != nil && !nextPageToken!.isEmpty
+        
+        // Map all collected pages to models
+        let memos = allMemosData.map { mapMemoDataToModel($0) }
+        print("Sync complete. Total memos to save: \(memos.count)")
+        
+        // Save to local database and return the managed versions
+        return LocalDatabase.shared.saveMemos(memos)
     }
 
     private func fetchMemoAttachments(memoName: String) async throws -> [Attachment] {
@@ -530,7 +494,7 @@ class MemosAPIClient {
                 location: location,
                 isPendingSync: true
             )
-            LocalDatabase.shared.saveMemos([pendingMemo])
+            _ = LocalDatabase.shared.saveMemos([pendingMemo])
             return pendingMemo
         }
 
@@ -842,7 +806,7 @@ class MemosAPIClient {
         let memosData: [MemoData]
         
         if let memoResponse = try? decoder.decode(MemoResponse.self, from: data) {
-            memosData = memoResponse.memos
+            memosData = memoResponse.memos ?? []
         } else if let directMemos = try? decoder.decode([MemoData].self, from: data) {
             memosData = directMemos
         } else {
