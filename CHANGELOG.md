@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - 2026-03-29
+
+### Added
+- 🚀 **Sparkle Updates**: Integrated Sparkle 2 framework for seamless automated updates on macOS.
+- 🛠️ **Update Menu**: Added a "Check for Updates..." option in the app menu for manual update checks.
+- 🌐 **Enhanced Release Flow**: Automated universal binary builds and localized release notes for English and Simplified Chinese.
+
+### Chinese
+
+### 新增
+- 🚀 **Sparkle 自动更新**: 集成了 Sparkle 2 框架，为 macOS 用户提供无缝的自动更新体验。
+- 🛠️ **更新菜单**: 在应用菜单中增加了“检查更新...”选项，方便手动触发更新检查。
+- 🌐 **优化发布流程**: 实现了 Universal 架构自动构建，并提供中英文双语更新日志支持。
+
+---
+
 ## [2.1.0] - 2026-03-28
 
 ### Added
@@ -15,7 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 🧪 **Empty Sync Robustness**: Fixed a bug where deleting all memos from the server caused decoding failures and "ghost data" to reappear from the local cache.
 - 🧹 **Concurrency Safety**: Refined internal API calls to achieve perfect Swift 6 strict concurrency compliance and removed redundant `await` calls.
 
----
+### Chinese
 
 ### 新增
 - 🛡️ **数据库自愈机制**: 实现了自动修复机制，能够自动检测持续的启动崩溃。如果检测到崩溃循环，将自动重置本地数据库，用户不再需要手动删除缓存文件。
@@ -38,7 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Improved
 - 🤖 **Automated Connectivity**: The app now automatically detects and reflects server status changes without requiring manual refresh.
 
----
+### Chinese
 
 ### 新增
 - 🔍 **联网诊断**: 在侧边栏和设置页面的提示中增加了详细的联网错误反馈。

@@ -763,6 +763,23 @@
         }
       }
     },
+    "Check for Updates..." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Check for Updates..."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "检查更新..."
+          }
+        }
+      }
+    },
     "Click the shortcut field and press your desired key combination." : {
       "extractionState" : "manual",
       "localizations" : {

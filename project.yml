@@ -9,7 +9,7 @@ options:
   defaultConfig: Release
 settings:
   base:
-    MARKETING_VERSION: 2.1.0
+    MARKETING_VERSION: 2.2.0
     CURRENT_PROJECT_VERSION: 14
 
 configs:
@@ -40,6 +40,9 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.essays.app
         PRODUCT_NAME: Essays
         ENABLE_HARDENED_RUNTIME: true
+        ENABLE_APP_SANDBOX: false
+        SUFeedURL: https://github.com/lpgneg19/Essays/releases/latest/download/appcast.xml
+        SUPublicEDKey: MkHAeSDd//tR7+jzLDuwomA0aHHe5+35hbQ4csagwF0=
         CODE_SIGN_ENTITLEMENTS: Resources/Essays.entitlements
     entitlements:
       path: Resources/Essays.entitlements
@@ -52,6 +55,8 @@ targets:
         product: MarkdownView
       - package: KeyboardShortcuts
         product: KeyboardShortcuts
+      - package: Sparkle
+        product: Sparkle
         
   EssaysiOS:
     type: application
@@ -102,6 +107,9 @@ packages:
   KeyboardShortcuts:
     url: https://github.com/sindresorhus/KeyboardShortcuts
     from: 2.0.0
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    from: 2.9.0
 
 schemes:
   Essays:

@@ -13,6 +13,9 @@ struct EssaysApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 #endif
     @State private var appState = AppState()
+    #if os(macOS)
+    @State private var updaterViewModel = UpdaterViewModel()
+    #endif
     @AppStorage("theme") private var theme = "system"
     
     private var preferredColorScheme: ColorScheme? {
@@ -64,6 +67,13 @@ struct EssaysApp: App {
                     NotificationCenter.default.post(name: .toggleSidebar, object: nil)
                 }
                 .keyboardShortcut("s", modifiers: [.command, .control])
+            }
+            
+            CommandGroup(after: .appInfo) {
+                Button(String(localized: "Check for Updates...", comment: "Menu command to check for updates")) {
+                    updaterViewModel.checkForUpdates()
+                }
+                .disabled(!updaterViewModel.canCheckForUpdates)
             }
         }
 #endif
