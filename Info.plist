@@ -32,6 +32,14 @@
     <string>We need camera access to let you take photos and attach them to your memos.</string>
     <key>NSLocationWhenInUseUsageDescription</key>
     <string>We use your location to automatically add geotags to your memos, making it easier to remember where you captured your thoughts.</string>
+    <key>SUFeedURL</key>
+    <string>https://github.com/lpgneg19/Essays/releases/latest/download/appcast.xml</string>
+    <key>SUPublicEDKey</key>
+    <string>MkHAeSDd//tR7+jzLDuwomA0aHHe5+35hbQ4csagwF0=</string>
+    <key>SUEnableAutomaticChecks</key>
+    <true/>
+    <key>SUScheduledCheckInterval</key>
+    <integer>86400</integer>
     <key>NSAppTransportSecurity</key>
     <dict>
         <key>NSAllowsArbitraryLoads</key>

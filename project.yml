@@ -40,7 +40,9 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.essays.app
         PRODUCT_NAME: Essays
         ENABLE_HARDENED_RUNTIME: true
-        ENABLE_APP_SANDBOX: false
+        ENABLE_APP_SANDBOX: NO
+        SUEnableAutomaticChecks: true
+        SUScheduledCheckInterval: 86400
         SUFeedURL: https://github.com/lpgneg19/Essays/releases/latest/download/appcast.xml
         SUPublicEDKey: MkHAeSDd//tR7+jzLDuwomA0aHHe5+35hbQ4csagwF0=
         CODE_SIGN_ENTITLEMENTS: Resources/Essays.entitlements
