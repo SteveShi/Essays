@@ -2,6 +2,7 @@ const contentRoot = "/content";
 const state = {
   locale: "en"
 };
+const cacheBuster = document.documentElement.dataset.cache || "20260331";
 
 const elements = {
   metaDescription: document.querySelector("meta[name='description']"),
@@ -151,14 +152,15 @@ const applyContent = (content) => {
 
   elements.footerCopyright.textContent = content.footer.copyright;
 
-  if (elements.langToggle) {
+  if (elements.langToggle && content.language) {
     const nextLocale = state.locale === "en" ? "zh-Hans" : "en";
+    const toggle = content.language.toggle || {};
     const nextLabel =
       state.locale === "en"
-        ? content.language.toggle.chinese
-        : content.language.toggle.english;
-    elements.langToggle.textContent = nextLabel;
-    elements.langToggle.setAttribute("aria-label", content.language.label);
+        ? toggle.chinese || content.language.chinese
+        : toggle.english || content.language.english;
+    elements.langToggle.textContent = nextLabel || "";
+    elements.langToggle.setAttribute("aria-label", content.language.label || "");
     elements.langToggle.dataset.lang = nextLocale;
   }
 
@@ -170,7 +172,9 @@ const applyContent = (content) => {
 };
 
 const loadContent = async () => {
-  const response = await fetch(`${contentRoot}/${state.locale}.json`);
+  const response = await fetch(
+    `${contentRoot}/${state.locale}.json?v=${cacheBuster}`
+  );
   if (!response.ok) {
     throw new Error();
   }
@@ -179,8 +183,20 @@ const loadContent = async () => {
 
 const start = async () => {
   setLocale(pickInitialLocale());
-  const content = await loadContent();
-  applyContent(content);
+  try {
+    const content = await loadContent();
+    applyContent(content);
+  } catch {
+    if (state.locale !== "en") {
+      setLocale("en");
+      try {
+        const content = await loadContent();
+        applyContent(content);
+      } catch {
+        return;
+      }
+    }
+  }
 };
 
 if (elements.langToggle) {
