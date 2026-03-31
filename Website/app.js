@@ -1,8 +1,7 @@
-const contentRoot = "/content";
+const contentRoot = "./content";
 const state = {
   locale: "en"
 };
-const cacheBuster = document.documentElement.dataset.cache || "20260331";
 
 const elements = {
   metaDescription: document.querySelector("meta[name='description']"),
@@ -25,7 +24,10 @@ const elements = {
   downloadBody: document.querySelector("[data-bind='downloadBody']"),
   downloadCta: document.querySelector("[data-bind='downloadCta']"),
   footerCopyright: document.querySelector("[data-bind='footerCopyright']"),
-  langToggle: document.querySelector("[data-bind='langToggle']"),
+  langLabel: document.querySelector("[data-bind='langLabel']"),
+  langEn: document.querySelector("[data-bind='langEn']"),
+  langZh: document.querySelector("[data-bind='langZh']"),
+  langGroup: document.querySelector("[data-bind='langGroup']"),
   linkRelease: document.querySelector("[data-bind='linkRelease']"),
   linkGitHub: document.querySelector("[data-bind='linkGitHub']"),
   linkReleaseNav: document.querySelector("[data-bind='linkReleaseNav']"),
@@ -33,29 +35,10 @@ const elements = {
   linkReleaseDownload: document.querySelector("[data-bind='linkReleaseDownload']")
 };
 
-
-const safeStorageGet = (key) => {
-  try {
-    return window.localStorage.getItem(key);
-  } catch {
-    return null;
-  }
-};
-
-const safeStorageSet = (key, value) => {
-  try {
-    window.localStorage.setItem(key, value);
-  } catch {
-    return;
-  }
-};
+const languageButtons = document.querySelectorAll("[data-lang]");
 
 const pickInitialLocale = () => {
-  const forced = document.documentElement.dataset.defaultLocale;
-  if (forced) {
-    return forced;
-  }
-  const stored = safeStorageGet("essays_locale");
+  const stored = window.localStorage.getItem("essays_locale");
   if (stored) {
     return stored;
   }
@@ -65,7 +48,7 @@ const pickInitialLocale = () => {
 
 const setLocale = (locale) => {
   state.locale = locale;
-  safeStorageSet("essays_locale", locale);
+  window.localStorage.setItem("essays_locale", locale);
   languageButtons.forEach((button) => {
     button.classList.toggle("active", button.dataset.lang === locale);
   });
@@ -152,17 +135,12 @@ const applyContent = (content) => {
 
   elements.footerCopyright.textContent = content.footer.copyright;
 
-  if (elements.langToggle && content.language) {
-    const nextLocale = state.locale === "en" ? "zh-Hans" : "en";
-    const toggle = content.language.toggle || {};
-    const nextLabel =
-      state.locale === "en"
-        ? toggle.chinese || content.language.chinese
-        : toggle.english || content.language.english;
-    elements.langToggle.textContent = nextLabel || "";
-    elements.langToggle.setAttribute("aria-label", content.language.label || "");
-    elements.langToggle.dataset.lang = nextLocale;
+  elements.langLabel.textContent = content.language.label;
+  if (elements.langGroup) {
+    elements.langGroup.setAttribute("aria-label", content.language.label);
   }
+  elements.langEn.textContent = content.language.english;
+  elements.langZh.textContent = content.language.chinese;
 
   elements.linkRelease.href = content.links.releases;
   elements.linkGitHub.href = content.links.github;
@@ -172,9 +150,7 @@ const applyContent = (content) => {
 };
 
 const loadContent = async () => {
-  const response = await fetch(
-    `${contentRoot}/${state.locale}.json?v=${cacheBuster}`
-  );
+  const response = await fetch(`${contentRoot}/${state.locale}.json`);
   if (!response.ok) {
     throw new Error();
   }
@@ -183,36 +159,17 @@ const loadContent = async () => {
 
 const start = async () => {
   setLocale(pickInitialLocale());
-  try {
-    const content = await loadContent();
-    applyContent(content);
-  } catch {
-    if (state.locale !== "en") {
-      setLocale("en");
-      try {
-        const content = await loadContent();
-        applyContent(content);
-      } catch {
-        return;
-      }
-    }
-  }
+  const content = await loadContent();
+  applyContent(content);
 };
 
-if (elements.langToggle) {
-  elements.langToggle.addEventListener("click", async () => {
-    const nextLocale = elements.langToggle.dataset.lang;
+languageButtons.forEach((button) => {
+  button.addEventListener("click", async () => {
+    const nextLocale = button.dataset.lang;
     setLocale(nextLocale);
     const content = await loadContent();
     applyContent(content);
-    const targetPath =
-      content && content.language && content.language.paths
-        ? content.language.paths[nextLocale]
-        : null;
-    if (targetPath && window.location.pathname !== targetPath) {
-      window.location.pathname = targetPath;
-    }
   });
-}
+});
 
 start();

@@ -1,5 +1,4 @@
 @import url("https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap");
-@import url("https://cdn.jsdelivr.net/npm/lxgw-wenkai-webfont@1.7.0/style.css");
 
 :root {
   color-scheme: light;
@@ -12,8 +11,6 @@
   --card: #fbf9f6;
   --shadow: 0 24px 60px rgba(28, 27, 25, 0.12);
   --radius: 24px;
-  --display-font: "DM Serif Display";
-  --body-font: "IBM Plex Sans";
 }
 
 * {
@@ -22,14 +19,9 @@
 
 body {
   margin: 0;
-  font-family: var(--body-font), system-ui, -apple-system, sans-serif;
+  font-family: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
   background: radial-gradient(circle at 20% 20%, #ffffff 0%, var(--bg) 45%, var(--bg-accent) 100%);
   color: var(--ink);
-}
-
-html[lang="zh-Hans"] body {
-  --display-font: "LXGW WenKai";
-  --body-font: "LXGW WenKai";
 }
 
 .page {
@@ -46,7 +38,7 @@ header {
 }
 
 .brand {
-  font-family: var(--display-font), serif;
+  font-family: "DM Serif Display", serif;
   font-size: 28px;
   letter-spacing: 0.5px;
 }
@@ -63,15 +55,40 @@ nav a {
   font-weight: 500;
 }
 
-.lang-toggle {
-  border: 1px solid var(--accent-strong);
+.lang {
+  display: inline-flex;
+  gap: 8px;
   background: var(--card);
-  padding: 8px 14px;
+  padding: 6px;
   border-radius: 999px;
-  font-weight: 600;
-  color: var(--accent-strong);
-  cursor: pointer;
   box-shadow: var(--shadow);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.lang button {
+  border: none;
+  background: transparent;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-weight: 500;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.lang button.active {
+  background: var(--accent);
+  color: #fff;
 }
 
 main {
@@ -89,7 +106,7 @@ main {
 }
 
 .hero h1 {
-  font-family: var(--display-font), serif;
+  font-family: "DM Serif Display", serif;
   font-size: clamp(32px, 4vw, 56px);
   margin: 0 0 16px;
 }
@@ -138,7 +155,6 @@ main {
 .story-header h2 {
   font-size: 28px;
   margin: 0 0 8px;
-  font-family: var(--display-font), serif;
 }
 
 .story-header p {
@@ -190,7 +206,6 @@ main {
 .download h2 {
   font-size: 28px;
   margin: 0 0 12px;
-  font-family: var(--display-font), serif;
 }
 
 .feature-grid {

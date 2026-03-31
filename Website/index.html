@@ -1,11 +1,11 @@
 <!doctype html>
-<html lang="en" data-cache="20260331">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content="" />
     <title data-bind="title"></title>
-    <link rel="stylesheet" href="/styles.css?v=20260331" />
+    <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
     <div class="page">
@@ -18,7 +18,11 @@
           <a data-bind="linkGitHubNav" href="#" target="_blank" rel="noreferrer">
             <span data-bind="navGitHub"></span>
           </a>
-          <button type="button" class="lang-toggle" data-bind="langToggle"></button>
+          <div class="lang" data-bind="langGroup">
+            <span data-bind="langLabel" class="sr-only"></span>
+            <button type="button" data-lang="en" data-bind="langEn"></button>
+            <button type="button" data-lang="zh-Hans" data-bind="langZh"></button>
+          </div>
         </nav>
       </header>
 
@@ -71,6 +75,6 @@
       </footer>
     </div>
 
-    <script src="/app.js?v=20260331"></script>
+    <script src="./app.js"></script>
   </body>
 </html>
