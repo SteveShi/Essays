@@ -33,12 +33,28 @@ const elements = {
 };
 
 
+const safeStorageGet = (key) => {
+  try {
+    return window.localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+};
+
+const safeStorageSet = (key, value) => {
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    return;
+  }
+};
+
 const pickInitialLocale = () => {
   const forced = document.documentElement.dataset.defaultLocale;
   if (forced) {
     return forced;
   }
-  const stored = window.localStorage.getItem("essays_locale");
+  const stored = safeStorageGet("essays_locale");
   if (stored) {
     return stored;
   }
@@ -48,7 +64,7 @@ const pickInitialLocale = () => {
 
 const setLocale = (locale) => {
   state.locale = locale;
-  window.localStorage.setItem("essays_locale", locale);
+  safeStorageSet("essays_locale", locale);
   languageButtons.forEach((button) => {
     button.classList.toggle("active", button.dataset.lang === locale);
   });
