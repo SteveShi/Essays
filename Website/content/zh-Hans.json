@@ -1,0 +1,104 @@
+{
+  "meta": {
+    "lang": "zh-Hans",
+    "title": "Essays",
+    "description": "一款为 Memos 自托管笔记服务量身打造的 macOS 原生客户端。"
+  },
+  "nav": {
+    "download": "下载",
+    "github": "GitHub"
+  },
+  "hero": {
+    "headline": "写作与阅读，只留专注",
+    "subhead": "Essays 专注捕捉灵感、记录日常与整理想法，界面克制而清晰。",
+    "primaryCta": "前往 Releases 下载",
+    "secondaryCta": "查看 GitHub"
+  },
+  "features": {
+    "title": "功能特性",
+    "items": [
+      {
+        "title": "全平台通用",
+        "body": "原生支持 macOS、iPadOS 与 iOS，在各设备间保持一致体验。"
+      },
+      {
+        "title": "三栏式导航",
+        "body": "响应式 NavigationSplitView，覆盖侧边栏、时间线与详情页。"
+      },
+      {
+        "title": "极致原生视觉",
+        "body": "LiquidGlass 设计语言，融合毛玻璃、超薄材质与细腻微动效。"
+      },
+      {
+        "title": "Apple AI 助手",
+        "body": "原生基础大模型提供私密的本地文本智能能力。"
+      },
+      {
+        "title": "全局快捷键与闪念记录",
+        "body": "自定义全局快捷键，随时唤出输入面板。"
+      },
+      {
+        "title": "附件画廊",
+        "body": "侧边栏网格视图，快速浏览所有图片备忘录。"
+      },
+      {
+        "title": "丰富的媒体预览",
+        "body": "支持 Quick Look 图片预览与 MapKit 位置标签气泡。"
+      },
+      {
+        "title": "交互式日历",
+        "body": "侧边栏响应式月历，一键筛选每日日志。"
+      },
+      {
+        "title": "时间线视图",
+        "body": "按日期分组的时间线呈现，回顾更清晰。"
+      },
+      {
+        "title": "全量国际化",
+        "body": "完整支持中英文切换。"
+      },
+      {
+        "title": "隐私安全",
+        "body": "通过访问令牌直连自托管 Memos 服务器。"
+      }
+    ]
+  },
+  "assistant": {
+    "title": "Apple AI 助手",
+    "body": "所有 AI 处理均在 Mac 本地完成，确保隐私与数据安全。",
+    "items": [
+      {
+        "title": "智能摘要"
+      },
+      {
+        "title": "润色文本"
+      },
+      {
+        "title": "内容扩充"
+      },
+      {
+        "title": "自动标签"
+      },
+      {
+        "title": "灵感关联"
+      }
+    ]
+  },
+  "download": {
+    "title": "下载",
+    "body": "从 GitHub Releases 获取最新的 .dmg 或 .app。",
+    "cta": "打开 Releases"
+  },
+  "footer": {
+    "copyright": "© 2026 Essays"
+  },
+  "links": {
+    "releases": "https://github.com/lpgneg19/Essays/releases",
+    "github": "https://github.com/lpgneg19/Essays"
+  },
+  "language": {
+    "label": "语言",
+    "english": "English",
+    "chinese": "中文"
+  }
+}

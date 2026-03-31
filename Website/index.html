@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="" />
+    <title data-bind="title"></title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="page">
+      <header>
+        <div class="brand" data-bind="brand"></div>
+        <nav>
+          <a data-bind="linkReleaseNav" href="#">
+            <span data-bind="navDownload"></span>
+          </a>
+          <a data-bind="linkGitHubNav" href="#" target="_blank" rel="noreferrer">
+            <span data-bind="navGitHub"></span>
+          </a>
+          <div class="lang" data-bind="langGroup">
+            <span data-bind="langLabel" class="sr-only"></span>
+            <button type="button" data-lang="en" data-bind="langEn"></button>
+            <button type="button" data-lang="zh-Hans" data-bind="langZh"></button>
+          </div>
+        </nav>
+      </header>
+
+      <main>
+        <section class="hero">
+          <div>
+            <h1 data-bind="heroHeadline"></h1>
+            <p data-bind="heroSubhead"></p>
+            <div class="cta">
+              <a class="primary" data-bind="linkRelease" href="#">
+                <span data-bind="heroPrimary"></span>
+              </a>
+              <a class="secondary" data-bind="linkGitHub" href="#" target="_blank" rel="noreferrer">
+                <span data-bind="heroSecondary"></span>
+              </a>
+            </div>
+          </div>
+        </section>
+
+        <section class="features">
+          <h2 data-bind="featuresTitle"></h2>
+          <div class="feature-grid" data-bind="featuresList"></div>
+        </section>
+
+        <section class="assistant">
+          <h2 data-bind="assistantTitle"></h2>
+          <p data-bind="assistantBody"></p>
+          <div class="assistant-grid" data-bind="assistantList"></div>
+        </section>
+
+        <section class="download">
+          <h2 data-bind="downloadTitle"></h2>
+          <p data-bind="downloadBody"></p>
+          <a class="primary" data-bind="linkReleaseDownload" href="#">
+            <span data-bind="downloadCta"></span>
+          </a>
+        </section>
+      </main>
+
+      <footer>
+        <span data-bind="footerCopyright"></span>
+      </footer>
+    </div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

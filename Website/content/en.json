@@ -1,0 +1,104 @@
+{
+  "meta": {
+    "lang": "en",
+    "title": "Essays",
+    "description": "A native macOS client for the Memos self-hosted note-taking service."
+  },
+  "nav": {
+    "download": "Download",
+    "github": "GitHub"
+  },
+  "hero": {
+    "headline": "Write and read without noise",
+    "subhead": "Essays is a native macOS client for Memos, focused on capturing thoughts, daily logs, and inspiration with a calm UI.",
+    "primaryCta": "Download from Releases",
+    "secondaryCta": "View on GitHub"
+  },
+  "features": {
+    "title": "Features",
+    "items": [
+      {
+        "title": "Universal App",
+        "body": "Native support for macOS, iPadOS, and iOS with a unified experience."
+      },
+      {
+        "title": "Three-Column Navigation",
+        "body": "A responsive NavigationSplitView layout for sidebar, timeline, and details."
+      },
+      {
+        "title": "Premium Native UI",
+        "body": "LiquidGlass aesthetics with glassmorphism, thin materials, and micro-animations."
+      },
+      {
+        "title": "Apple AI Assistant",
+        "body": "On-device Foundation Models for private text intelligence."
+      },
+      {
+        "title": "Quick Capture & Global Shortcuts",
+        "body": "Capture ideas instantly with customizable global hotkeys."
+      },
+      {
+        "title": "Attachments Gallery",
+        "body": "A dedicated sidebar grid for browsing image memos."
+      },
+      {
+        "title": "Rich Media Previews",
+        "body": "Quick Look for images and MapKit popovers for location tags."
+      },
+      {
+        "title": "Interactive Calendar",
+        "body": "Monthly calendar in the sidebar for filtering daily logs."
+      },
+      {
+        "title": "Timeline View",
+        "body": "Chronological memos grouped by date." 
+      },
+      {
+        "title": "Fully Localized",
+        "body": "Complete support for English and Simplified Chinese."
+      },
+      {
+        "title": "Privacy First",
+        "body": "Direct connection to your self-hosted Memos server via access tokens."
+      }
+    ]
+  },
+  "assistant": {
+    "title": "Apple AI Assistant",
+    "body": "All AI processing happens locally on your Mac to keep your data private.",
+    "items": [
+      {
+        "title": "Summarize"
+      },
+      {
+        "title": "Improve Writing"
+      },
+      {
+        "title": "Expand"
+      },
+      {
+        "title": "Generate Tags"
+      },
+      {
+        "title": "Related Ideas"
+      }
+    ]
+  },
+  "download": {
+    "title": "Download",
+    "body": "Get the latest .dmg or .app from GitHub Releases.",
+    "cta": "Open Releases"
+  },
+  "footer": {
+    "copyright": "© 2026 Essays"
+  },
+  "links": {
+    "releases": "https://github.com/lpgneg19/Essays/releases",
+    "github": "https://github.com/lpgneg19/Essays"
+  },
+  "language": {
+    "label": "Language",
+    "english": "English",
+    "chinese": "中文"
+  }
+}
