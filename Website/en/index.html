@@ -1,38 +1,40 @@
 <!doctype html>
-<html lang="en" data-default-locale="en" data-cache="20260331">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="" />
-    <title data-bind="title"></title>
-    <link rel="stylesheet" href="/styles.css?v=20260331" />
+    <meta
+      name="description"
+      content="A native macOS client for the Memos self-hosted note-taking service."
+    />
+    <title>Essays</title>
+    <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
     <div class="page">
       <header>
-        <div class="brand" data-bind="brand"></div>
+        <div class="brand">Essays</div>
         <nav>
-          <a data-bind="linkReleaseNav" href="#">
-            <span data-bind="navDownload"></span>
-          </a>
-          <a data-bind="linkGitHubNav" href="#" target="_blank" rel="noreferrer">
-            <span data-bind="navGitHub"></span>
-          </a>
-          <button type="button" class="lang-toggle" data-bind="langToggle"></button>
+          <a href="https://github.com/lpgneg19/Essays/releases">Download</a>
+          <a href="https://github.com/lpgneg19/Essays" target="_blank" rel="noreferrer">GitHub</a>
+          <a class="lang-toggle" href="/zh/">中文</a>
         </nav>
       </header>
 
       <main>
         <section class="hero">
           <div>
-            <h1 data-bind="heroHeadline"></h1>
-            <p data-bind="heroSubhead"></p>
+            <h1>Write and read without noise</h1>
+            <p>
+              Essays is a native macOS client for Memos, focused on capturing thoughts,
+              daily logs, and inspiration with a calm UI.
+            </p>
             <div class="cta">
-              <a class="primary" data-bind="linkRelease" href="#">
-                <span data-bind="heroPrimary"></span>
+              <a class="primary" href="https://github.com/lpgneg19/Essays/releases">
+                Download from Releases
               </a>
-              <a class="secondary" data-bind="linkGitHub" href="#" target="_blank" rel="noreferrer">
-                <span data-bind="heroSecondary"></span>
+              <a class="secondary" href="https://github.com/lpgneg19/Essays" target="_blank" rel="noreferrer">
+                View on GitHub
               </a>
             </div>
           </div>
@@ -40,37 +42,121 @@
 
         <section class="story">
           <div class="story-header">
-            <h2 data-bind="storyTitle"></h2>
-            <p data-bind="storyLead"></p>
+            <h2>An editor that stays out of your way</h2>
+            <p>A three-column layout keeps navigation, timeline, and details always within reach.</p>
           </div>
-          <div class="story-grid" data-bind="storyList"></div>
+          <div class="story-grid">
+            <div class="story-item">
+              <div class="story-media">
+                <img src="/assets/timeline.png" alt="Timeline view in Essays" loading="lazy" />
+              </div>
+              <div class="story-text">
+                <h3>Timeline for daily flow</h3>
+                <p>Browse memos chronologically and keep context while you write.</p>
+              </div>
+            </div>
+            <div class="story-item">
+              <div class="story-media">
+                <img src="/assets/attachments.png" alt="Attachments gallery in Essays" loading="lazy" />
+              </div>
+              <div class="story-text">
+                <h3>Attachments at a glance</h3>
+                <p>Preview images instantly with a dedicated attachments gallery.</p>
+              </div>
+            </div>
+            <div class="story-item">
+              <div class="story-media">
+                <img src="/assets/ai-assistant.png" alt="Apple AI Assistant panel in Essays" loading="lazy" />
+              </div>
+              <div class="story-text">
+                <h3>AI assistance on device</h3>
+                <p>Summarize, rewrite, and expand with local Foundation Models.</p>
+              </div>
+            </div>
+            <div class="story-item">
+              <div class="story-media">
+                <img src="/assets/empty-state.png" alt="Empty state in Essays" loading="lazy" />
+              </div>
+              <div class="story-text">
+                <h3>A calm starting point</h3>
+                <p>Empty states guide the next step without noise or clutter.</p>
+              </div>
+            </div>
+          </div>
         </section>
 
         <section class="features">
-          <h2 data-bind="featuresTitle"></h2>
-          <div class="feature-grid" data-bind="featuresList"></div>
+          <h2>Features</h2>
+          <div class="feature-grid">
+            <div class="feature">
+              <h3>Universal App</h3>
+              <p>Native support for macOS, iPadOS, and iOS with a unified experience.</p>
+            </div>
+            <div class="feature">
+              <h3>Three-Column Navigation</h3>
+              <p>A responsive NavigationSplitView layout for sidebar, timeline, and details.</p>
+            </div>
+            <div class="feature">
+              <h3>Premium Native UI</h3>
+              <p>LiquidGlass aesthetics with glassmorphism, thin materials, and micro-animations.</p>
+            </div>
+            <div class="feature">
+              <h3>Apple AI Assistant</h3>
+              <p>On-device Foundation Models for private text intelligence.</p>
+            </div>
+            <div class="feature">
+              <h3>Quick Capture & Global Shortcuts</h3>
+              <p>Capture ideas instantly with customizable global hotkeys.</p>
+            </div>
+            <div class="feature">
+              <h3>Attachments Gallery</h3>
+              <p>A dedicated sidebar grid for browsing image memos.</p>
+            </div>
+            <div class="feature">
+              <h3>Rich Media Previews</h3>
+              <p>Quick Look for images and MapKit popovers for location tags.</p>
+            </div>
+            <div class="feature">
+              <h3>Interactive Calendar</h3>
+              <p>Monthly calendar in the sidebar for filtering daily logs.</p>
+            </div>
+            <div class="feature">
+              <h3>Timeline View</h3>
+              <p>Chronological memos grouped by date.</p>
+            </div>
+            <div class="feature">
+              <h3>Fully Localized</h3>
+              <p>Complete support for English and Simplified Chinese.</p>
+            </div>
+            <div class="feature">
+              <h3>Privacy First</h3>
+              <p>Direct connection to your self-hosted Memos server via access tokens.</p>
+            </div>
+          </div>
         </section>
 
         <section class="assistant">
-          <h2 data-bind="assistantTitle"></h2>
-          <p data-bind="assistantBody"></p>
-          <div class="assistant-grid" data-bind="assistantList"></div>
+          <h2>Apple AI Assistant</h2>
+          <p>All AI processing happens locally on your Mac to keep your data private.</p>
+          <div class="assistant-grid">
+            <div class="feature"><h3>Summarize</h3></div>
+            <div class="feature"><h3>Improve Writing</h3></div>
+            <div class="feature"><h3>Expand</h3></div>
+            <div class="feature"><h3>Generate Tags</h3></div>
+            <div class="feature"><h3>Related Ideas</h3></div>
+          </div>
         </section>
 
         <section class="download">
-          <h2 data-bind="downloadTitle"></h2>
-          <p data-bind="downloadBody"></p>
-          <a class="primary" data-bind="linkReleaseDownload" href="#">
-            <span data-bind="downloadCta"></span>
-          </a>
+          <h2>Download</h2>
+          <p>Get the latest .dmg or .app from GitHub Releases.</p>
+          <a class="primary" href="https://github.com/lpgneg19/Essays/releases">Open Releases</a>
         </section>
       </main>
 
       <footer>
-        <span data-bind="footerCopyright"></span>
+        <span>© 2026 Essays</span>
       </footer>
     </div>
-
-    <script src="/app.js?v=20260331"></script>
   </body>
 </html>

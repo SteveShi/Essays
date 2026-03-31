@@ -1,76 +1,155 @@
 <!doctype html>
-<html lang="zh-Hans" data-default-locale="zh-Hans" data-cache="20260331">
+<html lang="zh-Hans">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="" />
-    <title data-bind="title"></title>
-    <link rel="stylesheet" href="/styles.css?v=20260331" />
+    <meta
+      name="description"
+      content="一款为 Memos 自托管笔记服务量身打造的 macOS 原生客户端。"
+    />
+    <title>Essays</title>
+    <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
     <div class="page">
       <header>
-        <div class="brand" data-bind="brand"></div>
+        <div class="brand">Essays</div>
         <nav>
-          <a data-bind="linkReleaseNav" href="#">
-            <span data-bind="navDownload"></span>
-          </a>
-          <a data-bind="linkGitHubNav" href="#" target="_blank" rel="noreferrer">
-            <span data-bind="navGitHub"></span>
-          </a>
-          <button type="button" class="lang-toggle" data-bind="langToggle"></button>
+          <a href="https://github.com/lpgneg19/Essays/releases">下载</a>
+          <a href="https://github.com/lpgneg19/Essays" target="_blank" rel="noreferrer">GitHub</a>
+          <a class="lang-toggle" href="/en/">English</a>
         </nav>
       </header>
 
       <main>
         <section class="hero">
           <div>
-            <h1 data-bind="heroHeadline"></h1>
-            <p data-bind="heroSubhead"></p>
+            <h1>写作与阅读，只留专注</h1>
+            <p>Essays 专注捕捉灵感、记录日常与整理想法，界面克制而清晰。</p>
             <div class="cta">
-              <a class="primary" data-bind="linkRelease" href="#">
-                <span data-bind="heroPrimary"></span>
-              </a>
-              <a class="secondary" data-bind="linkGitHub" href="#" target="_blank" rel="noreferrer">
-                <span data-bind="heroSecondary"></span>
-              </a>
+              <a class="primary" href="https://github.com/lpgneg19/Essays/releases">前往 Releases 下载</a>
+              <a class="secondary" href="https://github.com/lpgneg19/Essays" target="_blank" rel="noreferrer">查看 GitHub</a>
             </div>
           </div>
         </section>
 
         <section class="story">
           <div class="story-header">
-            <h2 data-bind="storyTitle"></h2>
-            <p data-bind="storyLead"></p>
+            <h2>让编辑器隐身的设计</h2>
+            <p>三栏式布局始终保持导航、时间线与详情在视野内。</p>
           </div>
-          <div class="story-grid" data-bind="storyList"></div>
+          <div class="story-grid">
+            <div class="story-item">
+              <div class="story-media">
+                <img src="/assets/timeline.png" alt="Essays 时间线界面" loading="lazy" />
+              </div>
+              <div class="story-text">
+                <h3>日常时间线</h3>
+                <p>按时间顺序回顾记录，保持写作上下文。</p>
+              </div>
+            </div>
+            <div class="story-item">
+              <div class="story-media">
+                <img src="/assets/attachments.png" alt="Essays 附件画廊" loading="lazy" />
+              </div>
+              <div class="story-text">
+                <h3>附件一目了然</h3>
+                <p>专属附件画廊，图片快速预览与查找。</p>
+              </div>
+            </div>
+            <div class="story-item">
+              <div class="story-media">
+                <img src="/assets/ai-assistant.png" alt="Essays 闪念助手" loading="lazy" />
+              </div>
+              <div class="story-text">
+                <h3>本地 AI 助手</h3>
+                <p>摘要、润色与扩写全部在设备端完成。</p>
+              </div>
+            </div>
+            <div class="story-item">
+              <div class="story-media">
+                <img src="/assets/empty-state.png" alt="Essays 空状态" loading="lazy" />
+              </div>
+              <div class="story-text">
+                <h3>安静的起点</h3>
+                <p>空状态引导下一步，不喧哗也不打扰。</p>
+              </div>
+            </div>
+          </div>
         </section>
 
         <section class="features">
-          <h2 data-bind="featuresTitle"></h2>
-          <div class="feature-grid" data-bind="featuresList"></div>
+          <h2>功能特性</h2>
+          <div class="feature-grid">
+            <div class="feature">
+              <h3>全平台通用</h3>
+              <p>原生支持 macOS、iPadOS 与 iOS，在各设备间保持一致体验。</p>
+            </div>
+            <div class="feature">
+              <h3>三栏式导航</h3>
+              <p>响应式 NavigationSplitView，覆盖侧边栏、时间线与详情页。</p>
+            </div>
+            <div class="feature">
+              <h3>极致原生视觉</h3>
+              <p>LiquidGlass 设计语言，融合毛玻璃、超薄材质与细腻微动效。</p>
+            </div>
+            <div class="feature">
+              <h3>Apple AI 助手</h3>
+              <p>原生基础大模型提供私密的本地文本智能能力。</p>
+            </div>
+            <div class="feature">
+              <h3>全局快捷键与闪念记录</h3>
+              <p>自定义全局快捷键，随时唤出输入面板。</p>
+            </div>
+            <div class="feature">
+              <h3>附件画廊</h3>
+              <p>侧边栏网格视图，快速浏览所有图片备忘录。</p>
+            </div>
+            <div class="feature">
+              <h3>丰富的媒体预览</h3>
+              <p>支持 Quick Look 图片预览与 MapKit 位置标签气泡。</p>
+            </div>
+            <div class="feature">
+              <h3>交互式日历</h3>
+              <p>侧边栏响应式月历，一键筛选每日日志。</p>
+            </div>
+            <div class="feature">
+              <h3>时间线视图</h3>
+              <p>按日期分组的时间线呈现，回顾更清晰。</p>
+            </div>
+            <div class="feature">
+              <h3>全量国际化</h3>
+              <p>完整支持中英文切换。</p>
+            </div>
+            <div class="feature">
+              <h3>隐私安全</h3>
+              <p>通过访问令牌直连自托管 Memos 服务器。</p>
+            </div>
+          </div>
         </section>
 
         <section class="assistant">
-          <h2 data-bind="assistantTitle"></h2>
-          <p data-bind="assistantBody"></p>
-          <div class="assistant-grid" data-bind="assistantList"></div>
+          <h2>Apple AI 助手</h2>
+          <p>所有 AI 处理均在 Mac 本地完成，确保隐私与数据安全。</p>
+          <div class="assistant-grid">
+            <div class="feature"><h3>智能摘要</h3></div>
+            <div class="feature"><h3>润色文本</h3></div>
+            <div class="feature"><h3>内容扩充</h3></div>
+            <div class="feature"><h3>自动标签</h3></div>
+            <div class="feature"><h3>灵感关联</h3></div>
+          </div>
         </section>
 
         <section class="download">
-          <h2 data-bind="downloadTitle"></h2>
-          <p data-bind="downloadBody"></p>
-          <a class="primary" data-bind="linkReleaseDownload" href="#">
-            <span data-bind="downloadCta"></span>
-          </a>
+          <h2>下载</h2>
+          <p>从 GitHub Releases 获取最新的 .dmg 或 .app。</p>
+          <a class="primary" href="https://github.com/lpgneg19/Essays/releases">打开 Releases</a>
         </section>
       </main>
 
       <footer>
-        <span data-bind="footerCopyright"></span>
+        <span>© 2026 Essays</span>
       </footer>
     </div>
-
-    <script src="/app.js?v=20260331"></script>
   </body>
 </html>
