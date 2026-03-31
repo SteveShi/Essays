@@ -12,6 +12,8 @@
   --card: #fbf9f6;
   --shadow: 0 24px 60px rgba(28, 27, 25, 0.12);
   --radius: 24px;
+  --display-font: "DM Serif Display";
+  --body-font: "IBM Plex Sans";
 }
 
 * {
@@ -20,13 +22,14 @@
 
 body {
   margin: 0;
-  font-family: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+  font-family: var(--body-font), system-ui, -apple-system, sans-serif;
   background: radial-gradient(circle at 20% 20%, #ffffff 0%, var(--bg) 45%, var(--bg-accent) 100%);
   color: var(--ink);
 }
 
 html[lang="zh-Hans"] body {
-  font-family: "LXGW WenKai", "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+  --display-font: "LXGW WenKai";
+  --body-font: "LXGW WenKai";
 }
 
 .page {
@@ -43,7 +46,7 @@ header {
 }
 
 .brand {
-  font-family: "DM Serif Display", serif;
+  font-family: var(--display-font), serif;
   font-size: 28px;
   letter-spacing: 0.5px;
 }
@@ -86,7 +89,7 @@ main {
 }
 
 .hero h1 {
-  font-family: "DM Serif Display", serif;
+  font-family: var(--display-font), serif;
   font-size: clamp(32px, 4vw, 56px);
   margin: 0 0 16px;
 }
@@ -135,6 +138,7 @@ main {
 .story-header h2 {
   font-size: 28px;
   margin: 0 0 8px;
+  font-family: var(--display-font), serif;
 }
 
 .story-header p {
@@ -186,6 +190,7 @@ main {
 .download h2 {
   font-size: 28px;
   margin: 0 0 12px;
+  font-family: var(--display-font), serif;
 }
 
 .feature-grid {

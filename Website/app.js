@@ -1,4 +1,4 @@
-const contentRoot = "./content";
+const contentRoot = "/content";
 const state = {
   locale: "en"
 };
@@ -24,10 +24,7 @@ const elements = {
   downloadBody: document.querySelector("[data-bind='downloadBody']"),
   downloadCta: document.querySelector("[data-bind='downloadCta']"),
   footerCopyright: document.querySelector("[data-bind='footerCopyright']"),
-  langLabel: document.querySelector("[data-bind='langLabel']"),
-  langEn: document.querySelector("[data-bind='langEn']"),
-  langZh: document.querySelector("[data-bind='langZh']"),
-  langGroup: document.querySelector("[data-bind='langGroup']"),
+  langToggle: document.querySelector("[data-bind='langToggle']"),
   linkRelease: document.querySelector("[data-bind='linkRelease']"),
   linkGitHub: document.querySelector("[data-bind='linkGitHub']"),
   linkReleaseNav: document.querySelector("[data-bind='linkReleaseNav']"),
@@ -35,9 +32,12 @@ const elements = {
   linkReleaseDownload: document.querySelector("[data-bind='linkReleaseDownload']")
 };
 
-const languageButtons = document.querySelectorAll("[data-lang]");
 
 const pickInitialLocale = () => {
+  const forced = document.documentElement.dataset.defaultLocale;
+  if (forced) {
+    return forced;
+  }
   const stored = window.localStorage.getItem("essays_locale");
   if (stored) {
     return stored;
@@ -135,12 +135,16 @@ const applyContent = (content) => {
 
   elements.footerCopyright.textContent = content.footer.copyright;
 
-  elements.langLabel.textContent = content.language.label;
-  if (elements.langGroup) {
-    elements.langGroup.setAttribute("aria-label", content.language.label);
+  if (elements.langToggle) {
+    const nextLocale = state.locale === "en" ? "zh-Hans" : "en";
+    const nextLabel =
+      state.locale === "en"
+        ? content.language.toggle.chinese
+        : content.language.toggle.english;
+    elements.langToggle.textContent = nextLabel;
+    elements.langToggle.setAttribute("aria-label", content.language.label);
+    elements.langToggle.dataset.lang = nextLocale;
   }
-  elements.langEn.textContent = content.language.english;
-  elements.langZh.textContent = content.language.chinese;
 
   elements.linkRelease.href = content.links.releases;
   elements.linkGitHub.href = content.links.github;
@@ -163,13 +167,17 @@ const start = async () => {
   applyContent(content);
 };
 
-languageButtons.forEach((button) => {
-  button.addEventListener("click", async () => {
-    const nextLocale = button.dataset.lang;
+if (elements.langToggle) {
+  elements.langToggle.addEventListener("click", async () => {
+    const nextLocale = elements.langToggle.dataset.lang;
     setLocale(nextLocale);
     const content = await loadContent();
     applyContent(content);
+    const targetPath = content.language?.paths?.[nextLocale];
+    if (targetPath && window.location.pathname !== targetPath) {
+      window.location.pathname = targetPath;
+    }
   });
-});
+}
 
 start();

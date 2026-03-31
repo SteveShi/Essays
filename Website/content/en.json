@@ -21,25 +21,25 @@
       {
         "title": "Timeline for daily flow",
         "body": "Browse memos chronologically and keep context while you write.",
-        "image": "./assets/timeline.png",
+        "image": "/assets/timeline.png",
         "alt": "Timeline view in Essays"
       },
       {
         "title": "Attachments at a glance",
         "body": "Preview images instantly with a dedicated attachments gallery.",
-        "image": "./assets/attachments.png",
+        "image": "/assets/attachments.png",
         "alt": "Attachments gallery in Essays"
       },
       {
         "title": "AI assistance on device",
         "body": "Summarize, rewrite, and expand with local Foundation Models.",
-        "image": "./assets/ai-assistant.png",
+        "image": "/assets/ai-assistant.png",
         "alt": "Apple AI Assistant panel in Essays"
       },
       {
         "title": "A calm starting point",
         "body": "Empty states guide the next step without noise or clutter.",
-        "image": "./assets/empty-state.png",
+        "image": "/assets/empty-state.png",
         "alt": "Empty state in Essays"
       }
     ]
@@ -129,6 +129,14 @@
   "language": {
     "label": "Language",
     "english": "English",
-    "chinese": "中文"
+    "chinese": "中文",
+    "paths": {
+      "en": "/en/",
+      "zh-Hans": "/zh/"
+    },
+    "toggle": {
+      "english": "English",
+      "chinese": "中文"
+    }
   }
 }
