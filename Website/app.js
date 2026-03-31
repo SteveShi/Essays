@@ -173,7 +173,10 @@ if (elements.langToggle) {
     setLocale(nextLocale);
     const content = await loadContent();
     applyContent(content);
-    const targetPath = content.language?.paths?.[nextLocale];
+    const targetPath =
+      content && content.language && content.language.paths
+        ? content.language.paths[nextLocale]
+        : null;
     if (targetPath && window.location.pathname !== targetPath) {
       window.location.pathname = targetPath;
     }
