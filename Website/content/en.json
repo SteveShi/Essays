@@ -14,6 +14,36 @@
     "primaryCta": "Download from Releases",
     "secondaryCta": "View on GitHub"
   },
+  "story": {
+    "title": "An editor that stays out of your way",
+    "lead": "A three-column layout keeps navigation, timeline, and details always within reach.",
+    "items": [
+      {
+        "title": "Timeline for daily flow",
+        "body": "Browse memos chronologically and keep context while you write.",
+        "image": "./assets/timeline.png",
+        "alt": "Timeline view in Essays"
+      },
+      {
+        "title": "Attachments at a glance",
+        "body": "Preview images instantly with a dedicated attachments gallery.",
+        "image": "./assets/attachments.png",
+        "alt": "Attachments gallery in Essays"
+      },
+      {
+        "title": "AI assistance on device",
+        "body": "Summarize, rewrite, and expand with local Foundation Models.",
+        "image": "./assets/ai-assistant.png",
+        "alt": "Apple AI Assistant panel in Essays"
+      },
+      {
+        "title": "A calm starting point",
+        "body": "Empty states guide the next step without noise or clutter.",
+        "image": "./assets/empty-state.png",
+        "alt": "Empty state in Essays"
+      }
+    ]
+  },
   "features": {
     "title": "Features",
     "items": [
@@ -51,7 +81,7 @@
       },
       {
         "title": "Timeline View",
-        "body": "Chronological memos grouped by date." 
+        "body": "Chronological memos grouped by date."
       },
       {
         "title": "Fully Localized",

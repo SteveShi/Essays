@@ -147,6 +147,61 @@ main {
   gap: 24px;
 }
 
+.story {
+  display: grid;
+  gap: 32px;
+}
+
+.story-header h2 {
+  font-size: 28px;
+  margin: 0 0 8px;
+}
+
+.story-header p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 18px;
+}
+
+.story-grid {
+  display: grid;
+  gap: 32px;
+}
+
+.story-item {
+  display: grid;
+  gap: 24px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  align-items: center;
+  background: var(--card);
+  padding: 24px;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.story-item:nth-child(even) .story-media {
+  order: 2;
+}
+
+.story-media img {
+  width: 100%;
+  height: auto;
+  border-radius: 18px;
+  display: block;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
+}
+
+.story-text h3 {
+  margin: 0 0 8px;
+  font-size: 22px;
+}
+
+.story-text p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
 .features h2,
 .download h2 {
   font-size: 28px;

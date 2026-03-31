@@ -12,6 +12,9 @@ const elements = {
   heroSubhead: document.querySelector("[data-bind='heroSubhead']"),
   heroPrimary: document.querySelector("[data-bind='heroPrimary']"),
   heroSecondary: document.querySelector("[data-bind='heroSecondary']"),
+  storyTitle: document.querySelector("[data-bind='storyTitle']"),
+  storyLead: document.querySelector("[data-bind='storyLead']"),
+  storyList: document.querySelector("[data-bind='storyList']"),
   featuresTitle: document.querySelector("[data-bind='featuresTitle']"),
   featuresList: document.querySelector("[data-bind='featuresList']"),
   assistantTitle: document.querySelector("[data-bind='assistantTitle']"),
@@ -70,6 +73,35 @@ const renderCardList = (listElement, items) => {
   });
 };
 
+const renderStoryList = (listElement, items) => {
+  listElement.innerHTML = "";
+  items.forEach((item) => {
+    const section = document.createElement("div");
+    section.className = "story-item";
+
+    const media = document.createElement("div");
+    media.className = "story-media";
+    const image = document.createElement("img");
+    image.src = item.image;
+    image.alt = item.alt;
+    image.loading = "lazy";
+    media.appendChild(image);
+
+    const text = document.createElement("div");
+    text.className = "story-text";
+    const title = document.createElement("h3");
+    title.textContent = item.title;
+    const body = document.createElement("p");
+    body.textContent = item.body;
+    text.appendChild(title);
+    text.appendChild(body);
+
+    section.appendChild(media);
+    section.appendChild(text);
+    listElement.appendChild(section);
+  });
+};
+
 const applyContent = (content) => {
   document.documentElement.lang = content.meta.lang;
   document.title = content.meta.title;
@@ -85,6 +117,10 @@ const applyContent = (content) => {
   elements.heroSubhead.textContent = content.hero.subhead;
   elements.heroPrimary.textContent = content.hero.primaryCta;
   elements.heroSecondary.textContent = content.hero.secondaryCta;
+
+  elements.storyTitle.textContent = content.story.title;
+  elements.storyLead.textContent = content.story.lead;
+  renderStoryList(elements.storyList, content.story.items);
 
   elements.featuresTitle.textContent = content.features.title;
   renderCardList(elements.featuresList, content.features.items);

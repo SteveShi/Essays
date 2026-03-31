@@ -14,6 +14,36 @@
     "primaryCta": "前往 Releases 下载",
     "secondaryCta": "查看 GitHub"
   },
+  "story": {
+    "title": "让编辑器隐身的设计",
+    "lead": "三栏式布局始终保持导航、时间线与详情在视野内。",
+    "items": [
+      {
+        "title": "日常时间线",
+        "body": "按时间顺序回顾记录，保持写作上下文。",
+        "image": "./assets/timeline.png",
+        "alt": "Essays 时间线界面"
+      },
+      {
+        "title": "附件一目了然",
+        "body": "专属附件画廊，图片快速预览与查找。",
+        "image": "./assets/attachments.png",
+        "alt": "Essays 附件画廊"
+      },
+      {
+        "title": "本地 AI 助手",
+        "body": "摘要、润色与扩写全部在设备端完成。",
+        "image": "./assets/ai-assistant.png",
+        "alt": "Essays 闪念助手"
+      },
+      {
+        "title": "安静的起点",
+        "body": "空状态引导下一步，不喧哗也不打扰。",
+        "image": "./assets/empty-state.png",
+        "alt": "Essays 空状态"
+      }
+    ]
+  },
   "features": {
     "title": "功能特性",
     "items": [
