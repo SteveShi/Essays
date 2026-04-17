@@ -4,6 +4,30 @@ All notable changes to this project will be documented in this file.
 
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.1] - 2026-04-17
+
+### Improved
+- 🌐 **Localization Robustness**: Replaced dynamic localization keys with stable, format-based rendering in memo counters to avoid untranslated runtime keys.
+- 📡 **Connectivity State Accuracy**: Fixed server reachability state handling when server URL is empty, preventing stale "online" status in the UI.
+- ⚙️ **Sidebar Rendering Performance**: Moved attachment and protected visibility counts to precomputed app state values to reduce repeated view-time calculations.
+
+### Changed
+- 🔌 **API Consistency**: Unified unarchive behavior through `MemosAPIClient` to avoid duplicated request logic and keep network handling centralized.
+- 🧱 **Pagination Safety**: Removed unnecessary force-unwrapping in pagination loop conditions to improve maintainability and reduce crash risk during future refactors.
+
+---
+
+### Chinese
+
+### 改进
+- 🌐 **本地化健壮性**: 将笔记计数展示中的动态本地化键替换为稳定的格式化渲染，避免运行时 key 无法翻译的问题。
+- 📡 **联网状态准确性**: 修复服务器地址为空时的可达性状态处理，避免界面残留“在线”状态。
+- ⚙️ **侧边栏渲染性能**: 将附件数量和受保护可见性数量改为在应用状态中预计算，减少视图渲染时的重复计算。
+
+### 变更
+- 🔌 **API 一致性**: 将反归档行为统一收敛到 `MemosAPIClient`，避免重复请求逻辑并保持网络层集中管理。
+- 🧱 **分页安全性**: 移除分页循环条件中的非必要强制解包，提升可维护性并降低后续重构中的崩溃风险。
+
 ## [2.2.0] - 2026-03-29
 
 ### Added

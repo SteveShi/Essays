@@ -1,17 +1,137 @@
 @import url("https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap");
 @import url("https://cdn.jsdelivr.net/npm/lxgw-wenkai-webfont@1.7.0/style.css");
 
+@property --bg {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #0f0f10;
+}
+
+@property --bg-accent {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #161718;
+}
+
+@property --ink {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #f2f2f2;
+}
+
+@property --muted {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #a0a0a0;
+}
+
+@property --accent {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #7ad6dc;
+}
+
+@property --accent-strong {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #9ee8ec;
+}
+
+@property --card {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #151516;
+}
+
 :root {
+  color-scheme: light dark;
+  --bg: #0f0f10;
+  --bg-accent: #161718;
+  --ink: #f2f2f2;
+  --muted: #a0a0a0;
+  --accent: #7ad6dc;
+  --accent-strong: #9ee8ec;
+  --card: #151516;
+  --shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+  --radius: 24px;
+  transition:
+    --bg 400ms ease,
+    --bg-accent 400ms ease,
+    --ink 400ms ease,
+    --muted 400ms ease,
+    --accent 400ms ease,
+    --accent-strong 400ms ease,
+    --card 400ms ease;
+}
+
+.mode-night {
+  --bg: #0f0f10;
+  --bg-accent: #17181a;
+  --ink: #f1f1f2;
+  --muted: #96979b;
+  --accent: #8aa0ff;
+  --accent-strong: #b7c2ff;
+  --card: #151517;
+  --shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+}
+
+.mode-moonlight {
+  --bg: #0c1116;
+  --bg-accent: #16212b;
+  --ink: #eef4ff;
+  --muted: #95a2b6;
+  --accent: #8bd0ff;
+  --accent-strong: #bfe8ff;
+  --card: #131c24;
+  --shadow: 0 24px 60px rgba(8, 12, 20, 0.6);
+}
+
+.mode-day {
   color-scheme: light;
-  --bg: #f7f3ee;
-  --bg-accent: #e9dfd1;
+  --bg: #f6f0e7;
+  --bg-accent: #eadfce;
   --ink: #1c1b19;
   --muted: #5a5248;
   --accent: #3a6a6f;
   --accent-strong: #254a4d;
   --card: #fbf9f6;
   --shadow: 0 24px 60px rgba(28, 27, 25, 0.12);
-  --radius: 24px;
+}
+
+.mode-sunny {
+  color-scheme: light;
+  --bg: #fff5dc;
+  --bg-accent: #f6dfb1;
+  --ink: #2b2418;
+  --muted: #6b5b40;
+  --accent: #d08a2e;
+  --accent-strong: #a66512;
+  --card: #fff9ee;
+  --shadow: 0 24px 60px rgba(142, 101, 35, 0.2);
+}
+
+.mode-rainy {
+  color-scheme: light;
+  --bg: #e6eef2;
+  --bg-accent: #cfdde6;
+  --ink: #1b2a35;
+  --muted: #50626e;
+  --accent: #3b6b8a;
+  --accent-strong: #2b4e66;
+  --card: #f1f6f9;
+  --shadow: 0 24px 60px rgba(33, 49, 60, 0.18);
+}
+
+.mode-snowy {
+  color-scheme: light;
+  --bg: #f3f6fb;
+  --bg-accent: #e2ebf5;
+  --ink: #1c2732;
+  --muted: #5a6b7a;
+  --accent: #5b8bc7;
+  --accent-strong: #3f6fa8;
+  --card: #f8fbff;
+  --shadow: 0 24px 60px rgba(30, 44, 58, 0.12);
 }
 
 * {
@@ -21,7 +141,7 @@
 body {
   margin: 0;
   font-family: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
-  background: radial-gradient(circle at 20% 20%, #ffffff 0%, var(--bg) 45%, var(--bg-accent) 100%);
+  background: radial-gradient(circle at 20% 20%, color-mix(in srgb, var(--bg) 80%, #ffffff 20%) 0%, var(--bg) 45%, var(--bg-accent) 100%);
   color: var(--ink);
 }
 
@@ -33,6 +153,18 @@ html[lang="zh-Hans"] body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  position: relative;
+  z-index: 2;
+}
+
+.shade-canvas {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+  mix-blend-mode: multiply;
 }
 
 header {
@@ -67,6 +199,35 @@ nav a {
   padding: 6px;
   border-radius: 999px;
   box-shadow: var(--shadow);
+}
+
+.mode-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--card) 85%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent);
+  box-shadow: var(--shadow);
+  letter-spacing: 0.4em;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.mode-switch button {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-weight: 600;
+  padding: 2px 0;
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.mode-switch button.active {
+  color: var(--ink);
+  transform: translateY(-1px);
 }
 
 .sr-only {
@@ -272,6 +433,110 @@ footer {
   padding: 24px 8vw 40px;
   color: var(--muted);
   font-size: 14px;
+}
+
+.atmosphere {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  overflow: hidden;
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 400ms ease;
+}
+
+.overlay-moonlight {
+  background:
+    radial-gradient(circle at 20% 15%, rgba(122, 208, 255, 0.22), transparent 45%),
+    radial-gradient(circle at 70% 10%, rgba(255, 255, 255, 0.2), transparent 40%),
+    radial-gradient(circle, rgba(255, 255, 255, 0.28) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 120px 120px;
+  mix-blend-mode: screen;
+  animation: twinkle 6s ease-in-out infinite;
+}
+
+.overlay-sunny {
+  background:
+    radial-gradient(circle at 20% 20%, rgba(255, 214, 140, 0.35), transparent 55%),
+    radial-gradient(circle at 80% 10%, rgba(255, 237, 186, 0.28), transparent 60%),
+    linear-gradient(120deg, rgba(255, 210, 120, 0.18), transparent 55%);
+  animation: sway 7s ease-in-out infinite;
+}
+
+.overlay-rainy {
+  background:
+    repeating-linear-gradient(120deg, rgba(84, 110, 130, 0.18) 0 2px, transparent 2px 12px),
+    radial-gradient(circle at 50% 15%, rgba(210, 226, 240, 0.4), transparent 55%);
+  background-size: 180px 180px, 100% 100%;
+  animation: rain 0.8s linear infinite;
+  mix-blend-mode: multiply;
+}
+
+.overlay-rainy::after {
+  content: "";
+  position: absolute;
+  inset: -20%;
+  background: radial-gradient(circle at 50% 20%, rgba(170, 190, 205, 0.35), transparent 60%);
+  filter: blur(24px);
+  opacity: 0.7;
+}
+
+.overlay-snowy {
+  background:
+    radial-gradient(circle, rgba(255, 255, 255, 0.7) 1px, transparent 2px),
+    radial-gradient(circle, rgba(255, 255, 255, 0.5) 1px, transparent 3px);
+  background-size: 80px 80px, 140px 140px;
+  animation: snow 8s linear infinite;
+}
+
+.mode-moonlight .overlay-moonlight,
+.mode-sunny .overlay-sunny,
+.mode-rainy .overlay-rainy,
+.mode-snowy .overlay-snowy {
+  opacity: 1;
+}
+
+@keyframes twinkle {
+  0%,
+  100% {
+    opacity: 0.75;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes sway {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(12px);
+  }
+}
+
+@keyframes rain {
+  0% {
+    background-position: 0 0, 0 0;
+  }
+  100% {
+    background-position: 160px 240px, 0 0;
+  }
+}
+
+@keyframes snow {
+  0% {
+    background-position: 0 0, 0 0;
+  }
+  100% {
+    background-position: 0 200px, 0 320px;
+  }
 }
 
 @media (max-width: 720px) {

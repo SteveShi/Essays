@@ -12,14 +12,31 @@
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <link rel="stylesheet" href="/styles.css" />
+    <script src="/theme-modes.js" defer></script>
+    <script src="/shade-canvas.js" defer></script>
   </head>
   <body>
+    <canvas class="shade-canvas" id="shade-canvas"></canvas>
+    <div class="atmosphere">
+      <div class="overlay overlay-moonlight"></div>
+      <div class="overlay overlay-sunny"></div>
+      <div class="overlay overlay-rainy"></div>
+      <div class="overlay overlay-snowy"></div>
+    </div>
     <div class="page">
       <header>
-        <div class="brand">Essays</div>
+        <div class="brand" id="brand">Essays</div>
         <nav>
           <a href="https://github.com/lpgneg19/Essays/releases">Download</a>
           <a href="https://github.com/lpgneg19/Essays" target="_blank" rel="noreferrer">GitHub</a>
+          <div class="mode-switch" aria-labelledby="brand">
+            <button type="button" data-mode="night" data-mode-key="n">N</button>
+            <button type="button" data-mode="moonlight" data-mode-key="m">M</button>
+            <button type="button" data-mode="day" data-mode-key="d">D</button>
+            <button type="button" data-mode="sunny" data-mode-key="s">S</button>
+            <button type="button" data-mode="rainy" data-mode-key="r">R</button>
+            <button type="button" data-mode="snowy" data-mode-key="w">W</button>
+          </div>
           <a class="lang-toggle" href="/zh/">中文</a>
         </nav>
       </header>

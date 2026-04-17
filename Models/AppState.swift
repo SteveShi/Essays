@@ -86,8 +86,10 @@ class AppState {
     private(set) var todayMemosCount: Int = 0
     private(set) var recentWeekMemosCount: Int = 0
     private(set) var publicMemosCount: Int = 0
+    private(set) var protectedMemosCount: Int = 0
     private(set) var privateMemosCount: Int = 0
     private(set) var archivedMemosCount: Int = 0
+    private(set) var imageAttachmentMemosCount: Int = 0
     
     // For navigation jumping
     var scrollToMemoID: String?
@@ -180,6 +182,7 @@ class AppState {
     @MainActor
     func checkServerReachability() {
         guard !serverURL.isEmpty else { 
+            self.isServerReachable = false
             self.lastConnectionError = String(localized: "Server URL not configured")
             return 
         }
@@ -271,8 +274,12 @@ class AppState {
         // 统计公开和私有数量 (仅统计 NORMAL 状态)
         let normalMemos = memos.filter { $0.state == .normal }
         self.publicMemosCount = normalMemos.filter { $0.visibility == MemoVisibility.`public` }.count
+        self.protectedMemosCount = normalMemos.filter { $0.visibility == MemoVisibility.protected }.count
         self.privateMemosCount = normalMemos.filter { $0.visibility == MemoVisibility.`private` }.count
         self.archivedMemosCount = memos.filter { $0.state == .archived }.count
+        self.imageAttachmentMemosCount = memos.reduce(0) { count, memo in
+            count + memo.attachments.filter { $0.isImage }.count
+        }
     }
 
     /// 在搜索、标签过滤或数据变动时调用的过滤状态更新（主要针对当前视图显示）
@@ -373,25 +380,7 @@ class AppState {
     @MainActor
     func unarchiveMemo(_ memo: Memo) async {
         do {
-            // Unarchiving is essentially patching state back to NORMAL
-            // We can reuse updateMemo or add a specific unarchive in API client
-            // For now, let's use updateMemo with state update (I need to ensure updateMemo supports state)
-            let resourceName = memo.name
-            let encodedName = resourceName.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? resourceName
-            
-            guard let url = URL(string: "\(serverURL)/api/v1/\(encodedName)?updateMask=state") else { return }
-            
-            var request = URLRequest(url: url)
-            request.httpMethod = "PATCH"
-            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
-            
-            let body: [String: Any] = ["name": resourceName, "state": "NORMAL"]
-            request.httpBody = try? JSONSerialization.data(withJSONObject: body)
-            
-            let (_, response) = try await URLSession.shared.data(for: request)
-            guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else { return }
-            
+            _ = try await MemosAPIClient.shared.unarchiveMemo(id: memo.numericID, memoName: memo.name)
             // Update local state
             if let index = memos.firstIndex(where: { $0.id == memo.id }) {
                 memos[index].state = .normal

@@ -13,7 +13,7 @@ struct SidebarView: View {
                 sidebarLabel(.today, icon: "sun.max", title: String(localized: "Today", comment: "Sidebar item for today's memos"), count: appState.todayMemosCount)
                 sidebarLabel(.past7Days, icon: "clock.arrow.circlepath", title: String(localized: "Past 7 Days", comment: "Sidebar item for memos in the last week"), count: appState.recentWeekMemosCount)
                 sidebarLabel(.archived, icon: "archivebox", title: String(localized: "Archived", comment: "Sidebar item for archived memos"), count: appState.archivedMemosCount)
-                sidebarLabel(.attachments, icon: "photo.on.rectangle.angled", title: String(localized: "Attachments", comment: "Sidebar item for image gallery"), count: appState.memos.reduce(0) { $0 + $1.attachments.filter { $0.isImage }.count })
+                sidebarLabel(.attachments, icon: "photo.on.rectangle.angled", title: String(localized: "Attachments", comment: "Sidebar item for image gallery"), count: appState.imageAttachmentMemosCount)
             }
             
             if !appState.tags.isEmpty {
@@ -26,7 +26,7 @@ struct SidebarView: View {
             
             Section(String(localized: "Visibility", comment: "Sidebar section header for visibility filters")) {
                 sidebarLabel(.publicMemos, icon: "globe", title: String(localized: "Public", comment: "Sidebar item for public memos"), count: appState.publicMemosCount)
-                sidebarLabel(.protectedMemos, icon: MemoVisibility.protected.icon, title: MemoVisibility.protected.displayName, count: appState.memos.filter { $0.visibility == .protected }.count)
+                sidebarLabel(.protectedMemos, icon: MemoVisibility.protected.icon, title: MemoVisibility.protected.displayName, count: appState.protectedMemosCount)
                 sidebarLabel(.privateMemos, icon: "lock", title: String(localized: "Private", comment: "Sidebar item for private memos"), count: appState.privateMemosCount)
             }
         }

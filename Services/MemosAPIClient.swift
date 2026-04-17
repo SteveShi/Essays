@@ -382,7 +382,10 @@ class MemosAPIClient {
                 // This ensures LocalDatabase.saveMemos is NEVER called with a partial list.
                 throw error
             }
-        } while nextPageToken != nil && !nextPageToken!.isEmpty
+        } while ({
+            guard let token = nextPageToken else { return false }
+            return !token.isEmpty
+        }())
         
         // Map all collected pages to models
         let memos = allMemosData.map { mapMemoDataToModel($0) }
@@ -689,6 +692,61 @@ class MemosAPIClient {
             relations: relations,
         )
         
+        if memoModel.tags.isEmpty {
+            memoModel.extractTagsFromContent()
+        }
+
+        return memoModel
+    }
+
+    func unarchiveMemo(id: Int, memoName: String) async throws -> Memo {
+        let encodedName = memoName.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? memoName
+        guard var urlComponents = URLComponents(string: "\(baseURL)/api/v1/\(encodedName)") else {
+            throw MemosAPIError.invalidURL
+        }
+
+        urlComponents.queryItems = [URLQueryItem(name: "updateMask", value: "state")]
+        guard let url = urlComponents.url else {
+            throw MemosAPIError.invalidURL
+        }
+
+        let body: [String: Any] = ["name": memoName, "state": "NORMAL"]
+        let request = buildRequest(url: url, method: "PATCH", body: try? JSONSerialization.data(withJSONObject: body))
+
+        let data: MemoData = try await performRequest(request)
+        let visibility = MemoVisibility(rawValue: data.visibility) ?? .private
+
+        let attachments = (data.attachments ?? []).map {
+            Attachment(
+                name: $0.name, filename: $0.filename, type: $0.type, size: $0.sizeInt,
+                content: $0.content, externalLink: $0.externalLink, createTime: $0.createTime)
+        }
+
+        let locationValue = data.location.map {
+            Location(placeholder: $0.placeholder, latitude: $0.latitude, longitude: $0.longitude)
+        }
+
+        let relations = (data.relations ?? []).map {
+            Relation(
+                memo: $0.memo.value, relatedMemo: $0.relatedMemo.value,
+                type: Relation.RelationType(rawValue: $0.type) ?? .unspecified)
+        }
+
+        let memoModel = Memo(
+            name: data.name,
+            numericID: data.extractedId,
+            content: data.content,
+            createdAt: data.createTime,
+            updatedAt: data.updateTime,
+            visibility: visibility,
+            pinned: data.pinned ?? false,
+            state: MemoState(rawValue: data.state ?? "NORMAL") ?? .normal,
+            tags: data.tags ?? [],
+            attachments: attachments,
+            location: locationValue,
+            relations: relations,
+        )
+
         if memoModel.tags.isEmpty {
             memoModel.extractTagsFromContent()
         }

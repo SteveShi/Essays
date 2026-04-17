@@ -65,3 +65,4 @@ Essays.xcodeproj/
 *.txt
 skills-lock.json
 /.agents
+.vercel

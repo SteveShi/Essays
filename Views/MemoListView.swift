@@ -748,7 +748,7 @@ struct MemoCard: View {
                 HStack(spacing: 3) {
                     Image(systemName: "bubble.left")
                         .font(.system(size: 10))
-                                Text(String(localized: "\(memo.commentCount)", comment: "Comment count value"))
+                    Text(memo.commentCount, format: .number)
                         .font(.system(size: 10, weight: .medium))
                 }
                 .foregroundColor(LiquidGlassTheme.colors.secondaryText)
@@ -1002,9 +1002,10 @@ struct MemoCard: View {
             HStack(spacing: 6) {
                 Image(systemName: icon)
                     .font(.system(size: 10))
-                Text(String(localized: "\(title) (\(items.count))", comment: "Section title with item count"))
-                    .font(LiquidGlassTheme.typography.caption)
+                Text(title)
+                Text(items.count, format: .number)
             }
+            .font(LiquidGlassTheme.typography.caption)
             .foregroundColor(LiquidGlassTheme.colors.tertiaryText)
             .padding(.horizontal, 10)
             .padding(.top, 6)
@@ -1115,4 +1116,3 @@ struct MemoCard: View {
         }
     }
 }
-
