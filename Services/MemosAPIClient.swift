@@ -366,7 +366,6 @@ class MemosAPIClient {
             
             var queryItems = [
                 URLQueryItem(name: "state", value: state),
-                URLQueryItem(name: "filter", value: "state == '\(state)'"),
                 URLQueryItem(name: "pageSize", value: "200")
             ]
             
