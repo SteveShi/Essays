@@ -157,7 +157,6 @@ class AppState {
         checkServerReachability()
         startServerStatusTimer()
         updateFilteredMemosState()  // Initial computation
-        autoSyncOnLaunch()  // 自动同步远程数据
     }
 
     private func setupConnectivityActions() {
@@ -243,21 +242,7 @@ class AppState {
         print("Network restored, checking for pending syncs...")
     }
 
-    /// 应用启动时自动从服务器同步最新数据，确保已删除的笔记不会在本地残留
-    private func autoSyncOnLaunch() {
-        guard isLoggedIn, !serverURL.isEmpty, !accessToken.isEmpty else { return }
-        Task {
-            do {
-                MemosAPIClient.shared.configure(serverURL: serverURL, accessToken: accessToken)
-                let freshMemos = try await MemosAPIClient.shared.fetchMemos()
-                self.memos = freshMemos
-                print("Auto-sync on launch completed: \(freshMemos.count) memos")
-            } catch {
-                print("Auto-sync on launch failed (using local cache): \(error.localizedDescription)")
-                // 失败时保留本地缓存，不覆盖
-            }
-        }
-    }
+
 
     private func scheduleFilteredUpdate() {
         updateTask?.cancel()

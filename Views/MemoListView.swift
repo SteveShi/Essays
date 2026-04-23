@@ -581,8 +581,11 @@ struct MemoListView: View {
                 accessToken: appState.accessToken
             )
             
-            let memos = try await MemosAPIClient.shared.fetchMemos()
-            appState.memos = memos
+            let fetchedMemos = try await MemosAPIClient.shared.fetchMemos()
+            let fetchedTags = try await MemosAPIClient.shared.fetchTags()
+            
+            appState.memos = fetchedMemos
+            appState.tags = fetchedTags
         } catch {
             appState.errorMessage = error.localizedDescription
         }
@@ -1111,6 +1114,7 @@ struct MemoCard: View {
         do {
             try await MemosAPIClient.shared.deleteMemo(memoName: memo.name)
             appState.memos.removeAll { $0.name == memo.name }
+            LocalDatabase.shared.deleteMemo(memo)
         } catch {
             appState.errorMessage = error.localizedDescription
         }

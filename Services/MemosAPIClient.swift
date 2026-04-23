@@ -366,6 +366,7 @@ class MemosAPIClient {
             
             var queryItems = [
                 URLQueryItem(name: "state", value: state),
+                URLQueryItem(name: "filter", value: "state == '\(state)'"),
                 URLQueryItem(name: "pageSize", value: "200")
             ]
             
@@ -387,10 +388,12 @@ class MemosAPIClient {
             let decoder = makeDecoder()
             
             if let memoResponse = try? decoder.decode(MemoResponse.self, from: data) {
-                allMemosData.append(contentsOf: memoResponse.memos ?? [])
+                let filtered = (memoResponse.memos ?? []).filter { ($0.state ?? "NORMAL").uppercased() == state }
+                allMemosData.append(contentsOf: filtered)
                 nextPageToken = memoResponse.nextPageToken
             } else if let directMemos = try? decoder.decode([MemoData].self, from: data) {
-                allMemosData.append(contentsOf: directMemos)
+                let filtered = directMemos.filter { ($0.state ?? "NORMAL").uppercased() == state }
+                allMemosData.append(contentsOf: filtered)
                 nextPageToken = nil
             } else {
                 throw MemosAPIError.decodingError(NSError(domain: "MemosAPIClient", code: 0, 

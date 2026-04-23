@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.4] - 2026-04-24
+
+### Fixed
+- 🔄 **Refresh Button Reliability**: Resolved a race condition at startup that occasionally made the manual refresh button appear ineffective.
+- 🧹 **Ghost Memo Cleanup**: Fixed an issue where deleted memos from the server could reappear in the local view due to API filtering changes in newer Memos versions.
+- 🗑️ **Local Deletion Consistency**: Improved local database handling to ensure memos deleted within the app are immediately removed from the local cache.
+
+---
+
+### Chinese
+
+### 修复
+- 🔄 **刷新按钮可靠性**: 解决了启动时的竞争条件问题，该问题曾导致手动刷新按钮偶尔失效。
+- 🧹 **残留数据清理**: 修复了由于新版 Memos API 过滤逻辑变化导致的已删除笔记在本地视图中“复活”的问题。
+- 🗑️ **本地删除一致性**: 优化了本地数据库处理逻辑，确保在应用内删除的笔记会立即从本地缓存中移除，避免重启后再次出现。
+
+---
+
 ## [2.2.3] - 2026-04-23
 
 ### Fixed
