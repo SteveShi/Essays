@@ -4,6 +4,26 @@ All notable changes to this project will be documented in this file.
 
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.0] - 2026-04-24
+
+### Added
+- 📴 **Offline-First Architecture**: Complete redesign of the data synchronization layer. You can now compose, edit, and delete memos even without an internet connection.
+- 📬 **Sync Queue View**: A new dedicated dashboard in the sidebar to monitor the status of pending local changes and background synchronization.
+- ⚙️ **Background Sync Engine**: Intelligent background processing with exponential backoff retries and network status awareness.
+- 🔄 **ID Mapping System**: Seamless transition from local temporary IDs to remote server IDs once synchronization is complete.
+
+---
+
+### Chinese
+
+### 新增
+- 📴 **离线优先架构**: 全面重构数据同步层。即使在没有网络连接的情况下，您也可以创作、编辑和删除笔记。
+- 📬 **同步队列查看器**: 侧边栏新增专属面板，用于实时监控本地更改的挂起状态及后台同步进展。
+- ⚙️ **后台同步引擎**: 具备网络状态感知能力的智能后台处理机制，支持指数退避重试算法。
+- 🔄 **ID 自动映射系统**: 同步完成后，系统会自动将本地临时 ID 替换为远程服务器真实 ID，确保数据一致性。
+
+---
+
 ## [2.2.4] - 2026-04-24
 
 ### Fixed

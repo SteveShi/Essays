@@ -340,9 +340,7 @@ struct MemoListView: View {
                     Spacer()
 
                     Button {
-                        Task {
-                            await quickCaptureMemo()
-                        }
+                        quickCaptureMemo()
                     } label: {
                         Group {
                             if isQuickCaptureSaving {
@@ -466,37 +464,69 @@ struct MemoListView: View {
         }
     }
 
-    private func quickCaptureMemo() async {
+    private func quickCaptureMemo() {
         let trimmed = quickCaptureText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
 
         isQuickCaptureSaving = true
-        defer { isQuickCaptureSaving = false }
-
+        
         let extractedTags = MemoUtility.extractTags(from: trimmed)
         let attachmentNames = quickCaptureAttachments.map { $0.name }
 
         do {
-            let memo = try await MemosAPIClient.shared.createMemo(
+            // 1. Create locally with temporary ID
+            let tempId = "local_\(UUID().uuidString)"
+            let newMemo = Memo(
+                name: tempId,
+                numericID: "",
                 content: trimmed,
+                createdAt: Date(),
+                updatedAt: Date(),
                 visibility: quickCaptureVisibility,
+                pinned: false,
+                state: .normal,
+                tags: extractedTags,
+                attachments: quickCaptureAttachments,
+                location: quickCaptureLocation,
+                relations: []
+            )
+            LocalDatabase.shared.context.insert(newMemo)
+            
+            // 2. Enqueue OutboxTask
+            let payload = CreateMemoPayload(
+                content: trimmed,
+                visibility: quickCaptureVisibility.rawValue,
+                pinned: false,
                 tags: extractedTags,
                 attachmentNames: attachmentNames,
-                location: quickCaptureLocation
+                locationPlaceholder: quickCaptureLocation?.placeholder,
+                locationLatitude: quickCaptureLocation?.latitude,
+                locationLongitude: quickCaptureLocation?.longitude
             )
+            let payloadData = try JSONEncoder().encode(payload)
+            let task = OutboxTask(type: .createMemo, payload: payloadData, memoId: tempId)
+            
+            LocalDatabase.shared.context.insert(task)
+            try LocalDatabase.shared.context.save()
+            
+            // Trigger background sync
+            SyncEngine.shared.triggerSync()
             
             #if os(iOS)
             let generator = UIImpactFeedbackGenerator(style: .medium)
             generator.impactOccurred()
             #endif
-            appState.memos.insert(memo, at: 0)
+            
+            // UI cleanup
             quickCaptureText = ""
             quickCaptureAttachments = []
             quickCaptureLocation = nil
             quickCaptureRequestID = nil
             locationManager.clear()
+            isQuickCaptureSaving = false
         } catch {
             appState.errorMessage = error.localizedDescription
+            isQuickCaptureSaving = false
         }
     }
 
@@ -767,7 +797,7 @@ struct MemoCard: View {
 
             Menu {
                 Button {
-                    Task { await togglePin() }
+                    togglePin()
                 } label: {
                     Label(
                         memo.pinned
@@ -823,7 +853,7 @@ struct MemoCard: View {
                 Divider()
 
                 Button(role: .destructive) {
-                    Task { await deleteMemo() }
+                    deleteMemo()
                 } label: {
                     Label(
                         String(localized: "Delete", comment: "Context menu item to delete memo"),
@@ -1076,13 +1106,21 @@ struct MemoCard: View {
         )
     }
 
-    private func togglePin() async {
+    private func togglePin() {
         do {
-            let updated = try await MemosAPIClient.shared.togglePinMemo(
-                pinned: !memo.pinned, memoName: memo.name)
-            if let index = appState.memos.firstIndex(where: { $0.name == memo.name }) {
-                appState.memos[index] = updated
-            }
+            let newPinnedStatus = !memo.pinned
+            // 1. Update locally
+            memo.pinned = newPinnedStatus
+            
+            // 2. Enqueue Outbox
+            let payload = TogglePinPayload(pinned: newPinnedStatus)
+            let payloadData = try JSONEncoder().encode(payload)
+            let task = OutboxTask(type: .togglePinMemo, payload: payloadData, memoId: memo.name)
+            
+            LocalDatabase.shared.context.insert(task)
+            try LocalDatabase.shared.context.save()
+            
+            SyncEngine.shared.triggerSync()
         } catch {
             appState.errorMessage = error.localizedDescription
         }
@@ -1110,11 +1148,18 @@ struct MemoCard: View {
         #endif
     }
 
-    private func deleteMemo() async {
+    private func deleteMemo() {
         do {
-            try await MemosAPIClient.shared.deleteMemo(memoName: memo.name)
+            // 1. Enqueue Outbox FIRST (while we still have memo name)
+            let task = OutboxTask(type: .deleteMemo, payload: Data(), memoId: memo.name)
+            LocalDatabase.shared.context.insert(task)
+            
+            // 2. Delete locally
             appState.memos.removeAll { $0.name == memo.name }
             LocalDatabase.shared.deleteMemo(memo)
+            
+            try LocalDatabase.shared.context.save()
+            SyncEngine.shared.triggerSync()
         } catch {
             appState.errorMessage = error.localizedDescription
         }

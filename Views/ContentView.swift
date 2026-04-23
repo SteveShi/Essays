@@ -56,12 +56,16 @@ struct ContentView: View {
                 .frame(minWidth: 220, idealWidth: 260, maxWidth: 300)
                 #endif
         } content: {
-            MemoListView()
-                #if os(macOS)
-                .frame(minWidth: 320, idealWidth: 360)
-                #else
-                .navigationTitle(String(localized: "Timeline", comment: "Navigation title for the main list view"))
-                #endif
+            if appState.sidebarSelection == .outbox {
+                SyncQueueView()
+            } else {
+                MemoListView()
+                    #if os(macOS)
+                    .frame(minWidth: 320, idealWidth: 360)
+                    #else
+                    .navigationTitle(String(localized: "Timeline", comment: "Navigation title for the main list view"))
+                    #endif
+            }
         } detail: {
             detailColumn
         }
@@ -102,6 +106,8 @@ struct ContentView: View {
         defer { appState.isLoading = false }
 
         do {
+
+
             MemosAPIClient.shared.configure(
                 serverURL: appState.serverURL,
                 accessToken: appState.accessToken

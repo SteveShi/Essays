@@ -27,3 +27,19 @@ enum UserRole: String, Codable {
     case admin = "ADMIN"
     case user = "USER"
 }
+
+extension User {
+    /// 本地模式下使用的模拟管理员用户
+    static let localUser = User(
+        name: "users/local-admin",
+        role: .admin,
+        username: "admin",
+        email: nil,
+        displayName: String(localized: "Local Account", comment: "Display name for local mode user"),
+        avatarUrl: nil,
+        description: nil,
+        state: "NORMAL",
+        createTime: nil,
+        updateTime: nil
+    )
+}

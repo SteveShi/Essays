@@ -29,6 +29,10 @@ struct SidebarView: View {
                 sidebarLabel(.protectedMemos, icon: MemoVisibility.protected.icon, title: MemoVisibility.protected.displayName, count: appState.protectedMemosCount)
                 sidebarLabel(.privateMemos, icon: "lock", title: String(localized: "Private", comment: "Sidebar item for private memos"), count: appState.privateMemosCount)
             }
+            
+            Section(String(localized: "System", comment: "Sidebar section header for system items")) {
+                sidebarLabel(.outbox, icon: "arrow.triangle.2.circlepath.icloud", title: String(localized: "Sync Queue", comment: "Sidebar item for sync queue"), count: SyncEngine.shared.pendingTasksCount + SyncEngine.shared.errorTasksCount)
+            }
         }
         .listStyle(.sidebar)
         .navigationTitle(String(localized: "Essays", comment: "Application name"))
@@ -217,13 +221,26 @@ struct SidebarView: View {
                     count: appState.privateMemosCount
                 )
             }
+            
+            VStack(alignment: .leading, spacing: 8) {
+                SectionHeader(title: String(localized: "System", comment: "Sidebar section header for system items"))
+                
+                SidebarLinkItem(
+                    selection: .outbox,
+                    icon: "arrow.triangle.2.circlepath.icloud",
+                    title: String(localized: "Sync Queue", comment: "Sidebar item for sync queue"),
+                    count: SyncEngine.shared.pendingTasksCount + SyncEngine.shared.errorTasksCount
+                )
+            }
         }
     }
     
+    @State private var showAddAccountSheet = false
+
     private var userSection: some View {
         HStack(spacing: 12) {
             Circle()
-                .fill(LiquidGlassTheme.colors.accent.gradient)
+                .fill(appState.isLocalMode ? Color.green.gradient : LiquidGlassTheme.colors.accent.gradient)
                 .frame(width: 32, height: 32)
                 .overlay(
                     Text(appState.currentUser?.displayNameResolved.prefix(1).uppercased() ?? String(localized: "Me", comment: "Fallback for user avatar if name is missing"))
@@ -238,21 +255,62 @@ struct SidebarView: View {
                     .font(LiquidGlassTheme.typography.subheadline)
                     .foregroundColor(LiquidGlassTheme.colors.text)
                 
-                Text(
-                    !appState.isConnected
-                        ? String(localized: "Offline", comment: "Network status: Offline")
-                        : (appState.isServerReachable
-                            ? String(localized: "Online", comment: "Network status: Online")
-                            : String(localized: "Server Offline", comment: "Network status: Server unreachable")))
-                    .font(LiquidGlassTheme.typography.caption)
-                .foregroundColor(!appState.isConnected ? .secondary : (appState.isServerReachable ? .green : .orange))
+                if appState.isLocalMode {
+                    Text(String(localized: "Local Mode", comment: "Status label for local server mode"))
+                        .font(LiquidGlassTheme.typography.caption)
+                        .foregroundColor(.green)
+                } else {
+                    Text(
+                        !appState.isConnected
+                            ? String(localized: "Offline", comment: "Network status: Offline")
+                            : (appState.isServerReachable
+                                ? String(localized: "Online", comment: "Network status: Online")
+                                : String(localized: "Server Offline", comment: "Network status: Server unreachable")))
+                        .font(LiquidGlassTheme.typography.caption)
+                    .foregroundColor(!appState.isConnected ? .secondary : (appState.isServerReachable ? .green : .orange))
+                }
             }
             .help(appState.lastConnectionError ?? String(localized: "Connection Status", comment: "Tooltip for connection status label"))
             
             Spacer()
             
             Menu {
+                // 添加账户
                 Button {
+                    showAddAccountSheet = true
+                } label: {
+                    Label(String(localized: "Add Account", comment: "Menu item for adding account"), systemImage: "person.badge.plus")
+                }
+                
+                // 切换账户子菜单
+                let accounts = AccountManager.shared.accounts
+                if accounts.count > 1 {
+                    Menu {
+                        ForEach(accounts) { account in
+                            Button {
+                                appState.switchToAccount(account)
+                            } label: {
+                                HStack {
+                                    if account.id == AccountManager.shared.activeAccountID {
+                                        Image(systemName: "checkmark")
+                                    }
+                                    Text(account.displayName)
+                                    if account.mode == .local {
+                                        Text(String(localized: "Local", comment: "Account mode label: local"))
+                                            .foregroundColor(.secondary)
+                                    }
+                                }
+                            }
+                        }
+                    } label: {
+                        Label(String(localized: "Switch Account", comment: "Menu item for switching account"), systemImage: "arrow.left.arrow.right")
+                    }
+                }
+                
+                Divider()
+                
+                // 退出登录
+                Button(role: .destructive) {
                     appState.clearCredentials()
                 } label: {
                     Label(String(localized: "Sign Out", comment: "Menu item for signing out"), systemImage: "rectangle.portrait.and.arrow.right")
@@ -266,6 +324,10 @@ struct SidebarView: View {
             .menuIndicator(.hidden)
         }
         .padding(16)
+        .sheet(isPresented: $showAddAccountSheet) {
+            LoginView()
+                .environment(appState)
+        }
     }
     
 }

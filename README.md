@@ -4,6 +4,8 @@
 
 ## Features
 
+- 📴 **Offline-First Architecture**: Redesigned sync layer allowing you to compose, edit, and delete memos without an internet connection.
+- 📬 **Sync Queue View**: Monitor pending local changes and background synchronization status directly from the sidebar.
 - 📱 **Universal App**: Full native support for macOS, iPadOS, and iOS, providing a seamless experience across all your devices.
 - 🔀 **Three-Column Navigation**: A responsive, standard `NavigationSplitView` ensuring optimal use of screen real estate (Sidebar, Timeline, and Details).
 - ✨ **Premium Native UI**: A "LiquidGlass" aesthetic with glassmorphism, thin materials, and subtle micro-animations.
@@ -15,6 +17,17 @@
 - 🕒 **Timeline View**: A beautifully organized chronological feed of your memos, grouped by date.
 - 🌍 **Fully Localized**: Complete support for English and Simplified Chinese.
 - 🔒 **Privacy First**: Direct connection to your self-hosted Memos server via Access Tokens.
+
+## Screenshots
+
+<p align="center">
+  <img src="Website/assets/timeline.png" width="45%" alt="Timeline View" />
+  <img src="Website/assets/ai-assistant.png" width="45%" alt="AI Assistant" />
+</p>
+<p align="center">
+  <img src="Website/assets/attachments.png" width="45%" alt="Attachments Gallery" />
+  <img src="Website/assets/empty-state.png" width="45%" alt="Empty State" />
+</p>
 
 ## Apple AI Assistant
 

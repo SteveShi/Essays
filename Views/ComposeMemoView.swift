@@ -98,9 +98,7 @@ struct ComposeMemoView: View {
             Spacer()
             
             Button {
-                Task {
-                    await saveMemo()
-                }
+                saveMemo()
             } label: {
                 Group {
                     if isSaving {
@@ -535,33 +533,81 @@ struct ComposeMemoView: View {
         }
     }
 
-    private func saveMemo() async {
+    private func saveMemo() {
         let extractedTags = MemoUtility.extractTags(from: content)
         let attachmentNames = uploadedAttachments.map { $0.name }
-
+        
         do {
             if let memo = editingMemo {
-                let updated = try await MemosAPIClient.shared.updateMemo(
-                    memoName: memo.name,
+                // 1. Update locally
+                memo.content = content
+                memo.visibility = visibility
+                memo.tags = extractedTags
+                memo.location = currentLocation
+                memo.updatedAt = Date()
+                
+                // Save attachment relations locally
+                for attr in uploadedAttachments {
+                    attr.parentMemo = memo
+                    memo.attachments.append(attr)
+                }
+                
+                // 2. Enqueue OutboxTask
+                let payload = UpdateMemoPayload(
                     content: content,
-                    visibility: visibility,
+                    visibility: visibility.rawValue,
+                    pinned: memo.pinned,
                     tags: extractedTags,
                     attachmentNames: attachmentNames,
-                    location: currentLocation
+                    locationPlaceholder: currentLocation?.placeholder,
+                    locationLatitude: currentLocation?.latitude,
+                    locationLongitude: currentLocation?.longitude
                 )
+                let payloadData = try JSONEncoder().encode(payload)
+                let task = OutboxTask(type: .updateMemo, payload: payloadData, memoId: memo.name)
                 
-                if let index = appState.memos.firstIndex(where: { $0.name == memo.name }) {
-                    appState.memos[index] = updated
-                }
+                LocalDatabase.shared.context.insert(task)
+                try LocalDatabase.shared.context.save()
+                
             } else {
-                let newMemo = try await MemosAPIClient.shared.createMemo(
+                // 1. Create locally with temporary ID
+                let tempId = "local_\(UUID().uuidString)"
+                let newMemo = Memo(
+                    name: tempId,
+                    numericID: "",
                     content: content,
+                    createdAt: Date(),
+                    updatedAt: Date(),
                     visibility: visibility,
-                    attachmentNames: attachmentNames,
-                    location: currentLocation
+                    pinned: false,
+                    state: .normal,
+                    tags: extractedTags,
+                    attachments: uploadedAttachments,
+                    location: currentLocation,
+                    relations: []
                 )
-                appState.memos.insert(newMemo, at: 0)
+                LocalDatabase.shared.context.insert(newMemo)
+                
+                // 2. Enqueue OutboxTask
+                let payload = CreateMemoPayload(
+                    content: content,
+                    visibility: visibility.rawValue,
+                    pinned: false,
+                    tags: extractedTags,
+                    attachmentNames: attachmentNames,
+                    locationPlaceholder: currentLocation?.placeholder,
+                    locationLatitude: currentLocation?.latitude,
+                    locationLongitude: currentLocation?.longitude
+                )
+                let payloadData = try JSONEncoder().encode(payload)
+                let task = OutboxTask(type: .createMemo, payload: payloadData, memoId: tempId)
+                
+                LocalDatabase.shared.context.insert(task)
+                try LocalDatabase.shared.context.save()
             }
+            
+            // Trigger background sync
+            SyncEngine.shared.triggerSync()
             
             dismiss()
         } catch {

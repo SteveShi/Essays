@@ -23,6 +23,7 @@ class AppState {
         case privateMemos
         case tag(String)
         case date(Date)
+        case outbox
     }
 
     var serverURL: String = ""
@@ -30,9 +31,24 @@ class AppState {
     var isOnline: Bool { NetworkMonitor.shared.isConnected }
     var isServerReachable: Bool = false
     var lastConnectionError: String? = nil
+
+    /// 当前活跃账户
+    var activeAccount: Account? {
+        AccountManager.shared.activeAccount
+    }
+
+    /// 是否处于本地模式
+    var isLocalMode: Bool {
+        AccountManager.shared.isLocalMode
+    }
+
+
     
     /// Returns true if either the network monitor reports a connection OR we successfully reached the server.
     var isConnected: Bool {
+        if isLocalMode {
+            return true // Local Mode is offline-first, always logically connected to local DB
+        }
         return isOnline || isServerReachable
     }
     var appVersion: String {
@@ -142,6 +158,9 @@ class AppState {
             formatter.dateFormat = "yyyy-MM-dd"
             searchText = "created:\(formatter.string(from: date))"
             selectedTag = nil
+        case .outbox:
+            searchText = ""
+            selectedTag = nil
         }
     }
 
@@ -181,6 +200,13 @@ class AppState {
 
     @MainActor
     func checkServerReachability() {
+        if isLocalMode {
+            self.isServerReachable = true
+            self.lastConnectionError = nil
+            return
+        }
+
+        
         guard !serverURL.isEmpty else { 
             self.isServerReachable = false
             self.lastConnectionError = String(localized: "Server URL not configured")
@@ -335,18 +361,43 @@ class AppState {
     }
     
     func loadSavedCredentials() {
-        serverURL = userDefaults.string(forKey: serverURLKey) ?? ""
-        accessToken = userDefaults.string(forKey: accessTokenKey) ?? ""
-        
-        if let userData = userDefaults.data(forKey: currentUserKey),
-            let user = try? JSONDecoder().decode(User.self, from: userData) as User,
-           !serverURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-           !accessToken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            currentUser = user
-            isLoggedIn = true
+        // 优先从 AccountManager 加载活跃账户
+        if let account = AccountManager.shared.activeAccount {
+            switch account.mode {
+            case .local:
+                serverURL = ""
+                accessToken = account.accessToken ?? ""
+                currentUser = User.localUser
+                isLoggedIn = true
+            case .remote:
+                serverURL = account.serverURL ?? ""
+                accessToken = account.accessToken ?? ""
+                if let userData = userDefaults.data(forKey: currentUserKey),
+                   let user = try? JSONDecoder().decode(User.self, from: userData) {
+                    currentUser = user
+                    isLoggedIn = true
+                } else if !serverURL.isEmpty, !accessToken.isEmpty {
+                    isLoggedIn = true
+                } else {
+                    currentUser = nil
+                    isLoggedIn = false
+                }
+            }
         } else {
-            currentUser = nil
-            isLoggedIn = false
+            // 向后兼容：从旧的 UserDefaults 键加载
+            serverURL = userDefaults.string(forKey: serverURLKey) ?? ""
+            accessToken = userDefaults.string(forKey: accessTokenKey) ?? ""
+            
+            if let userData = userDefaults.data(forKey: currentUserKey),
+                let user = try? JSONDecoder().decode(User.self, from: userData) as User,
+               !serverURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+               !accessToken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                currentUser = user
+                isLoggedIn = true
+            } else {
+                currentUser = nil
+                isLoggedIn = false
+            }
         }
     }
     
@@ -369,12 +420,29 @@ class AppState {
         userDefaults.removeObject(forKey: accessTokenKey)
         userDefaults.removeObject(forKey: currentUserKey)
         
+
+        // 从 AccountManager 退出当前账户
+        AccountManager.shared.signOutCurrentAccount()
+        
         serverURL = ""
         accessToken = ""
         currentUser = nil
         isLoggedIn = false
+        memos = []
         tags = []
         selectedMemoForDetail = nil
+    }
+    
+    /// 切换到指定账户
+    func switchToAccount(_ account: Account) {
+
+        AccountManager.shared.setActiveAccount(account)
+        memos = []
+        tags = []
+        selectedMemoForDetail = nil
+        loadSavedCredentials()
+        loadLocalCachedMemos()
+        checkServerReachability()
     }
     
     @MainActor

@@ -4,6 +4,8 @@
 
 ## 功能特性
 
+- 📴 **离线优先架构**: 全新设计的同步层，允许您在没有网络连接的情况下创作、编辑和删除笔记。
+- 📬 **同步队列查看器**: 侧边栏新增专属面板，实时监控本地更改的挂起状态及后台同步进展。
 - 📱 **全平台通用**: 原生支持 macOS、iPadOS 与 iOS，在您所有设备间提供统一且强大的体验。
 - 🔀 **三栏式导航**: 采用响应式标准的 `NavigationSplitView` 架构，最大化利用屏幕空间（侧边栏、时间线及详情页）。
 - ✨ **极致原生视觉**: 采用 "LiquidGlass" 设计语言，深度集成毛玻璃效果、超薄材质与细腻的微交互动画。
@@ -15,6 +17,17 @@
 - 🕒 **时间线视图**: 优雅的按日期分组的纪实呈现，让回忆有迹可循。
 - 🌍 **全量国际化**: 完整支持中英文切换，适配您的语言习惯。
 - 🔒 **隐私安全**: 通过访问令牌（Access Token）直接连接到您的自托管 Memos 服务器。
+
+## 软件截图
+
+<p align="center">
+  <img src="Website/assets/timeline.png" width="45%" alt="时间线视图" />
+  <img src="Website/assets/ai-assistant.png" width="45%" alt="AI 助手" />
+</p>
+<p align="center">
+  <img src="Website/assets/attachments.png" width="45%" alt="附件画廊" />
+  <img src="Website/assets/empty-state.png" width="45%" alt="空状态" />
+</p>
 
 ## Apple AI 助手
 

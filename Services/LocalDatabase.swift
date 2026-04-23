@@ -42,12 +42,12 @@ final class LocalDatabase {
             let config = ModelConfiguration(url: storeURL)
             
             do {
-                container = try ModelContainer(for: Memo.self, Attachment.self, Relation.self, Location.self, configurations: config)
+                container = try ModelContainer(for: Memo.self, Attachment.self, Relation.self, Location.self, OutboxTask.self, configurations: config)
             } catch {
                 print("Failed to initialize ModelContainer, attempting to recreate store: \(error)")
                 // If initialization fails (likely due to schema change), delete the store and try again
                 LocalDatabase.hardReset(databaseURL: databaseURL)
-                container = try ModelContainer(for: Memo.self, Attachment.self, Relation.self, Location.self, configurations: config)
+                container = try ModelContainer(for: Memo.self, Attachment.self, Relation.self, Location.self, OutboxTask.self, configurations: config)
             }
             
             context = container.mainContext
@@ -66,7 +66,7 @@ final class LocalDatabase {
             // If it still fails, fallback to in-memory store
             do {
                 let config = ModelConfiguration(isStoredInMemoryOnly: true)
-                container = try ModelContainer(for: Memo.self, Attachment.self, Relation.self, Location.self, configurations: config)
+                container = try ModelContainer(for: Memo.self, Attachment.self, Relation.self, Location.self, OutboxTask.self, configurations: config)
                 context = container.mainContext
                 print("Falling back to in-memory store")
                 // Still mark as successful for in-memory so we don't reset infinitely
@@ -285,5 +285,32 @@ final class LocalDatabase {
     func deleteMemo(_ memo: Memo) {
         context.delete(memo)
         try? context.save()
+    }
+    
+    // MARK: - Outbox Tasks
+    
+    @MainActor
+    func fetchOutboxTasks() throws -> [OutboxTask] {
+        let descriptor = FetchDescriptor<OutboxTask>(sortBy: [SortDescriptor(\.createdAt)])
+        return try context.fetch(descriptor)
+    }
+    
+    @MainActor
+    func deleteOutboxTask(_ task: OutboxTask) {
+        context.delete(task)
+        try? context.save()
+    }
+    
+    @MainActor
+    func replaceLocalMemoId(oldId: String, newMemo: Memo) {
+        let descriptor = FetchDescriptor<Memo>(predicate: #Predicate { $0.numericID == oldId })
+        if let existing = try? context.fetch(descriptor).first {
+            existing.numericID = newMemo.numericID
+            existing.name = newMemo.name
+            // We should sync other fields too if server modified them
+            existing.createdAt = newMemo.createdAt
+            existing.updatedAt = newMemo.updatedAt
+            try? context.save()
+        }
     }
 }

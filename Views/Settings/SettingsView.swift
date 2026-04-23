@@ -206,7 +206,7 @@ struct SettingsView: View {
                 if let user = appState.currentUser {
                     HStack(spacing: 16) {
                         Circle()
-                            .fill(LiquidGlassTheme.colors.accent.gradient)
+                            .fill(appState.isLocalMode ? Color.green.gradient : LiquidGlassTheme.colors.accent.gradient)
                             .frame(width: 48, height: 48)
                             .overlay(
                                 Text(user.displayNameResolved.prefix(1).uppercased())
@@ -218,9 +218,15 @@ struct SettingsView: View {
                             Text(user.displayNameResolved)
                                 .font(LiquidGlassTheme.typography.headline)
                             
-                            Text(user.email ?? user.username)
-                                .font(LiquidGlassTheme.typography.subheadline)
-                                .foregroundColor(LiquidGlassTheme.colors.secondaryText)
+                            if appState.isLocalMode {
+                                Text(String(localized: "Local Mode", comment: "Account mode label in settings"))
+                                    .font(LiquidGlassTheme.typography.subheadline)
+                                    .foregroundColor(.green)
+                            } else {
+                                Text(user.email ?? user.username)
+                                    .font(LiquidGlassTheme.typography.subheadline)
+                                    .foregroundColor(LiquidGlassTheme.colors.secondaryText)
+                            }
                         }
                     }
                 }
@@ -234,7 +240,12 @@ struct SettingsView: View {
                     String(localized: "Version", comment: "App version label"),
                     value: appState.appVersion)
 
-                LabeledContent(String(localized: "Server", comment: "Server info label"), value: appState.serverURL)
+                if appState.isLocalMode {
+                    LabeledContent(String(localized: "Mode", comment: "Mode label"),
+                                   value: String(localized: "Offline First (Local DB)", comment: "Offline first mode value"))
+                } else {
+                    LabeledContent(String(localized: "Server", comment: "Server info label"), value: appState.serverURL)
+                }
                 
                 LabeledContent(
                     String(localized: "Total Memos", comment: "Memos count label"),
@@ -248,6 +259,33 @@ struct SettingsView: View {
             } header: {
                 Text(String(localized: "Statistics", comment: "Statistics section header"))
                     .font(LiquidGlassTheme.typography.headline)
+            }
+            
+            // 已保存的账户列表
+            if AccountManager.shared.accounts.count > 1 {
+                Section {
+                    ForEach(AccountManager.shared.accounts) { account in
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(account.displayName)
+                                    .font(LiquidGlassTheme.typography.body)
+                                Text(account.mode == .local
+                                     ? String(localized: "Local", comment: "Account type local")
+                                     : (account.serverURL ?? ""))
+                                    .font(LiquidGlassTheme.typography.caption)
+                                    .foregroundColor(LiquidGlassTheme.colors.secondaryText)
+                            }
+                            Spacer()
+                            if account.id == AccountManager.shared.activeAccountID {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundColor(.green)
+                            }
+                        }
+                    }
+                } header: {
+                    Text(String(localized: "Saved Accounts", comment: "Saved accounts section header"))
+                        .font(LiquidGlassTheme.typography.headline)
+                }
             }
             
             Section {
