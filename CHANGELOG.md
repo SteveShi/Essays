@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.3] - 2026-04-23
+
+### Fixed
+- 📡 **Server Status Correction**: Fixed an issue where the server status incorrectly showed as offline due to a decoding mismatch with the Memos v0.27 `InstanceProfile` API.
+- 🔄 **Stale Data Sync**: Implemented automatic synchronization on application launch to ensure memos deleted on the server are correctly removed from the local view.
+
+---
+
+### Chinese
+
+### 修复
+- 📡 **服务器状态修正**: 修复了由于 Memos v0.27 `InstanceProfile` API 结构变化导致的服务器状态异常显示为“离线”的问题。
+- 🔄 **过时数据同步**: 实现了应用启动时的自动同步机制，确保服务器上已删除的笔记能及时从本地视图中移除。
+
+---
+
 ## [2.2.2] - 2026-04-22
 
 ### Added

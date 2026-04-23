@@ -258,10 +258,11 @@ class MemosAPIClient {
         }
     }
 
-    struct WorkspaceProfile: Decodable {
-        let name: String
-        let owner: String
+    struct InstanceProfile: Decodable {
         let version: String
+        let demo: Bool?
+        let instanceUrl: String?
+        let admin: User?
     }
 
     func checkServerStatus() async throws -> String {
@@ -269,7 +270,7 @@ class MemosAPIClient {
             throw MemosAPIError.invalidURL
         }
         let request = buildRequest(url: url)
-        let profile: WorkspaceProfile = try await performRequest(request)
+        let profile: InstanceProfile = try await performRequest(request)
         return profile.version
     }
     
