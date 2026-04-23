@@ -7,9 +7,7 @@ struct SyncQueueView: View {
     @Query(sort: \OutboxTask.createdAt, order: .reverse) private var tasks: [OutboxTask]
     
     var body: some View {
-        VStack(spacing: 0) {
-            headerView
-            
+        Group {
             if tasks.isEmpty {
                 emptyStateView
             } else {
@@ -18,36 +16,28 @@ struct SyncQueueView: View {
         }
         .background(LiquidGlassTheme.colors.background)
         .navigationTitle(String(localized: "Sync Queue", comment: "Navigation title for sync queue"))
-    }
-    
-    private var headerView: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(String(localized: "Sync Queue", comment: "Sync queue title"))
-                    .font(LiquidGlassTheme.typography.title2)
-                
-                let pendingCount = tasks.filter { $0.state == .pending || $0.state == .retry || $0.state == .running }.count
-                Text(String(localized: "\(pendingCount) tasks pending", comment: "Pending tasks count"))
-                    .font(LiquidGlassTheme.typography.subheadline)
-                    .foregroundStyle(LiquidGlassTheme.colors.secondaryText)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    SyncEngine.shared.triggerSync()
+                } label: {
+                    Label(String(localized: "Sync Now", comment: "Trigger sync button"), systemImage: "arrow.clockwise.icloud")
+                }
+                .disabled(SyncEngine.shared.isSyncing)
             }
-            
-            Spacer()
-            
-            Button {
-                SyncEngine.shared.triggerSync()
-            } label: {
-                Label(String(localized: "Sync Now", comment: "Trigger sync button"), systemImage: "arrow.clockwise.icloud")
-            }
-            .buttonStyle(.borderedProminent)
-            .disabled(SyncEngine.shared.isSyncing)
         }
-        .padding(24)
-        .background(.ultraThinMaterial)
     }
     
     private var taskList: some View {
         List {
+            Section {
+                let pendingCount = tasks.filter { $0.state == .pending || $0.state == .retry || $0.state == .running }.count
+                Text("\(pendingCount) tasks pending")
+                    .font(LiquidGlassTheme.typography.subheadline)
+                    .foregroundStyle(LiquidGlassTheme.colors.secondaryText)
+                    .listRowBackground(Color.clear)
+            }
+            
             ForEach(tasks) { task in
                 taskRow(for: task)
                     .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
@@ -55,7 +45,7 @@ struct SyncQueueView: View {
                     .listRowSeparator(.hidden)
             }
         }
-        .listStyle(.plain)
+        .listStyle(.inset)
     }
     
     private func taskRow(for task: OutboxTask) -> some View {
