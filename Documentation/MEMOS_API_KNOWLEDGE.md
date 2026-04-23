@@ -6,12 +6,12 @@
 
 ### 资源名称 (Resource Names) (中文)
 v1 API 使用资源名称而非简单的 ID：
-- **格式**: `memos/{id}` 或 `users/{id}`
-- **示例**: `memos/123`, `users/1`
+- **格式**: `memos/{uuid}` 或 `users/{username}`
+- **示例**: `memos/abc-123-efg`, `users/alice`
 - **注意**: 在 `PATCH` 和 `DELETE` 请求中，资源名称必须经过 URL 编码（例如 `/` 编码为 `%2F`）。
 
-### 认证 (Authentication) (中文)
 - **Header**: `Authorization: Bearer <TOKEN>`
+- **SignIn (v0.27+)**: `POST /api/v1/auth/signin` 使用 `passwordCredentials` 并在响应体中获取 `accessToken`。
 - **Content-Type**: `application/json`
 
 ---
@@ -40,13 +40,13 @@ v1 API 使用资源名称而非简单的 ID：
 
 | 功能 (中文) | 方法 (中文) | 路径 (中文) | 参数/说明 (中文) |
 | :--- | :--- | :--- | :--- |
-| **获取 Memos** | `GET` | `/api/v1/memos` | `pageSize=100`, `view=MEMO_VIEW_FULL` |
+| **获取 Memos** | `GET` | `/api/v1/memos` | `pageSize=100`, `state=NORMAL` (或 `ARCHIVED`) |
 | **创建 Memo** | `POST` | `/api/v1/memos` | Body: `{ content, visibility, pinned, ... }` |
 | **更新 Memo** | `PATCH` | `/api/v1/{encoded_name}` | 使用 `updateMask` 参数指定更新字段 |
 | **删除 Memo** | `DELETE` | `/api/v1/{encoded_name}` | 彻底删除资源 |
 | **上传附件** | `POST` | `/api/v1/attachments` | Body: `{ filename, type, content (base64) }` |
 | **获取当前用户** | `GET` | `/api/v1/auth/me` | 返回登录用户详细信息 |
-| **服务器状态** | `GET` | `/api/v1/status` | 检查版本及服务器配置 |
+| **服务器状态** | `GET` | `/api/v1/instance/profile` | 检查版本及服务器配置 |
 
 ---
 

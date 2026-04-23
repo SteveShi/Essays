@@ -1,7 +1,7 @@
 import Foundation
 
 struct User: Codable, Identifiable, Sendable {
-    let name: String          // Resource name, e.g. "users/1"
+    let name: String          // Resource name, e.g. "users/alice" (previously "users/1")
     let role: UserRole
     let username: String
     let email: String?

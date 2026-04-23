@@ -4,7 +4,7 @@ import SwiftData
 @Model
 final class Memo: Identifiable {
     @Attribute(.unique) var name: String  // Full resource name, e.g. "memos/123"
-    var numericID: Int
+    var numericID: String
     var content: String
     var createdAt: Date
     var updatedAt: Date
@@ -34,7 +34,7 @@ final class Memo: Identifiable {
 
     init(
         name: String = "",
-        numericID: Int,
+        numericID: String = "",
         content: String,
         createdAt: Date = Date(),
         updatedAt: Date = Date(),

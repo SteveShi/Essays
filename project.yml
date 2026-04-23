@@ -9,8 +9,8 @@ options:
   defaultConfig: Release
 settings:
   base:
-    MARKETING_VERSION: 2.2.1
-    CURRENT_PROJECT_VERSION: 15
+    MARKETING_VERSION: 2.2.2
+    CURRENT_PROJECT_VERSION: 16
 
 configs:
   Debug:

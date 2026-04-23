@@ -542,7 +542,6 @@ struct ComposeMemoView: View {
         do {
             if let memo = editingMemo {
                 let updated = try await MemosAPIClient.shared.updateMemo(
-                    id: memo.numericID,
                     memoName: memo.name,
                     content: content,
                     visibility: visibility,

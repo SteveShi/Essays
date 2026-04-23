@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.2] - 2026-04-22
+
+### Added
+- 🚀 **Memos v0.27 Compatibility**: Fully migrated from numeric integer IDs to string-based resource names (UUIDs) for both memos and users, ensuring compatibility with the latest Memos release.
+- 🛠️ **API Robustness**: Refactored core operations including update, delete, pin, and archive to use robust resource paths, eliminating dependency on deprecated ID extraction logic.
+
+---
+
+### Chinese
+
+### 新增
+- 🚀 **Memos v0.27 适配**: 全面迁移至基于字符串的资源名称 (UUID)，移除了对数字 ID 的依赖，确保与最新版 Memos 服务器的完美兼容。
+- 🛠️ **API 稳定性**: 重构了更新、删除、置顶和归档等核心操作，采用更稳健的资源路径，彻底摒弃了已废弃的 ID 提取逻辑。
+
+---
+
 ## [2.2.1] - 2026-04-17
 
 ### Improved

@@ -156,6 +156,7 @@ class MemosAPIClient {
 
     struct MemoAttachmentResponse: Decodable {
         let attachments: [AttachmentData]
+        let nextPageToken: String?
     }
 
     struct MemoData: Decodable {
@@ -172,11 +173,8 @@ class MemosAPIClient {
         let location: LocationData?
         let relations: [RelationData]?
         
-        var extractedId: Int {
-            if let idString = name.split(separator: "/").last, let id = Int(idString) {
-                return id
-            }
-            return 0
+        var extractedId: String {
+            return name.split(separator: "/").last.map(String.init) ?? ""
         }
     }
 
@@ -267,7 +265,7 @@ class MemosAPIClient {
     }
 
     func checkServerStatus() async throws -> String {
-        guard let url = buildURL("/api/v1/workspace/profile") else {
+        guard let url = buildURL("/api/v1/instance/profile") else {
             throw MemosAPIError.invalidURL
         }
         let request = buildRequest(url: url)
@@ -281,8 +279,10 @@ class MemosAPIClient {
         }
         
         let body: [String: Any] = [
-            "username": username,
-            "password": password
+            "passwordCredentials": [
+                "username": username,
+                "password": password
+            ]
         ]
         
         var request = buildRequest(
@@ -303,13 +303,21 @@ class MemosAPIClient {
             throw MemosAPIError.httpError(httpResponse.statusCode)
         }
         
-        let user = try makeDecoder().decode(User.self, from: data)
-        
-        if let accessTokenValue = httpResponse.value(forHTTPHeaderField: "Authorization") {
-            self._accessToken = accessTokenValue
+        struct SignInResponse: Decodable {
+            let user: User
+            let accessToken: String?
         }
         
-        return user
+        let signInResponse = try makeDecoder().decode(SignInResponse.self, from: data)
+        
+        if let token = signInResponse.accessToken {
+            self._accessToken = token
+        } else if let authHeader = httpResponse.value(forHTTPHeaderField: "Authorization") {
+            // Fallback for older versions if still needed, but prioritize body token
+            self._accessToken = authHeader
+        }
+        
+        return signInResponse.user
     }
     
     func getCurrentUser() async throws -> User {
@@ -329,10 +337,26 @@ class MemosAPIClient {
     /// Implementation of full pagination sync.
     /// Fetches ALL memos from the server by following 'nextPageToken' before saving to local database.
     func fetchMemos() async throws -> [Memo] {
+        print("Starting full memo sync...")
+        
+        let normalMemos = try await fetchMemosByState("NORMAL")
+        let archivedMemos = try await fetchMemosByState("ARCHIVED")
+        
+        let allMemosData = normalMemos + archivedMemos
+        
+        // Map all collected pages to models
+        let memos = allMemosData.map { mapMemoDataToModel($0) }
+        print("Sync complete. Total memos to save: \(memos.count)")
+        
+        // Save to local database and return the managed versions
+        return LocalDatabase.shared.saveMemos(memos)
+    }
+
+    private func fetchMemosByState(_ state: String) async throws -> [MemoData] {
         var allMemosData: [MemoData] = []
         var nextPageToken: String? = nil
         
-        print("Starting full memo sync...")
+        print("Fetching memos with state: \(state)...")
         
         repeat {
             guard var urlComponents = URLComponents(string: "\(baseURL)/api/v1/memos") else {
@@ -340,7 +364,7 @@ class MemosAPIClient {
             }
             
             var queryItems = [
-                URLQueryItem(name: "view", value: "MEMO_VIEW_FULL"),
+                URLQueryItem(name: "state", value: state),
                 URLQueryItem(name: "pageSize", value: "200")
             ]
             
@@ -353,88 +377,67 @@ class MemosAPIClient {
             guard let url = urlComponents.url else { throw MemosAPIError.invalidURL }
             let request = buildRequest(url: url)
             
-            do {
-                let (data, response) = try await session.data(for: request)
-                guard let httpResponse = response as? HTTPURLResponse,
-                      (200...299).contains(httpResponse.statusCode) else {
-                    throw MemosAPIError.invalidResponse
-                }
-                
-                let decoder = makeDecoder()
-                
-                // Handle different possible response formats
-                if let memoResponse = try? decoder.decode(MemoResponse.self, from: data) {
-                    allMemosData.append(contentsOf: memoResponse.memos ?? [])
-                    nextPageToken = memoResponse.nextPageToken
-                    print("Fetched page. Current total count: \(allMemosData.count). Next token: \(nextPageToken ?? "none")")
-                } else if let directMemos = try? decoder.decode([MemoData].self, from: data) {
-                    // Legacy or direct array response doesn't support pagination in the body
-                    allMemosData.append(contentsOf: directMemos)
-                    nextPageToken = nil
-                } else {
-                    // Critical failure in decoding
-                    throw MemosAPIError.decodingError(NSError(domain: "MemosAPIClient", code: 0, 
-                                                            userInfo: [NSLocalizedDescriptionKey: "Failed to decode memo response"]))
-                }
-            } catch {
-                print("Pagination fetch failed: \(error). Aborting sync to protect local data.")
-                // 🚨 CRITICAL: We THROW here to abort the sync. 
-                // This ensures LocalDatabase.saveMemos is NEVER called with a partial list.
-                throw error
+            let (data, response) = try await session.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse,
+                  (200...299).contains(httpResponse.statusCode) else {
+                throw MemosAPIError.invalidResponse
             }
-        } while ({
-            guard let token = nextPageToken else { return false }
-            return !token.isEmpty
-        }())
+            
+            let decoder = makeDecoder()
+            
+            if let memoResponse = try? decoder.decode(MemoResponse.self, from: data) {
+                allMemosData.append(contentsOf: memoResponse.memos ?? [])
+                nextPageToken = memoResponse.nextPageToken
+            } else if let directMemos = try? decoder.decode([MemoData].self, from: data) {
+                allMemosData.append(contentsOf: directMemos)
+                nextPageToken = nil
+            } else {
+                throw MemosAPIError.decodingError(NSError(domain: "MemosAPIClient", code: 0, 
+                                                        userInfo: [NSLocalizedDescriptionKey: "Failed to decode memo response"]))
+            }
+        } while nextPageToken != nil && !nextPageToken!.isEmpty
         
-        // Map all collected pages to models
-        let memos = allMemosData.map { mapMemoDataToModel($0) }
-        print("Sync complete. Total memos to save: \(memos.count)")
-        
-        // Save to local database and return the managed versions
-        return LocalDatabase.shared.saveMemos(memos)
+        return allMemosData
     }
 
     private func fetchMemoAttachments(memoName: String) async throws -> [Attachment] {
         let primaryEncodedMemoName =
             memoName.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? memoName
-        let fallbackMemoId = memoName.split(separator: "/").last.map(String.init) ?? memoName
-        let fallbackEncodedMemoId =
-            fallbackMemoId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed)
-            ?? fallbackMemoId
-
-        let candidatePaths = [
-            "/api/v1/\(primaryEncodedMemoName)/attachments",
-            "/api/v1/memos/\(fallbackEncodedMemoId)/attachments",
-        ]
-
-        var lastError: Error?
-        for path in candidatePaths {
-            guard let url = buildURL(path) else { continue }
-            let request = buildRequest(url: url)
-            do {
-                let response: MemoAttachmentResponse = try await performRequest(request)
-                let attachments = response.attachments.map { data in
-                    Attachment(
-                        name: data.name,
-                        filename: data.filename,
-                        type: data.type,
-                        size: data.sizeInt,
-                        content: data.content,
-                        externalLink: data.externalLink,
-                        createTime: data.createTime
-                    )
-                }
-                return try await hydrateAttachmentsIfNeeded(attachments)
-            } catch {
-                lastError = error
+        
+        var allAttachments: [Attachment] = []
+        var nextPageToken: String? = nil
+        
+        repeat {
+            guard var urlComponents = URLComponents(string: "\(baseURL)/api/v1/\(primaryEncodedMemoName)/attachments") else {
+                throw MemosAPIError.invalidURL
             }
-        }
-
-        if let lastError {
-            throw lastError
-        }
-        throw MemosAPIError.invalidURL
+            
+            var queryItems = [URLQueryItem(name: "pageSize", value: "100")]
+            if let token = nextPageToken, !token.isEmpty {
+                queryItems.append(URLQueryItem(name: "pageToken", value: token))
+            }
+            urlComponents.queryItems = queryItems
+            
+            guard let url = urlComponents.url else { throw MemosAPIError.invalidURL }
+            let request = buildRequest(url: url)
+            
+            let response: MemoAttachmentResponse = try await performRequest(request)
+            let attachments = response.attachments.map { data in
+                Attachment(
+                    name: data.name,
+                    filename: data.filename,
+                    type: data.type,
+                    size: data.sizeInt,
+                    content: data.content,
+                    externalLink: data.externalLink,
+                    createTime: data.createTime
+                )
+            }
+            allAttachments.append(contentsOf: attachments)
+            nextPageToken = response.nextPageToken
+        } while nextPageToken != nil && !nextPageToken!.isEmpty
+        
+        return try await hydrateAttachmentsIfNeeded(allAttachments)
     }
 
     private func hydrateAttachmentsIfNeeded(_ attachments: [Attachment]) async throws
@@ -488,7 +491,7 @@ class MemosAPIClient {
         // Handle Offline State
         if !NetworkMonitor.shared.isConnected {
             let pendingMemo = Memo(
-                numericID: Int.random(in: 1000000...9999999),
+                numericID: String(Int.random(in: 1000000...9999999)),
                 content: content,
                 visibility: visibility ?? .private,
                 pinned: pinned ?? false,
@@ -534,12 +537,12 @@ class MemosAPIClient {
     }
     
     func updateMemo(
-        id: Int, memoName: String? = nil, content: String, visibility: MemoVisibility? = nil,
+        memoName: String, content: String, visibility: MemoVisibility? = nil,
         tags: [String]? = nil,
         pinned: Bool? = nil,
         attachmentNames: [String]? = nil, location: Location? = nil
     ) async throws -> Memo {
-        let resourceName = memoName ?? "memos/\(id)"
+        let resourceName = memoName
         let encodedResourceName =
             resourceName.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed)
             ?? resourceName
@@ -626,8 +629,8 @@ class MemosAPIClient {
         return memoModel
     }
     
-    func deleteMemo(id: Int, memoName: String? = nil) async throws {
-        let resourceName = memoName ?? "memos/\(id)"
+    func deleteMemo(memoName: String) async throws {
+        let resourceName = memoName
         let encodedResourceName =
             resourceName.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed)
             ?? resourceName
@@ -644,7 +647,7 @@ class MemosAPIClient {
         }
     }
     
-    func archiveMemo(id: Int, memoName: String) async throws -> Memo {
+    func archiveMemo(memoName: String) async throws -> Memo {
         let encodedName = memoName.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? memoName
         guard var urlComponents = URLComponents(string: "\(baseURL)/api/v1/\(encodedName)") else {
             throw MemosAPIError.invalidURL
@@ -699,7 +702,7 @@ class MemosAPIClient {
         return memoModel
     }
 
-    func unarchiveMemo(id: Int, memoName: String) async throws -> Memo {
+    func unarchiveMemo(memoName: String) async throws -> Memo {
         let encodedName = memoName.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? memoName
         guard var urlComponents = URLComponents(string: "\(baseURL)/api/v1/\(encodedName)") else {
             throw MemosAPIError.invalidURL
@@ -754,7 +757,7 @@ class MemosAPIClient {
         return memoModel
     }
     
-    func togglePinMemo(id: Int, pinned: Bool, memoName: String) async throws -> Memo {
+    func togglePinMemo(pinned: Bool, memoName: String) async throws -> Memo {
         // memoName is like "memos/123" - use it directly as the resource path
         let encodedName = memoName.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? memoName
         guard var urlComponents = URLComponents(string: "\(baseURL)/api/v1/\(encodedName)") else {
@@ -849,29 +852,42 @@ class MemosAPIClient {
     }
 
     func fetchComments(parentId: String) async throws -> [Memo] {
-        guard let url = buildURL("/api/v1/\(parentId)/comments") else {
-            throw MemosAPIError.invalidURL
-        }
-        let request = buildRequest(url: url)
+        var allMemosData: [MemoData] = []
+        var nextPageToken: String? = nil
         
-        let (data, response) = try await session.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse,
-              (200...299).contains(httpResponse.statusCode) else {
-            throw MemosAPIError.invalidResponse
-        }
+        repeat {
+            guard var urlComponents = URLComponents(string: "\(baseURL)/api/v1/\(parentId)/comments") else {
+                throw MemosAPIError.invalidURL
+            }
+            
+            var queryItems = [URLQueryItem(name: "pageSize", value: "100")]
+            if let token = nextPageToken, !token.isEmpty {
+                queryItems.append(URLQueryItem(name: "pageToken", value: token))
+            }
+            urlComponents.queryItems = queryItems
+            
+            guard let url = urlComponents.url else { throw MemosAPIError.invalidURL }
+            let request = buildRequest(url: url)
+            
+            let (data, response) = try await session.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse,
+                  (200...299).contains(httpResponse.statusCode) else {
+                throw MemosAPIError.invalidResponse
+            }
+            
+            let decoder = makeDecoder()
+            if let memoResponse = try? decoder.decode(MemoResponse.self, from: data) {
+                allMemosData.append(contentsOf: memoResponse.memos ?? [])
+                nextPageToken = memoResponse.nextPageToken
+            } else if let directMemos = try? decoder.decode([MemoData].self, from: data) {
+                allMemosData.append(contentsOf: directMemos)
+                nextPageToken = nil
+            } else {
+                nextPageToken = nil
+            }
+        } while nextPageToken != nil && !nextPageToken!.isEmpty
         
-        let decoder = makeDecoder()
-        let memosData: [MemoData]
-        
-        if let memoResponse = try? decoder.decode(MemoResponse.self, from: data) {
-            memosData = memoResponse.memos ?? []
-        } else if let directMemos = try? decoder.decode([MemoData].self, from: data) {
-            memosData = directMemos
-        } else {
-            memosData = []
-        }
-        
-        return memosData.map { mapMemoDataToModel($0) }
+        return allMemosData.map { mapMemoDataToModel($0) }
     }
 
     func syncPendingMemos() async {

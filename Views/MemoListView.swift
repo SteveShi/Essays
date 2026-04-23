@@ -1076,7 +1076,7 @@ struct MemoCard: View {
     private func togglePin() async {
         do {
             let updated = try await MemosAPIClient.shared.togglePinMemo(
-                id: memo.numericID, pinned: !memo.pinned, memoName: memo.name)
+                pinned: !memo.pinned, memoName: memo.name)
             if let index = appState.memos.firstIndex(where: { $0.name == memo.name }) {
                 appState.memos[index] = updated
             }
@@ -1109,7 +1109,7 @@ struct MemoCard: View {
 
     private func deleteMemo() async {
         do {
-            try await MemosAPIClient.shared.deleteMemo(id: memo.numericID, memoName: memo.name)
+            try await MemosAPIClient.shared.deleteMemo(memoName: memo.name)
             appState.memos.removeAll { $0.name == memo.name }
         } catch {
             appState.errorMessage = error.localizedDescription

@@ -364,7 +364,7 @@ class AppState {
     @MainActor
     func archiveMemo(_ memo: Memo) async {
         do {
-            _ = try await MemosAPIClient.shared.archiveMemo(id: memo.numericID, memoName: memo.name)
+            _ = try await MemosAPIClient.shared.archiveMemo(memoName: memo.name)
             // Update local state
             if let index = memos.firstIndex(where: { $0.id == memo.id }) {
                 memos[index].state = .archived
@@ -380,7 +380,7 @@ class AppState {
     @MainActor
     func unarchiveMemo(_ memo: Memo) async {
         do {
-            _ = try await MemosAPIClient.shared.unarchiveMemo(id: memo.numericID, memoName: memo.name)
+            _ = try await MemosAPIClient.shared.unarchiveMemo(memoName: memo.name)
             // Update local state
             if let index = memos.firstIndex(where: { $0.id == memo.id }) {
                 memos[index].state = .normal
