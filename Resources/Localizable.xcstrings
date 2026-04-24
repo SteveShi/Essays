@@ -3601,19 +3601,19 @@
         }
       }
     },
-    "Write a thought, press ⌘↩ to save..." : {
+    "Write a thought, press ⌘S to save..." : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Write a thought, press ⌘↩ to save..."
+            "value" : "Write a thought, press ⌘S to save..."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "写下一条闪念，按 ⌘↩ 立即保存..."
+            "value" : "写下一条闪念，按 ⌘S 立即保存..."
           }
         }
       }

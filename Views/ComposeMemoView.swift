@@ -140,7 +140,7 @@ struct ComposeMemoView: View {
                 .background(Color.clear)
                 .overlay(
                     Group {
-                        if content.isEmpty {
+                        if content.isEmpty && !isContentFocused {
                             VStack {
                                 HStack {
                                     Text(String(localized: "What's on your mind...", comment: "Placeholder for memo content editor"))
@@ -150,7 +150,7 @@ struct ComposeMemoView: View {
                                 }
                                 Spacer()
                             }
-                            .padding(.top, 8)
+                            .padding(.top, 0)
                             .padding(.leading, 5)
                             .allowsHitTesting(false)
                         }

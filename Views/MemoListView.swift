@@ -24,6 +24,7 @@ struct MemoListView: View {
     @State private var showQuickMemoPicker = false
     @State private var showQuickCamera = false
     @State private var isQuickUploading = false
+    @FocusState private var isQuickCaptureEditorFocused: Bool
     @AppStorage("enableAIFeatures") private var enableAIFeatures = true
     
     @Query(sort: \Memo.createdAt, order: .reverse) private var allMemos: [Memo]
@@ -301,10 +302,23 @@ struct MemoListView: View {
                 .foregroundColor(LiquidGlassTheme.colors.secondaryText)
 
             VStack(spacing: 10) {
-                TextField(String(localized: "Write a thought, press ⌘↩ to save...", comment: "Placeholder for quick capture text field"), text: $quickCaptureText, axis: .vertical)
-                    .lineLimit(1...5)
-                    .textFieldStyle(.plain)
-                    .font(LiquidGlassTheme.typography.body)
+                ZStack(alignment: .topLeading) {
+                    TextEditor(text: $quickCaptureText)
+                        .font(LiquidGlassTheme.typography.body)
+                        .scrollContentBackground(.hidden)
+                        .background(Color.clear)
+                        .frame(minHeight: 110, maxHeight: 110)
+                        .focused($isQuickCaptureEditorFocused)
+
+                    if quickCaptureText.isEmpty && !isQuickCaptureEditorFocused {
+                        Text(String(localized: "Write a thought, press ⌘S to save...", comment: "Placeholder for quick capture text field"))
+                            .font(LiquidGlassTheme.typography.body)
+                            .foregroundColor(LiquidGlassTheme.colors.tertiaryText)
+                            .padding(.top, 0)
+                            .padding(.leading, 5)
+                            .allowsHitTesting(false)
+                    }
+                }
 
                 if !quickCaptureAttachments.isEmpty || quickCaptureLocation != nil {
                     HStack(spacing: 8) {
@@ -474,7 +488,7 @@ struct MemoListView: View {
                     }
                     .buttonStyle(.plain)
                     .disabled(quickCaptureText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isQuickCaptureSaving)
-                    .keyboardShortcut(.return, modifiers: [.command])
+                    .keyboardShortcut("s", modifiers: .command)
                 }
             }
             .padding(16)
