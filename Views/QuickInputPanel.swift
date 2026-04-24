@@ -77,12 +77,25 @@ struct QuickInputWindowView: View {
     
     var body: some View {
         VStack(spacing: 12) {
-            TextField(String(localized: "Capture a thought... (Press Esc to cancel)", comment: "Placeholder for quick thought capture"), text: $text, axis: .vertical)
-                .textFieldStyle(.plain)
-                .font(.system(size: 16))
-                .lineLimit(1...8)
-                .focused($isFocused)
-                .padding()
+            ZStack(alignment: .topLeading) {
+                TextEditor(text: $text)
+                    .font(.system(size: 16))
+                    .focused($isFocused)
+                    .scrollContentBackground(.hidden)
+                    .background(Color.clear)
+                    .frame(minHeight: 96, maxHeight: 96)
+
+                if text.isEmpty {
+                    Text(String(localized: "Capture a thought... (Press Esc to cancel)", comment: "Placeholder for quick thought capture"))
+                        .font(.system(size: 16))
+                        .foregroundColor(.secondary)
+                        .padding(.top, 8)
+                        .padding(.leading, 5)
+                        .allowsHitTesting(false)
+                }
+            }
+            .padding(.horizontal)
+            .padding(.top)
             
             if let location = currentLocation {
                 HStack(spacing: 4) {
@@ -160,7 +173,7 @@ struct QuickInputWindowView: View {
                     .buttonStyle(.borderedProminent)
                     .tint(LiquidGlassTheme.colors.accent)
                     .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSaving)
-                    .keyboardShortcut(.return, modifiers: .command)
+                    .keyboardShortcut("s", modifiers: .command)
                 }
             }
             .padding(.horizontal)
