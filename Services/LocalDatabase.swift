@@ -5,76 +5,140 @@ import SwiftData
 final class LocalDatabase {
     static let shared = LocalDatabase()
     
-    // Auto-Recovery Constants
-    private static let kLastInitializationSuccessful = "LocalDatabase.LastInitializationSuccessful"
-    private static let kInitializationAttempts = "LocalDatabase.InitializationAttempts"
-    private static let kMaxInitializationAttempts = 2
+    private static let storesRootDirectoryName = "Essays/Stores"
     
-    let container: ModelContainer
-    let context: ModelContext
+    private(set) var container: ModelContainer
+    private(set) var context: ModelContext
+    private(set) var activeStoreDirectory: URL
+    private var isActivatingStore = false
     
     private init() {
-        let appSupportURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let databaseURL = appSupportURL.appendingPathComponent("Essays")
-        let storeURL = databaseURL.appendingPathComponent("Essays.store")
-        
-        // 1. Check for Crash Loop and perform Self-Healing if needed
-        let attempts = UserDefaults.standard.string(forKey: LocalDatabase.kInitializationAttempts) != nil ?
-            UserDefaults.standard.integer(forKey: LocalDatabase.kInitializationAttempts) : 0
-        let lastSuccess = UserDefaults.standard.bool(forKey: LocalDatabase.kLastInitializationSuccessful)
-        
-        if attempts > LocalDatabase.kMaxInitializationAttempts || (!lastSuccess && attempts > 0) {
-            print("🚨 Crash loop detected (attempts: \(attempts), lastSuccess: \(lastSuccess)). Performing database hard reset.")
-            LocalDatabase.hardReset(databaseURL: databaseURL)
-            UserDefaults.standard.set(0, forKey: LocalDatabase.kInitializationAttempts)
-        }
-        
-        // Mark current attempt as NOT successful (yet)
-        UserDefaults.standard.set(attempts + 1, forKey: LocalDatabase.kInitializationAttempts)
-        UserDefaults.standard.set(false, forKey: LocalDatabase.kLastInitializationSuccessful)
-        
+        let initialDirectory = Self.defaultDirectoryForNoAccount()
+        self.activeStoreDirectory = initialDirectory
+
         do {
-            // Create directory if it doesn't exist
-            if !FileManager.default.fileExists(atPath: databaseURL.path) {
-                try? FileManager.default.createDirectory(at: databaseURL, withIntermediateDirectories: true)
-            }
-            
-            let config = ModelConfiguration(url: storeURL)
-            
-            do {
-                container = try ModelContainer(for: Memo.self, Attachment.self, Relation.self, Location.self, OutboxTask.self, configurations: config)
-            } catch {
-                print("Failed to initialize ModelContainer, attempting to recreate store: \(error)")
-                // If initialization fails (likely due to schema change), delete the store and try again
-                LocalDatabase.hardReset(databaseURL: databaseURL)
-                container = try ModelContainer(for: Memo.self, Attachment.self, Relation.self, Location.self, OutboxTask.self, configurations: config)
-            }
-            
-            context = container.mainContext
-            print("SwiftData initialized at: \(storeURL.path)")
-            
-            // 🚨 CRITICAL FIX: Clean up duplicate relations before any higher-level fetches
-            // This is the primary recovery phase for data-level corruption.
+            let loadedContainer = try Self.openContainer(storeDirectory: initialDirectory)
+            self.container = loadedContainer
+            self.context = loadedContainer.mainContext
             cleanDuplicateRelations()
-            
-            // 2. Mark initialization as successful 🎉
-            UserDefaults.standard.set(0, forKey: LocalDatabase.kInitializationAttempts)
-            UserDefaults.standard.set(true, forKey: LocalDatabase.kLastInitializationSuccessful)
-            
         } catch {
-            print("Final SwiftData initialization error: \(error)")
-            // If it still fails, fallback to in-memory store
+            print("SwiftData init failed for \(initialDirectory.path): \(error)")
             do {
                 let config = ModelConfiguration(isStoredInMemoryOnly: true)
-                container = try ModelContainer(for: Memo.self, Attachment.self, Relation.self, Location.self, OutboxTask.self, configurations: config)
-                context = container.mainContext
+                let fallbackContainer = try ModelContainer(
+                    for: Memo.self,
+                    Attachment.self,
+                    Relation.self,
+                    Location.self,
+                    OutboxTask.self,
+                    configurations: config
+                )
+                self.container = fallbackContainer
+                self.context = fallbackContainer.mainContext
                 print("Falling back to in-memory store")
-                // Still mark as successful for in-memory so we don't reset infinitely
-                UserDefaults.standard.set(true, forKey: LocalDatabase.kLastInitializationSuccessful)
             } catch {
                 fatalError("Failed to initialize SwiftData completely: \(error)")
             }
         }
+    }
+
+    @discardableResult
+    func activateStore(for account: Account?) -> Account? {
+        if isActivatingStore {
+            return account
+        }
+        var resolved = account
+
+        if var account = resolved {
+            let trimmed = account.dataDirectoryPath?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            if trimmed.isEmpty {
+                if account.mode == .remote, Self.legacyStoreFileExists() {
+                    account.dataDirectoryPath = Self.legacyStoreDirectoryURL().path
+                } else {
+                    let defaultDirectory = Self.defaultDirectory(for: account)
+                    account.dataDirectoryPath = defaultDirectory.path
+                }
+                AccountManager.shared.updateAccount(account)
+                resolved = account
+            }
+        }
+
+        let targetDirectory = Self.storeDirectory(for: resolved)
+        guard targetDirectory != activeStoreDirectory else {
+            return resolved
+        }
+
+        do {
+            isActivatingStore = true
+            defer { isActivatingStore = false }
+            let loadedContainer = try Self.openContainer(storeDirectory: targetDirectory)
+            self.container = loadedContainer
+            self.context = loadedContainer.mainContext
+            self.activeStoreDirectory = targetDirectory
+            cleanDuplicateRelations()
+            DispatchQueue.main.async {
+                NotificationCenter.default.post(name: .databaseContainerDidChange, object: nil)
+            }
+            print("Switched SwiftData store: \(targetDirectory.path)")
+        } catch {
+            isActivatingStore = false
+            print("Failed to switch SwiftData store: \(error)")
+        }
+
+        return resolved
+    }
+
+    private static func openContainer(storeDirectory: URL) throws -> ModelContainer {
+        try FileManager.default.createDirectory(at: storeDirectory, withIntermediateDirectories: true)
+        let storeURL = storeDirectory.appendingPathComponent("Essays.store")
+        let config = ModelConfiguration(url: storeURL)
+        return try ModelContainer(
+            for: Memo.self,
+            Attachment.self,
+            Relation.self,
+            Location.self,
+            OutboxTask.self,
+            configurations: config
+        )
+    }
+
+    private static func storeDirectory(for account: Account?) -> URL {
+        if let account {
+            let trimmed = account.dataDirectoryPath?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            if !trimmed.isEmpty {
+                return URL(fileURLWithPath: trimmed, isDirectory: true)
+            }
+            return defaultDirectory(for: account)
+        }
+        return defaultDirectoryForNoAccount()
+    }
+
+    private static func defaultDirectory(for account: Account) -> URL {
+        let root = storesRootDirectoryURL()
+        let modeFolder = account.mode == .local ? "local" : "remote"
+        return root
+            .appendingPathComponent(modeFolder, isDirectory: true)
+            .appendingPathComponent(account.id.uuidString, isDirectory: true)
+    }
+
+    private static func defaultDirectoryForNoAccount() -> URL {
+        storesRootDirectoryURL()
+            .appendingPathComponent("anonymous", isDirectory: true)
+    }
+
+    private static func storesRootDirectoryURL() -> URL {
+        let appSupportURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        return appSupportURL.appendingPathComponent(storesRootDirectoryName, isDirectory: true)
+    }
+
+    private static func legacyStoreDirectoryURL() -> URL {
+        let appSupportURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        return appSupportURL.appendingPathComponent("Essays", isDirectory: true)
+    }
+
+    private static func legacyStoreFileExists() -> Bool {
+        let legacyStore = legacyStoreDirectoryURL().appendingPathComponent("Essays.store")
+        return FileManager.default.fileExists(atPath: legacyStore.path)
     }
     
     /// Deletes the Essays directory and all its contents (Essays.store, Essays.store-shm, etc.)
@@ -126,6 +190,24 @@ final class LocalDatabase {
     /// Deletes local memos that are no longer in incoming list.
     func syncMemosSnapshot(_ incomingMemos: [Memo]) -> [Memo] {
         return syncMemos(incomingMemos, removeMissingLocalMemos: true)
+    }
+
+    /// Account-scoped full snapshot sync from server.
+    /// Only deletes memos belonging to the specific account.
+    func syncMemosSnapshot(_ incomingMemos: [Memo], forAccountID accountID: String) -> [Memo] {
+        let normalizedAccountID = accountID.trimmingCharacters(in: .whitespacesAndNewlines)
+        let incomingNames = Set(incomingMemos.map { $0.name })
+        let allLocalMemos = fetchAllMemos()
+
+        for localMemo in allLocalMemos
+            where localMemo.accountID == normalizedAccountID && !incomingNames.contains(localMemo.name)
+        {
+            context.delete(localMemo)
+        }
+
+        context.processPendingChanges()
+        _ = syncMemos(incomingMemos, removeMissingLocalMemos: false)
+        return fetchMemos(forAccountID: normalizedAccountID)
     }
     
     /// Incremental upsert.
@@ -295,6 +377,30 @@ final class LocalDatabase {
         let descriptor = FetchDescriptor<Memo>(sortBy: [SortDescriptor(\.createdAt, order: .reverse)])
         return (try? context.fetch(descriptor)) ?? []
     }
+
+    func fetchMemos(forAccountID accountID: String) -> [Memo] {
+        let normalized = accountID.trimmingCharacters(in: .whitespacesAndNewlines)
+        let allMemos = fetchAllMemos()
+
+        if normalized == "local" {
+            return allMemos.filter { memo in
+                memo.name.hasPrefix("local_")
+                    || memo.accountID?.trimmingCharacters(in: .whitespacesAndNewlines) == "local"
+            }
+        }
+
+        return allMemos.filter { memo in
+            guard let memoAccountID = memo.accountID?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !memoAccountID.isEmpty,
+                  memoAccountID != "local"
+            else {
+                return false
+            }
+
+            return AppState.normalizedRemoteAccountID(from: memoAccountID)
+                == AppState.normalizedRemoteAccountID(from: normalized)
+        }
+    }
     
     func deleteMemo(_ memo: Memo) {
         context.delete(memo)
@@ -324,6 +430,11 @@ final class LocalDatabase {
             existing.name = newMemo.name
             existing.createdAt = newMemo.createdAt
             existing.updatedAt = newMemo.updatedAt
+            if existing.accountID == nil || existing.accountID?.isEmpty == true {
+                existing.accountID = AccountManager.shared.activeAccount.map {
+                    AppState.accountIdentifier(for: $0)
+                } ?? "local"
+            }
             existing.isPendingSync = false
             for attachment in existing.attachments {
                 attachment.memoName = newMemo.name
@@ -351,6 +462,65 @@ final class LocalDatabase {
         guard let tasks = try? context.fetch(descriptor) else { return }
         for task in tasks where task.state != .completed {
             context.delete(task)
+        }
+        try? context.save()
+    }
+
+    @MainActor
+    func purgeLocalOutboxTasks() {
+        let descriptor = FetchDescriptor<OutboxTask>()
+        guard let tasks = try? context.fetch(descriptor) else { return }
+        for task in tasks {
+            if let memoId = task.memoId, memoId.hasPrefix("local_") {
+                context.delete(task)
+                continue
+            }
+
+            if task.type == .createMemo,
+               let payload = try? JSONDecoder().decode(CreateMemoPayload.self, from: task.payload),
+               payload.accountID == "local"
+            {
+                context.delete(task)
+                continue
+            }
+
+            if task.type == .updateMemo,
+               let payload = try? JSONDecoder().decode(UpdateMemoPayload.self, from: task.payload),
+               payload.accountID == "local"
+            {
+                context.delete(task)
+                continue
+            }
+
+            if task.type == .togglePinMemo,
+               let payload = try? JSONDecoder().decode(TogglePinPayload.self, from: task.payload),
+               payload.accountID == "local"
+            {
+                context.delete(task)
+                continue
+            }
+
+            if let payload = try? JSONDecoder().decode(SimpleMemoPayload.self, from: task.payload),
+               payload.accountID == "local"
+            {
+                context.delete(task)
+                continue
+            }
+
+            // No account marker and no resolvable memo: treat as orphan task and drop.
+            if task.memoId == nil {
+                let createPayload = try? JSONDecoder().decode(CreateMemoPayload.self, from: task.payload)
+                let updatePayload = try? JSONDecoder().decode(UpdateMemoPayload.self, from: task.payload)
+                let togglePayload = try? JSONDecoder().decode(TogglePinPayload.self, from: task.payload)
+                let simplePayload = try? JSONDecoder().decode(SimpleMemoPayload.self, from: task.payload)
+                let hasAccountHint = createPayload?.accountID != nil
+                    || updatePayload?.accountID != nil
+                    || togglePayload?.accountID != nil
+                    || simplePayload?.accountID != nil
+                if !hasAccountHint {
+                    context.delete(task)
+                }
+            }
         }
         try? context.save()
     }

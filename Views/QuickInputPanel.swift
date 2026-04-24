@@ -66,6 +66,14 @@ struct QuickInputWindowView: View {
     private var locationManager = LocationManager.shared
     @State private var currentLocation: Location?
     @State private var myRequestID: UUID?
+
+    private var isLocalMode: Bool {
+        AccountManager.shared.isLocalMode
+    }
+
+    private var activeAccountID: String {
+        AccountManager.shared.activeAccount.map { AppState.accountIdentifier(for: $0) } ?? "local"
+    }
     
     var body: some View {
         VStack(spacing: 12) {
@@ -199,23 +207,27 @@ struct QuickInputWindowView: View {
                     tags: tags,
                     attachments: [],
                     location: currentLocation,
-                    isPendingSync: true
+                    accountID: activeAccountID,
+                    isPendingSync: !isLocalMode
                 )
                 LocalDatabase.shared.context.insert(newMemo)
                 
-                let payload = CreateMemoPayload(
-                    content: trimmed,
-                    visibility: visibility.rawValue,
-                    pinned: false,
-                    tags: tags,
-                    attachmentNames: [],
-                    locationPlaceholder: currentLocation?.placeholder,
-                    locationLatitude: currentLocation?.latitude,
-                    locationLongitude: currentLocation?.longitude
-                )
-                let payloadData = try JSONEncoder().encode(payload)
-                let task = OutboxTask(type: .createMemo, payload: payloadData, memoId: tempId)
-                LocalDatabase.shared.context.insert(task)
+                if !isLocalMode {
+                    let payload = CreateMemoPayload(
+                        content: trimmed,
+                        visibility: visibility.rawValue,
+                        pinned: false,
+                        tags: tags,
+                        attachmentNames: [],
+                        locationPlaceholder: currentLocation?.placeholder,
+                        locationLatitude: currentLocation?.latitude,
+                        locationLongitude: currentLocation?.longitude,
+                        accountID: activeAccountID
+                    )
+                    let payloadData = try JSONEncoder().encode(payload)
+                    let task = OutboxTask(type: .createMemo, payload: payloadData, memoId: tempId)
+                    LocalDatabase.shared.context.insert(task)
+                }
                 try LocalDatabase.shared.context.save()
                 SyncEngine.shared.triggerSync()
                 

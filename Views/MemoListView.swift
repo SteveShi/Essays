@@ -31,7 +31,10 @@ struct MemoListView: View {
     private var locationManager = LocationManager.shared
     
     private func computeFilteredMemos() -> [Memo] {
-        var filtered = allMemos
+        var filtered = allMemos.filter {
+            appState.matchesActiveAccount(accountID: $0.accountID, memoName: $0.name)
+                && !$0.isSystemCommentMemo
+        }
         
         // 1. Sidebar Selection / State Filter
         if let selection = appState.sidebarSelection {
@@ -592,25 +595,28 @@ struct MemoListView: View {
                 tags: extractedTags,
                 attachments: quickCaptureAttachments,
                 location: quickCaptureLocation,
-                relations: []
+                relations: [],
+                accountID: appState.activeAccountID
             )
             LocalDatabase.shared.context.insert(newMemo)
             
             // 2. Enqueue OutboxTask
-            let payload = CreateMemoPayload(
-                content: trimmed,
-                visibility: quickCaptureVisibility.rawValue,
-                pinned: false,
-                tags: extractedTags,
-                attachmentNames: attachmentNames,
-                locationPlaceholder: quickCaptureLocation?.placeholder,
-                locationLatitude: quickCaptureLocation?.latitude,
-                locationLongitude: quickCaptureLocation?.longitude
-            )
-            let payloadData = try JSONEncoder().encode(payload)
-            let task = OutboxTask(type: .createMemo, payload: payloadData, memoId: tempId)
-            
-            LocalDatabase.shared.context.insert(task)
+            if !appState.isLocalMode {
+                let payload = CreateMemoPayload(
+                    content: trimmed,
+                    visibility: quickCaptureVisibility.rawValue,
+                    pinned: false,
+                    tags: extractedTags,
+                    attachmentNames: attachmentNames,
+                    locationPlaceholder: quickCaptureLocation?.placeholder,
+                    locationLatitude: quickCaptureLocation?.latitude,
+                    locationLongitude: quickCaptureLocation?.longitude,
+                    accountID: appState.activeAccountID
+                )
+                let payloadData = try JSONEncoder().encode(payload)
+                let task = OutboxTask(type: .createMemo, payload: payloadData, memoId: tempId)
+                LocalDatabase.shared.context.insert(task)
+            }
             try LocalDatabase.shared.context.save()
             
             // Trigger background sync
@@ -653,6 +659,33 @@ struct MemoListView: View {
     }
     
     private func handleQuickSelectedURLs(_ urls: [URL]) {
+        if appState.isLocalMode {
+            let localAttachments = urls.compactMap { url -> Attachment? in
+                let _ = url.startAccessingSecurityScopedResource()
+                defer { url.stopAccessingSecurityScopedResource() }
+
+                guard let data = try? Data(contentsOf: url) else { return nil }
+                let ext = url.pathExtension.lowercased()
+                let mimeType =
+                    (ext == "jpg" || ext == "jpeg")
+                    ? "image/jpeg"
+                    : (ext == "gif"
+                        ? "image/gif" : (ext == "webp" ? "image/webp" : "image/png"))
+
+                return Attachment(
+                    name: "local/attachments/\(UUID().uuidString)",
+                    filename: url.lastPathComponent,
+                    type: mimeType,
+                    size: Int64(data.count),
+                    content: data.base64EncodedString(),
+                    externalLink: url.absoluteString
+                )
+            }
+            quickCaptureAttachments.append(contentsOf: localAttachments)
+            isQuickUploading = false
+            return
+        }
+
         isQuickUploading = true
         Task {
             for url in urls {
@@ -706,6 +739,8 @@ struct MemoListView: View {
     }
 
     private func refreshMemos() async {
+        if appState.isLocalMode { return }
+        
         appState.isLoading = true
         defer { appState.isLoading = false }
 
@@ -1218,12 +1253,25 @@ struct MemoCard: View {
 
     private func togglePin() {
         do {
+            guard appState.matchesActiveAccount(accountID: memo.accountID, memoName: memo.name) else {
+                return
+            }
+
             let newPinnedStatus = !memo.pinned
             // 1. Update locally
             memo.pinned = newPinnedStatus
+
+            if appState.isLocalMode {
+                try LocalDatabase.shared.context.save()
+                return
+            }
             
             // 2. Enqueue Outbox
-            let payload = TogglePinPayload(pinned: newPinnedStatus, contentSummary: memo.truncatedContent)
+            let payload = TogglePinPayload(
+                pinned: newPinnedStatus,
+                contentSummary: memo.truncatedContent,
+                accountID: appState.activeAccountID
+            )
             let payloadData = try JSONEncoder().encode(payload)
             let task = OutboxTask(type: .togglePinMemo, payload: payloadData, memoId: memo.name)
             
@@ -1260,6 +1308,10 @@ struct MemoCard: View {
 
     private func deleteMemo() {
         do {
+            guard appState.matchesActiveAccount(accountID: memo.accountID, memoName: memo.name) else {
+                return
+            }
+
             if memo.name.hasPrefix("local_") {
                 // Local-only memo: cancel queued tasks and remove it locally.
                 LocalDatabase.shared.deletePendingOutboxTasks(forMemoId: memo.name)
@@ -1267,9 +1319,18 @@ struct MemoCard: View {
                 try LocalDatabase.shared.context.save()
                 return
             }
+
+            if appState.isLocalMode {
+                LocalDatabase.shared.deleteMemo(memo)
+                try LocalDatabase.shared.context.save()
+                return
+            }
             
             // 1. Enqueue Outbox FIRST (while we still have memo name)
-            let payload = SimpleMemoPayload(contentSummary: memo.truncatedContent)
+            let payload = SimpleMemoPayload(
+                contentSummary: memo.truncatedContent,
+                accountID: appState.activeAccountID
+            )
             let payloadData = (try? JSONEncoder().encode(payload)) ?? Data()
             let task = OutboxTask(type: .deleteMemo, payload: payloadData, memoId: memo.name)
             LocalDatabase.shared.context.insert(task)

@@ -7,21 +7,28 @@ struct SidebarView: View {
     @FocusState private var isSearchFocused: Bool
     
     // Computed counts
-    private var allCount: Int { allMemos.filter { $0.state == .normal }.count }
+    private var currentAccountMemos: [Memo] {
+        allMemos.filter {
+            appState.matchesActiveAccount(accountID: $0.accountID, memoName: $0.name)
+                && !$0.isSystemCommentMemo
+        }
+    }
+    
+    private var allCount: Int { currentAccountMemos.filter { $0.state == .normal }.count }
     private var todayCount: Int {
         let today = Calendar.current.startOfDay(for: Date())
-        return allMemos.filter { $0.state == .normal && $0.createdAt >= today }.count
+        return currentAccountMemos.filter { $0.state == .normal && $0.createdAt >= today }.count
     }
-    private var archivedCount: Int { allMemos.filter { $0.state == .archived }.count }
-    private var attachmentCount: Int { allMemos.filter { $0.state == .normal && !$0.attachments.isEmpty }.count }
+    private var archivedCount: Int { currentAccountMemos.filter { $0.state == .archived }.count }
+    private var attachmentCount: Int { currentAccountMemos.filter { $0.state == .normal && !$0.attachments.isEmpty }.count }
     
-    private var publicCount: Int { allMemos.filter { $0.state == .normal && $0.visibility == .public }.count }
-    private var protectedCount: Int { allMemos.filter { $0.state == .normal && $0.visibility == .protected }.count }
-    private var privateCount: Int { allMemos.filter { $0.state == .normal && $0.visibility == .private }.count }
+    private var publicCount: Int { currentAccountMemos.filter { $0.state == .normal && $0.visibility == .public }.count }
+    private var protectedCount: Int { currentAccountMemos.filter { $0.state == .normal && $0.visibility == .protected }.count }
+    private var privateCount: Int { currentAccountMemos.filter { $0.state == .normal && $0.visibility == .private }.count }
     
     private var tags: [Tag] {
         var dict: [String: Int] = [:]
-        for memo in allMemos where memo.state == .normal {
+        for memo in currentAccountMemos where memo.state == .normal {
             for tag in memo.tags {
                 dict[tag, default: 0] += 1
             }
@@ -30,7 +37,7 @@ struct SidebarView: View {
     }
     
     private var memoDateComponents: Set<DateComponents> {
-        Set(allMemos.map { Calendar.current.dateComponents([.year, .month, .day], from: $0.createdAt) })
+        Set(currentAccountMemos.map { Calendar.current.dateComponents([.year, .month, .day], from: $0.createdAt) })
     }
     
     var body: some View {

@@ -461,6 +461,33 @@ struct ComposeMemoView: View {
     }
     
     private func handleSelectedURLs(_ urls: [URL]) {
+        if appState.isLocalMode {
+            let localAttachments = urls.compactMap { url -> Attachment? in
+                let _ = url.startAccessingSecurityScopedResource()
+                defer { url.stopAccessingSecurityScopedResource() }
+
+                guard let data = try? Data(contentsOf: url) else { return nil }
+                let ext = url.pathExtension.lowercased()
+                let mimeType =
+                    (ext == "jpg" || ext == "jpeg")
+                    ? "image/jpeg"
+                    : (ext == "gif"
+                        ? "image/gif" : (ext == "webp" ? "image/webp" : "image/png"))
+
+                return Attachment(
+                    name: "local/attachments/\(UUID().uuidString)",
+                    filename: url.lastPathComponent,
+                    type: mimeType,
+                    size: Int64(data.count),
+                    content: data.base64EncodedString(),
+                    externalLink: url.absoluteString
+                )
+            }
+            uploadedAttachments.append(contentsOf: localAttachments)
+            isUploading = false
+            return
+        }
+
         isUploading = true
         Task {
             for url in urls {
@@ -516,6 +543,19 @@ struct ComposeMemoView: View {
     }
 
     private func uploadPhoto(data: Data) {
+        if appState.isLocalMode {
+            let attachment = Attachment(
+                name: "local/attachments/\(UUID().uuidString)",
+                filename: "photo_\(Int(Date().timeIntervalSince1970)).jpg",
+                type: "image/jpeg",
+                size: Int64(data.count),
+                content: data.base64EncodedString()
+            )
+            uploadedAttachments.append(attachment)
+            isUploading = false
+            return
+        }
+
         isUploading = true
         Task {
             do {
@@ -561,12 +601,14 @@ struct ComposeMemoView: View {
                     attachmentNames: attachmentNames,
                     locationPlaceholder: currentLocation?.placeholder,
                     locationLatitude: currentLocation?.latitude,
-                    locationLongitude: currentLocation?.longitude
+                    locationLongitude: currentLocation?.longitude,
+                    accountID: appState.activeAccountID
                 )
-                let payloadData = try JSONEncoder().encode(payload)
-                let task = OutboxTask(type: .updateMemo, payload: payloadData, memoId: memo.name)
-                
-                LocalDatabase.shared.context.insert(task)
+                if !appState.isLocalMode {
+                    let payloadData = try JSONEncoder().encode(payload)
+                    let task = OutboxTask(type: .updateMemo, payload: payloadData, memoId: memo.name)
+                    LocalDatabase.shared.context.insert(task)
+                }
                 try LocalDatabase.shared.context.save()
                 
             } else {
@@ -584,25 +626,28 @@ struct ComposeMemoView: View {
                     tags: extractedTags,
                     attachments: uploadedAttachments,
                     location: currentLocation,
-                    relations: []
+                    relations: [],
+                    accountID: appState.activeAccountID
                 )
                 LocalDatabase.shared.context.insert(newMemo)
                 
                 // 2. Enqueue OutboxTask
-                let payload = CreateMemoPayload(
-                    content: content,
-                    visibility: visibility.rawValue,
-                    pinned: false,
-                    tags: extractedTags,
-                    attachmentNames: attachmentNames,
-                    locationPlaceholder: currentLocation?.placeholder,
-                    locationLatitude: currentLocation?.latitude,
-                    locationLongitude: currentLocation?.longitude
-                )
-                let payloadData = try JSONEncoder().encode(payload)
-                let task = OutboxTask(type: .createMemo, payload: payloadData, memoId: tempId)
-                
-                LocalDatabase.shared.context.insert(task)
+                if !appState.isLocalMode {
+                    let payload = CreateMemoPayload(
+                        content: content,
+                        visibility: visibility.rawValue,
+                        pinned: false,
+                        tags: extractedTags,
+                        attachmentNames: attachmentNames,
+                        locationPlaceholder: currentLocation?.placeholder,
+                        locationLatitude: currentLocation?.latitude,
+                        locationLongitude: currentLocation?.longitude,
+                        accountID: appState.activeAccountID
+                    )
+                    let payloadData = try JSONEncoder().encode(payload)
+                    let task = OutboxTask(type: .createMemo, payload: payloadData, memoId: tempId)
+                    LocalDatabase.shared.context.insert(task)
+                }
                 try LocalDatabase.shared.context.save()
             }
             

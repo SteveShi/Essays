@@ -29,6 +29,21 @@ enum UserRole: String, Codable {
 }
 
 extension User {
+    static func localUser(displayName: String) -> User {
+        User(
+            name: "users/local-admin",
+            role: .admin,
+            username: "admin",
+            email: nil,
+            displayName: displayName,
+            avatarUrl: nil,
+            description: nil,
+            state: "NORMAL",
+            createTime: nil,
+            updateTime: nil
+        )
+    }
+
     /// 本地模式下使用的模拟管理员用户
     static let localUser = User(
         name: "users/local-admin",

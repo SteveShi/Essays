@@ -2,6 +2,7 @@ import SwiftUI
 import MapKit
 import CoreLocation
 import QuickLook
+import SwiftData
 
 struct MemoDetailView: View {
     let memo: Memo
@@ -16,6 +17,10 @@ struct MemoDetailView: View {
     
     // API logic to fetch specific comments for this memo
     private func loadComments() {
+        if appState.isLocalMode {
+            loadLocalComments()
+            return
+        }
         isLoadingComments = true
         Task {
             do {
@@ -31,6 +36,27 @@ struct MemoDetailView: View {
                 }
             }
         }
+    }
+
+    private func loadLocalComments() {
+        isLoadingComments = true
+        let context = LocalDatabase.shared.context
+        let parentName = memo.name
+        let relationDescriptor = FetchDescriptor<Relation>()
+        let allRelations = (try? context.fetch(relationDescriptor)) ?? []
+        let commentRelations = allRelations.filter {
+            $0.memo == parentName && $0.type == .comment
+        }
+        let commentNames = Set(commentRelations.map(\.relatedMemo))
+
+        let allMemos = LocalDatabase.shared.fetchAllMemos()
+        let localComments = allMemos
+            .filter { commentNames.contains($0.name) }
+            .filter { appState.matchesActiveAccount(accountID: $0.accountID, memoName: $0.name) }
+            .sorted { $0.createdAt < $1.createdAt }
+
+        comments = localComments
+        isLoadingComments = false
     }
 
     var body: some View {
@@ -170,6 +196,44 @@ struct MemoDetailView: View {
     private func submitComment() {
         guard !commentText.isEmpty else { return }
         isSubmitting = true
+
+        if appState.isLocalMode {
+            let content = commentText
+            let newComment = Memo(
+                name: "local_comment_\(UUID().uuidString)",
+                numericID: "",
+                content: content,
+                createdAt: Date(),
+                updatedAt: Date(),
+                visibility: .private,
+                pinned: false,
+                state: .normal,
+                tags: [],
+                attachments: [],
+                location: nil,
+                relations: [],
+                accountID: appState.activeAccountID
+            )
+
+            let relation = Relation(
+                memo: memo.name,
+                relatedMemo: newComment.name,
+                type: .comment,
+                parentMemo: memo
+            )
+
+            LocalDatabase.shared.context.insert(newComment)
+            LocalDatabase.shared.context.insert(relation)
+            memo.relations.append(relation)
+            try? LocalDatabase.shared.context.save()
+
+            comments.append(newComment)
+            comments.sort { $0.createdAt < $1.createdAt }
+            commentText = ""
+            isSubmitting = false
+            isCommentFocused = false
+            return
+        }
         
         Task {
             do {

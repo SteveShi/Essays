@@ -12,6 +12,7 @@ final class Memo: Identifiable {
     var pinned: Bool
     var tags: [String]
     var stateRaw: String = "NORMAL"
+    var accountID: String?
     var isPendingSync: Bool = false
 
     // Relationships
@@ -45,6 +46,7 @@ final class Memo: Identifiable {
         attachments: [Attachment] = [],
         location: Location? = nil,
         relations: [Relation] = [],
+        accountID: String? = nil,
         isPendingSync: Bool = false
     ) {
         self.name = name.isEmpty ? "memos/pending-\(UUID().uuidString)" : name
@@ -59,6 +61,7 @@ final class Memo: Identifiable {
         self.location = location
         self.relations = relations
         self.stateRaw = state.rawValue
+        self.accountID = accountID
         self.isPendingSync = isPendingSync
     }
     
@@ -71,7 +74,7 @@ final class Memo: Identifiable {
         
         let descriptor = FetchDescriptor<Relation>(
             predicate: #Predicate<Relation> { rel in
-                rel.memo == memoName && rel.typeRaw == commentType
+                rel.typeRaw == commentType && (rel.memo == memoName || rel.relatedMemo == memoName)
             }
         )
         
@@ -98,6 +101,10 @@ final class Memo: Identifiable {
 }
 
 extension Memo {
+    var isSystemCommentMemo: Bool {
+        name.hasPrefix("local_comment_")
+    }
+
     var contentWithoutTags: String {
         MemoUtility.stripTags(from: content)
     }

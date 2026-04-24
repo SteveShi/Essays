@@ -103,6 +103,17 @@ struct MemosAPIV027: MemosAPIProtocol {
         return decoder
     }
 
+    private func parseRelationType(_ rawValue: String) -> Relation.RelationType {
+        let normalized = rawValue.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        if normalized.contains("COMMENT") {
+            return .comment
+        }
+        if normalized.contains("REFERENCE") {
+            return .reference
+        }
+        return Relation.RelationType(rawValue: normalized) ?? .unspecified
+    }
+
     private func performRequest<T: Decodable>(_ request: URLRequest) async throws -> T {
         let (data, response) = try await session.data(for: request)
 
@@ -154,6 +165,7 @@ struct MemosAPIV027: MemosAPIProtocol {
         let resources: [AttachmentData]?
         let location: LocationData?
         let relations: [RelationData]?
+        let relationList: [RelationData]?
         
         var extractedId: String {
             return name.split(separator: "/").last.map(String.init) ?? ""
@@ -353,7 +365,8 @@ struct MemosAPIV027: MemosAPIProtocol {
             
             var queryItems = [
                 URLQueryItem(name: "state", value: state),
-                URLQueryItem(name: "pageSize", value: "200")
+                URLQueryItem(name: "pageSize", value: "200"),
+                URLQueryItem(name: "view", value: "MEMO_VIEW_FULL")
             ]
             
             if let token = nextPageToken, !token.isEmpty {
@@ -370,7 +383,6 @@ struct MemosAPIV027: MemosAPIProtocol {
                   (200...299).contains(httpResponse.statusCode) else {
                 throw MemosAPIError.invalidResponse
             }
-            
             let decoder = makeDecoder()
             
             if let memoResponse = try? decoder.decode(MemoResponse.self, from: data) {
@@ -576,10 +588,10 @@ struct MemosAPIV027: MemosAPIProtocol {
             Location(placeholder: $0.placeholder, latitude: $0.latitude, longitude: $0.longitude)
         }
 
-        let localRelations = (data.relations ?? []).map {
+        let localRelations = (data.relations ?? data.relationList ?? []).map {
             Relation(
                 memo: $0.memo.value, relatedMemo: $0.relatedMemo.value,
-                type: Relation.RelationType(rawValue: $0.type) ?? .unspecified)
+                type: parseRelationType($0.type))
         }
 
         let memoModel = Memo(
@@ -783,10 +795,10 @@ struct MemosAPIV027: MemosAPIProtocol {
             Location(placeholder: $0.placeholder, latitude: $0.latitude, longitude: $0.longitude)
         }
 
-        let localRelations = (data.relations ?? []).map {
+        let localRelations = (data.relations ?? data.relationList ?? []).map {
             Relation(
                 memo: $0.memo.value, relatedMemo: $0.relatedMemo.value,
-                type: Relation.RelationType(rawValue: $0.type) ?? .unspecified)
+                type: parseRelationType($0.type))
         }
 
         let memoModel = Memo(

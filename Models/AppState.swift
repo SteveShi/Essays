@@ -42,6 +42,15 @@ class AppState {
         AccountManager.shared.isLocalMode
     }
 
+    /// 账户唯一标识，用于数据库隔离
+    var activeAccountID: String {
+        if isLocalMode { return "local" }
+        if let account = activeAccount {
+            return Self.accountIdentifier(for: account)
+        }
+        return Self.normalizedRemoteAccountID(from: serverURL)
+    }
+
 
     
     /// Returns true if either the network monitor reports a connection OR we successfully reached the server.
@@ -50,6 +59,52 @@ class AppState {
             return true // Local Mode is offline-first, always logically connected to local DB
         }
         return isOnline || isServerReachable
+    }
+
+    static func accountIdentifier(for account: Account) -> String {
+        switch account.mode {
+        case .local:
+            return "local"
+        case .remote:
+            return normalizedRemoteAccountID(from: account.serverURL ?? "")
+        }
+    }
+
+    static func normalizedRemoteAccountID(from rawServerURL: String) -> String {
+        let trimmed = rawServerURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "" }
+        let fallback = trimmed.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        guard let components = URLComponents(string: trimmed),
+              let scheme = components.scheme?.lowercased(),
+              let host = components.host?.lowercased()
+        else {
+            return fallback
+        }
+
+        var normalized = "\(scheme)://\(host)"
+        if let port = components.port {
+            normalized += ":\(port)"
+        }
+
+        let path = components.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        if !path.isEmpty {
+            normalized += "/\(path)"
+        }
+        return normalized
+    }
+
+    func matchesActiveAccount(accountID: String?, memoName: String? = nil) -> Bool {
+        if let memoName, memoName.hasPrefix("local_") {
+            return activeAccountID == "local"
+        }
+        if let accountID {
+            let normalized = accountID.trimmingCharacters(in: .whitespacesAndNewlines)
+            if normalized == "local" {
+                return activeAccountID == "local"
+            }
+            return Self.normalizedRemoteAccountID(from: normalized) == activeAccountID
+        }
+        return isLocalMode
     }
     var appVersion: String {
         let version =
@@ -162,6 +217,10 @@ class AppState {
     
     init() {
         loadSavedCredentials()
+        let resolvedActive = LocalDatabase.shared.activateStore(for: AccountManager.shared.activeAccount)
+        if let resolvedActive {
+            AccountManager.shared.setActiveAccount(resolvedActive)
+        }
         loadLocalCachedMemos()
         setupConnectivityActions()
         checkServerReachability()
@@ -201,9 +260,9 @@ class AppState {
         }
 
         
-        guard !serverURL.isEmpty else { 
+        guard !serverURL.isEmpty, let _ = URL(string: serverURL) else { 
             self.isServerReachable = false
-            self.lastConnectionError = String(localized: "Server URL not configured")
+            self.lastConnectionError = String(localized: "Server URL not configured or invalid")
             return 
         }
         
@@ -256,11 +315,31 @@ class AppState {
         // Fetch fresh from context every time, bypassing any stale AppState array cache
         LocalDatabase.shared.context.processPendingChanges()
         let fetched = LocalDatabase.shared.fetchAllMemos()
-        for memo in fetched {
+        migrateLegacyLocalMemosIfNeeded(fetched)
+        let scoped = fetched.filter { memo in
+            matchesActiveAccount(accountID: memo.accountID, memoName: memo.name)
+                && !memo.isSystemCommentMemo
+        }
+        for memo in scoped {
             memo.extractTagsFromContent()
         }
-        self.memos = fetched
+        self.memos = scoped
         updateFilteredMemosState()
+    }
+
+    @MainActor
+    private func migrateLegacyLocalMemosIfNeeded(_ memos: [Memo]) {
+        guard isLocalMode else { return }
+        var didChange = false
+        for memo in memos where memo.name.hasPrefix("local_") {
+            if memo.accountID != "local" {
+                memo.accountID = "local"
+                didChange = true
+            }
+        }
+        if didChange {
+            try? LocalDatabase.shared.context.save()
+        }
     }
 
     private func syncPendingMemos() {
@@ -367,16 +446,24 @@ class AppState {
             case .local:
                 serverURL = ""
                 accessToken = account.accessToken ?? ""
-                currentUser = User.localUser
+                currentUser = User.localUser(displayName: account.displayName)
                 isLoggedIn = true
             case .remote:
                 serverURL = account.serverURL ?? ""
                 accessToken = account.accessToken ?? ""
-                if let userData = userDefaults.data(forKey: currentUserKey),
-                   let user = try? JSONDecoder().decode(User.self, from: userData) {
-                    currentUser = user
-                    isLoggedIn = true
-                } else if !serverURL.isEmpty, !accessToken.isEmpty {
+                if !serverURL.isEmpty, !accessToken.isEmpty {
+                    currentUser = User(
+                        name: "users/\(account.id.uuidString)",
+                        role: .user,
+                        username: account.username ?? account.displayName,
+                        email: nil,
+                        displayName: account.displayName,
+                        avatarUrl: nil,
+                        description: nil,
+                        state: "NORMAL",
+                        createTime: nil,
+                        updateTime: nil
+                    )
                     isLoggedIn = true
                 } else {
                     currentUser = nil
@@ -423,6 +510,7 @@ class AppState {
 
         // 从 AccountManager 退出当前账户
         AccountManager.shared.signOutCurrentAccount()
+        _ = LocalDatabase.shared.activateStore(for: nil)
         
         serverURL = ""
         accessToken = ""
@@ -435,26 +523,46 @@ class AppState {
     
     /// 切换到指定账户
     func switchToAccount(_ account: Account) {
-
-        AccountManager.shared.setActiveAccount(account)
+        let resolvedAccount = LocalDatabase.shared.activateStore(for: account) ?? account
+        AccountManager.shared.setActiveAccount(resolvedAccount)
+        if resolvedAccount.mode == .remote {
+            LocalDatabase.shared.purgeLocalOutboxTasks()
+        }
         memos = []
         tags = []
         selectedMemoForDetail = nil
         loadSavedCredentials()
+        if resolvedAccount.mode == .remote {
+            MemosAPIClient.shared.configure(
+                serverURL: resolvedAccount.serverURL ?? "",
+                accessToken: resolvedAccount.accessToken ?? "",
+                apiVersion: resolvedAccount.apiVersion ?? .v027
+            )
+        }
         loadLocalCachedMemos()
         checkServerReachability()
+        SyncEngine.shared.triggerSync()
     }
     
     @MainActor
     func archiveMemo(_ memo: Memo) async {
+        guard matchesActiveAccount(accountID: memo.accountID, memoName: memo.name) else { return }
         // Optimistic UI update: change state immediately
         let previousState = memo.state
         memo.state = .archived
         updateFilteredMemosState()
         
         do {
+            if isLocalMode {
+                try LocalDatabase.shared.context.save()
+                return
+            }
+
             // Enqueue outbox task only; SyncEngine will execute network request.
-            let payload = SimpleMemoPayload(contentSummary: memo.truncatedContent)
+            let payload = SimpleMemoPayload(
+                contentSummary: memo.truncatedContent,
+                accountID: activeAccountID
+            )
             let payloadData = (try? JSONEncoder().encode(payload)) ?? Data()
             let task = OutboxTask(type: .archiveMemo, payload: payloadData, memoId: memo.name)
             LocalDatabase.shared.context.insert(task)
@@ -470,14 +578,23 @@ class AppState {
     
     @MainActor
     func unarchiveMemo(_ memo: Memo) async {
+        guard matchesActiveAccount(accountID: memo.accountID, memoName: memo.name) else { return }
         // Optimistic UI update: change state immediately
         let previousState = memo.state
         memo.state = .normal
         updateFilteredMemosState()
         
         do {
+            if isLocalMode {
+                try LocalDatabase.shared.context.save()
+                return
+            }
+
             // Enqueue outbox task only; SyncEngine will execute network request.
-            let payload = SimpleMemoPayload(contentSummary: memo.truncatedContent)
+            let payload = SimpleMemoPayload(
+                contentSummary: memo.truncatedContent,
+                accountID: activeAccountID
+            )
             let payloadData = (try? JSONEncoder().encode(payload)) ?? Data()
             let task = OutboxTask(type: .unarchiveMemo, payload: payloadData, memoId: memo.name)
             LocalDatabase.shared.context.insert(task)

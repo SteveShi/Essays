@@ -13,6 +13,7 @@ struct EssaysApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 #endif
     @State private var appState = AppState()
+    @State private var databaseReloadToken = UUID()
     #if os(macOS)
     @State private var updaterViewModel = UpdaterViewModel()
     #endif
@@ -29,6 +30,7 @@ struct EssaysApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .id(databaseReloadToken)
                 .environment(appState)
                 .modelContainer(LocalDatabase.shared.container)
                 .preferredColorScheme(preferredColorScheme)
@@ -44,6 +46,9 @@ struct EssaysApp: App {
                         await MemosAIAssistant.shared.initialize()
                     }
                     #endif
+                }
+                .onReceive(NotificationCenter.default.publisher(for: .databaseContainerDidChange)) { _ in
+                    databaseReloadToken = UUID()
                 }
         }
 #if os(macOS)
@@ -82,6 +87,7 @@ struct EssaysApp: App {
         #if os(macOS)
         Settings {
             SettingsView()
+                .id(databaseReloadToken)
                 .environment(appState)
                 .modelContainer(LocalDatabase.shared.container)
                 .preferredColorScheme(preferredColorScheme)

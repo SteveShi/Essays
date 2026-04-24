@@ -1,4 +1,7 @@
 import SwiftUI
+#if os(macOS)
+import AppKit
+#endif
 
 struct LoginView: View {
     @Environment(AppState.self) var appState: AppState
@@ -40,6 +43,7 @@ struct LoginView: View {
     @State private var username: String = ""
     @State private var password: String = ""
     @State private var selectedAPIVersion: MemosAPIVersion = .v027
+    @State private var localDataDirectoryPath: String = ""
 
     @State private var isLoading = false
     @State private var errorMessage: String?
@@ -93,6 +97,9 @@ struct LoginView: View {
         .onAppear {
             serverURL = appState.serverURL
             accessToken = appState.accessToken
+            if let account = AccountManager.shared.activeAccount, account.mode == .local {
+                localDataDirectoryPath = account.dataDirectoryPath ?? ""
+            }
         }
     }
 
@@ -193,6 +200,24 @@ struct LoginView: View {
             Text(String(localized: "Memos will be stored in an offline-first local database. No network connection is required.", comment: "Help text for local storage mode"))
                 .font(LiquidGlassTheme.typography.footnote)
                 .foregroundColor(LiquidGlassTheme.colors.tertiaryText)
+
+            HStack(spacing: 8) {
+                Text(localDataDirectoryPath.isEmpty
+                     ? String(localized: "No folder selected", comment: "Placeholder when local data folder is not selected")
+                     : localDataDirectoryPath)
+                    .font(LiquidGlassTheme.typography.footnote)
+                    .foregroundColor(LiquidGlassTheme.colors.secondaryText)
+                    .lineLimit(2)
+                    .textSelection(.enabled)
+
+                Spacer()
+
+                Button(String(localized: "Choose Folder", comment: "Button to choose local data folder")) {
+                    chooseLocalDataFolder()
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            }
         }
     }
 
@@ -348,7 +373,7 @@ struct LoginView: View {
 
         switch selectedMode {
         case .local:
-            return true
+            return !localDataDirectoryPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         case .remote:
             let normalizedServerURL = serverURL.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !normalizedServerURL.isEmpty else { return false }
@@ -382,9 +407,16 @@ struct LoginView: View {
     }
 
     private func signInLocal() async {
+        let selectedFolder = localDataDirectoryPath.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !selectedFolder.isEmpty else {
+            errorMessage = String(localized: "Please choose a local data folder first.", comment: "Error when local data folder is missing")
+            return
+        }
+
         // 创建并保存本地账户
-        let account = Account.localAccount()
-        AccountManager.shared.setActiveAccount(account)
+        let account = Account.localAccount(dataDirectoryPath: selectedFolder)
+        let resolvedAccount = LocalDatabase.shared.activateStore(for: account) ?? account
+        AccountManager.shared.setActiveAccount(resolvedAccount)
 
         appState.currentUser = User.localUser
         appState.isLoggedIn = true
@@ -434,7 +466,8 @@ struct LoginView: View {
                 accessToken: token,
                 username: normalizedUsername
             )
-            AccountManager.shared.setActiveAccount(account)
+            let resolvedAccount = LocalDatabase.shared.activateStore(for: account) ?? account
+            AccountManager.shared.setActiveAccount(resolvedAccount)
 
             appState.serverURL = normalizedServerURL
             appState.accessToken = token
@@ -463,7 +496,8 @@ struct LoginView: View {
                 apiVersion: selectedAPIVersion,
                 accessToken: normalizedAccessToken
             )
-            AccountManager.shared.setActiveAccount(account)
+            let resolvedAccount = LocalDatabase.shared.activateStore(for: account) ?? account
+            AccountManager.shared.setActiveAccount(resolvedAccount)
 
             appState.serverURL = normalizedServerURL
             appState.accessToken = normalizedAccessToken
@@ -473,5 +507,20 @@ struct LoginView: View {
         }
     }
 
+    #if os(macOS)
+    private func chooseLocalDataFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.canCreateDirectories = true
+        panel.prompt = String(localized: "Select", comment: "Confirm button for folder picker")
+        panel.message = String(localized: "Choose a folder to store local account data.", comment: "Message for local data folder picker")
+
+        if panel.runModal() == .OK, let url = panel.url {
+            localDataDirectoryPath = url.path
+        }
+    }
+    #endif
 
 }

@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.1] - 2026-04-24
+
+### Fixed
+- 💬 **Comment Badge Restoration (Online Mode)**: Restored timeline comment count badges for remote accounts by improving relation payload compatibility and decoding robustness.
+- 🔁 **Comment Relation Direction Tolerance**: Comment counting now handles both relation directions to prevent missed badges when server relation orientation differs.
+- 🧩 **API Relation Field Compatibility**: Added support for both `relations` and `relationList` response shapes to ensure stable comment metadata ingestion across Memos deployments.
+
+---
+
+### Chinese
+
+### 修复
+- 💬 **在线模式评论角标恢复**: 通过增强关系字段兼容性与解码健壮性，恢复了远程账户时间线中的评论数量角标显示。
+- 🔁 **评论关系方向容错**: 评论计数现已同时兼容双向关系，避免因服务器关系方向差异导致角标漏计。
+- 🧩 **API 关系字段兼容**: 同时支持 `relations` 与 `relationList` 两种返回结构，确保不同 Memos 部署下评论元数据稳定写入。
+
+---
+
 ## [2.5.0] - 2026-04-24
 
 ### Added

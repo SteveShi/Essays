@@ -36,6 +36,12 @@ class MemosAPIClient {
             return strategy
         }
     }
+
+    private var activeAccountID: String {
+        AccountManager.shared.activeAccount.map {
+            AppState.accountIdentifier(for: $0)
+        } ?? "local"
+    }
     
     func checkServerStatus() async throws -> String {
         return try await activeStrategy.checkServerStatus()
@@ -55,7 +61,13 @@ class MemosAPIClient {
     
     func fetchMemos() async throws -> [Memo] {
         let memos = try await activeStrategy.fetchMemos()
-        return LocalDatabase.shared.syncMemosSnapshot(memos)
+        let accountID = activeAccountID
+
+        for memo in memos {
+            memo.accountID = accountID
+        }
+
+        return LocalDatabase.shared.syncMemosSnapshot(memos, forAccountID: accountID)
     }
     
     func fetchTags() async throws -> [Tag] {
@@ -74,6 +86,7 @@ class MemosAPIClient {
             attachmentNames: attachmentNames,
             location: location.map { LocationDTO(placeholder: $0.placeholder, latitude: $0.latitude, longitude: $0.longitude) }
         )
+        memo.accountID = activeAccountID
         return LocalDatabase.shared.upsertMemos([memo]).first(where: { $0.name == memo.name }) ?? memo
     }
     
@@ -90,6 +103,7 @@ class MemosAPIClient {
             attachmentNames: attachmentNames,
             location: location.map { LocationDTO(placeholder: $0.placeholder, latitude: $0.latitude, longitude: $0.longitude) }
         )
+        memo.accountID = activeAccountID
         return LocalDatabase.shared.upsertMemos([memo]).first(where: { $0.name == memo.name }) ?? memo
     }
     
@@ -99,16 +113,19 @@ class MemosAPIClient {
     
     func togglePinMemo(pinned: Bool, memoName: String) async throws -> Memo {
         let memo = try await activeStrategy.togglePinMemo(pinned: pinned, memoName: memoName)
+        memo.accountID = activeAccountID
         return LocalDatabase.shared.upsertMemos([memo]).first(where: { $0.name == memo.name }) ?? memo
     }
     
     func archiveMemo(memoName: String) async throws -> Memo {
         let memo = try await activeStrategy.archiveMemo(memoName: memoName)
+        memo.accountID = activeAccountID
         return LocalDatabase.shared.upsertMemos([memo]).first(where: { $0.name == memo.name }) ?? memo
     }
     
     func unarchiveMemo(memoName: String) async throws -> Memo {
         let memo = try await activeStrategy.unarchiveMemo(memoName: memoName)
+        memo.accountID = activeAccountID
         return LocalDatabase.shared.upsertMemos([memo]).first(where: { $0.name == memo.name }) ?? memo
     }
     func uploadAttachment(data: Data, filename: String, mimeType: String) async throws -> Attachment {
@@ -122,6 +139,7 @@ class MemosAPIClient {
     
     func createComment(parentId: String, content: String, visibility: MemoVisibility = .private) async throws -> Memo {
         let memo = try await activeStrategy.createComment(parentId: parentId, content: content, visibility: visibility)
+        memo.accountID = activeAccountID
         return LocalDatabase.shared.upsertMemos([memo]).first(where: { $0.name == memo.name }) ?? memo
     }
 }

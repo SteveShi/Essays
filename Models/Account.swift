@@ -11,6 +11,8 @@ struct Account: Codable, Identifiable, Hashable, Sendable {
     let id: UUID
     var displayName: String
     var mode: AccountMode
+    /// 每个账户独立的数据目录（数据库文件会存储在该目录下）
+    var dataDirectoryPath: String? = nil
 
     // MARK: - 远程模式字段
     var serverURL: String?
@@ -25,12 +27,14 @@ struct Account: Codable, Identifiable, Hashable, Sendable {
 
     /// 创建本地模式账户
     static func localAccount(
-        displayName: String = String(localized: "Local Account", comment: "Default local account name")
+        displayName: String = String(localized: "Local Account", comment: "Default local account name"),
+        dataDirectoryPath: String? = nil
     ) -> Account {
         Account(
             id: UUID(),
             displayName: displayName,
-            mode: .local
+            mode: .local,
+            dataDirectoryPath: dataDirectoryPath
         )
     }
 
@@ -40,12 +44,14 @@ struct Account: Codable, Identifiable, Hashable, Sendable {
         serverURL: String,
         apiVersion: MemosAPIVersion = .v027,
         accessToken: String? = nil,
-        username: String? = nil
+        username: String? = nil,
+        dataDirectoryPath: String? = nil
     ) -> Account {
         Account(
             id: UUID(),
             displayName: displayName,
             mode: .remote,
+            dataDirectoryPath: dataDirectoryPath,
             serverURL: serverURL,
             accessToken: accessToken,
             username: username,

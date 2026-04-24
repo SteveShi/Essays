@@ -27,6 +27,7 @@ class SyncEngine {
     
     /// Trigger an outbox sync process
     func triggerSync() {
+        if AccountManager.shared.isLocalMode { return }
         guard !isSyncing else { return }
         guard NetworkMonitor.shared.isConnected else { return }
         
@@ -42,8 +43,12 @@ class SyncEngine {
     func refreshStats() {
         do {
             let tasks = try LocalDatabase.shared.fetchOutboxTasks()
-            self.pendingTasksCount = tasks.filter { $0.state == .pending || $0.state == .retry }.count
-            self.errorTasksCount = tasks.filter { $0.state == .error }.count
+            let activeAccountID = AccountManager.shared.activeAccount.map {
+                AppState.accountIdentifier(for: $0)
+            } ?? "local"
+            let scopedTasks = tasks.filter { taskBelongsToActiveAccount($0, activeAccountID: activeAccountID) }
+            self.pendingTasksCount = scopedTasks.filter { $0.state == .pending || $0.state == .retry }.count
+            self.errorTasksCount = scopedTasks.filter { $0.state == .error }.count
         } catch {
             print("Failed to fetch outbox stats: \(error)")
         }
@@ -58,6 +63,14 @@ class SyncEngine {
         }
         
         do {
+            if let account = AccountManager.shared.activeAccount, account.mode == .remote {
+                MemosAPIClient.shared.configure(
+                    serverURL: account.serverURL ?? "",
+                    accessToken: account.accessToken ?? "",
+                    apiVersion: account.apiVersion ?? .v027
+                )
+            }
+
             refreshStats()
             
             // 1. Process Outbox (Push local changes to server)
@@ -74,6 +87,9 @@ class SyncEngine {
     
     private func processOutbox() async throws {
         let tasks = try LocalDatabase.shared.fetchOutboxTasks()
+        let activeAccountID = AccountManager.shared.activeAccount.map {
+            AppState.accountIdentifier(for: $0)
+        } ?? "local"
         let now = Date()
         
         // Recover tasks that were left in `running` due to interruption/crash.
@@ -85,6 +101,9 @@ class SyncEngine {
         
         let runnableTasks = tasks
             .filter { task in
+                guard taskBelongsToActiveAccount(task, activeAccountID: activeAccountID) else {
+                    return false
+                }
                 switch task.state {
                 case .pending:
                     return true
@@ -122,6 +141,48 @@ class SyncEngine {
                 handleTaskError(task, error: error)
             }
         }
+    }
+
+    private func taskBelongsToActiveAccount(_ task: OutboxTask, activeAccountID: String) -> Bool {
+        if let payloadAccountID = extractAccountID(from: task) {
+            return normalizedAccountID(payloadAccountID) == normalizedAccountID(activeAccountID)
+        }
+
+        if let memoId = task.memoId {
+            if memoId.hasPrefix("local_") {
+                return activeAccountID == "local"
+            }
+            let descriptor = FetchDescriptor<Memo>(predicate: #Predicate<Memo> { $0.name == memoId })
+            if let memo = try? LocalDatabase.shared.context.fetch(descriptor).first,
+               let memoAccountID = memo.accountID
+            {
+                return normalizedAccountID(memoAccountID) == normalizedAccountID(activeAccountID)
+            }
+        }
+
+        // Fail closed: if we cannot prove task ownership, never sync it.
+        return false
+    }
+
+    private func extractAccountID(from task: OutboxTask) -> String? {
+        switch task.type {
+        case .createMemo:
+            return (try? JSONDecoder().decode(CreateMemoPayload.self, from: task.payload))?.accountID
+        case .updateMemo:
+            return (try? JSONDecoder().decode(UpdateMemoPayload.self, from: task.payload))?.accountID
+        case .togglePinMemo:
+            return (try? JSONDecoder().decode(TogglePinPayload.self, from: task.payload))?.accountID
+        case .archiveMemo, .unarchiveMemo, .deleteMemo:
+            return (try? JSONDecoder().decode(SimpleMemoPayload.self, from: task.payload))?.accountID
+        case .unknown:
+            return nil
+        }
+    }
+
+    private func normalizedAccountID(_ raw: String) -> String {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed == "local" { return "local" }
+        return AppState.normalizedRemoteAccountID(from: trimmed)
     }
     
     private func executeTask(_ task: OutboxTask) async throws {
@@ -200,38 +261,8 @@ class SyncEngine {
     
     private func pullLatestMemos() async {
         do {
-            // MemosAPIClient.shared.fetchMemos() already handles fetching both NORMAL and ARCHIVED
-            let allServerMemos = try await MemosAPIClient.shared.fetchMemos()
-            
-            // Merge into local DB
-            for serverMemo in allServerMemos {
-                let name = serverMemo.name
-                let descriptor = FetchDescriptor<Memo>(predicate: #Predicate<Memo> { $0.name == name })
-                if let existing = try? LocalDatabase.shared.context.fetch(descriptor).first {
-                    
-                    // CRITICAL: Check if we have pending local changes for this memo in the Outbox.
-                    // If we do, do NOT let server data overwrite our local 'optimistic' state.
-                    let taskDescriptor = FetchDescriptor<OutboxTask>(predicate: #Predicate<OutboxTask> { $0.memoId == name })
-                    let pendingTasks = (try? LocalDatabase.shared.context.fetch(taskDescriptor)) ?? []
-                    let hasPendingChanges = pendingTasks.contains { $0.state != .completed }
-                    
-                    if !hasPendingChanges {
-                        // Only update if we don't have un-synced local changes
-                        existing.content = serverMemo.content
-                        existing.state = serverMemo.state
-                        existing.pinned = serverMemo.pinned
-                        existing.visibility = serverMemo.visibility
-                        existing.updatedAt = serverMemo.updatedAt
-                    }
-                } else {
-                    // Insert new memo from server
-                    LocalDatabase.shared.context.insert(serverMemo)
-                }
-            }
-            
-            try? LocalDatabase.shared.context.save()
-            
-            // Re-trigger AppState refresh
+            // fetchMemos already does account-scoped snapshot sync into LocalDatabase.
+            _ = try await MemosAPIClient.shared.fetchMemos()
             NotificationCenter.default.post(name: .syncCompleted, object: nil)
             
         } catch {
@@ -256,4 +287,5 @@ class SyncEngine {
 
 extension Notification.Name {
     static let syncCompleted = Notification.Name("syncCompleted")
+    static let databaseContainerDidChange = Notification.Name("com.steveshi.essays.databaseContainerDidChange")
 }

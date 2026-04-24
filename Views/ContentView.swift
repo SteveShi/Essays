@@ -101,6 +101,10 @@ struct ContentView: View {
 
     @MainActor
     private func refreshMemos() async {
+        if appState.isLocalMode {
+            return
+        }
+
         appState.isLoading = true
         defer { appState.isLoading = false }
 

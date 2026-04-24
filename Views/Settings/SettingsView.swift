@@ -246,6 +246,13 @@ struct SettingsView: View {
                 if appState.isLocalMode {
                     LabeledContent(String(localized: "Mode", comment: "Mode label"),
                                    value: String(localized: "Offline First (Local DB)", comment: "Offline first mode value"))
+                    if let folderPath = AccountManager.shared.activeAccount?.dataDirectoryPath,
+                       !folderPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        LabeledContent(
+                            String(localized: "Data Folder", comment: "Data folder label in account settings"),
+                            value: folderPath
+                        )
+                    }
                 } else {
                     LabeledContent(String(localized: "Server", comment: "Server info label"), value: appState.serverURL)
                 }

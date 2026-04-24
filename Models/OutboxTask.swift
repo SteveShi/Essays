@@ -105,6 +105,29 @@ struct CreateMemoPayload: Codable {
     let locationPlaceholder: String?
     let locationLatitude: Double?
     let locationLongitude: Double?
+    let accountID: String?
+
+    init(
+        content: String,
+        visibility: String?,
+        pinned: Bool?,
+        tags: [String]?,
+        attachmentNames: [String]?,
+        locationPlaceholder: String?,
+        locationLatitude: Double?,
+        locationLongitude: Double?,
+        accountID: String? = nil
+    ) {
+        self.content = content
+        self.visibility = visibility
+        self.pinned = pinned
+        self.tags = tags
+        self.attachmentNames = attachmentNames
+        self.locationPlaceholder = locationPlaceholder
+        self.locationLatitude = locationLatitude
+        self.locationLongitude = locationLongitude
+        self.accountID = accountID
+    }
 }
 
 struct UpdateMemoPayload: Codable {
@@ -116,13 +139,49 @@ struct UpdateMemoPayload: Codable {
     let locationPlaceholder: String?
     let locationLatitude: Double?
     let locationLongitude: Double?
+    let accountID: String?
+
+    init(
+        content: String,
+        visibility: String?,
+        pinned: Bool?,
+        tags: [String]?,
+        attachmentNames: [String]?,
+        locationPlaceholder: String?,
+        locationLatitude: Double?,
+        locationLongitude: Double?,
+        accountID: String? = nil
+    ) {
+        self.content = content
+        self.visibility = visibility
+        self.pinned = pinned
+        self.tags = tags
+        self.attachmentNames = attachmentNames
+        self.locationPlaceholder = locationPlaceholder
+        self.locationLatitude = locationLatitude
+        self.locationLongitude = locationLongitude
+        self.accountID = accountID
+    }
 }
 
 struct TogglePinPayload: Codable {
     let pinned: Bool
     let contentSummary: String?
+    let accountID: String?
+
+    init(pinned: Bool, contentSummary: String?, accountID: String? = nil) {
+        self.pinned = pinned
+        self.contentSummary = contentSummary
+        self.accountID = accountID
+    }
 }
 
 struct SimpleMemoPayload: Codable {
     let contentSummary: String
+    let accountID: String?
+
+    init(contentSummary: String, accountID: String? = nil) {
+        self.contentSummary = contentSummary
+        self.accountID = accountID
+    }
 }
