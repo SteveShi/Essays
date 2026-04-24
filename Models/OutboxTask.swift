@@ -77,6 +77,7 @@ enum OutboxTaskState: Int, Codable {
     case running = 1
     case error = 2
     case retry = 3
+    case completed = 4
 }
 
 

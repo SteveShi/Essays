@@ -41,7 +41,7 @@ struct LocationDTO: Sendable {
 
 protocol MemosAPIProtocol: Sendable {
     func checkServerStatus() async throws -> String
-    func signIn(username: String, password: String) async throws -> User
+    func signIn(username: String, password: String) async throws -> (user: User, accessToken: String?)
     func getCurrentUser() async throws -> User
     func fetchMemos() async throws -> [Memo]
     func fetchTags() async throws -> [Tag]

@@ -122,24 +122,38 @@ final class LocalDatabase {
         }
     }
     
-    /// Syncs memos from server, removing local ones not present in the list.
-    /// Uses an optimized Global Deep Upsert strategy to avoid unique constraint violations.
+    /// Full snapshot sync from server.
+    /// Deletes local memos that are no longer in incoming list.
+    func syncMemosSnapshot(_ incomingMemos: [Memo]) -> [Memo] {
+        return syncMemos(incomingMemos, removeMissingLocalMemos: true)
+    }
+    
+    /// Incremental upsert.
+    /// Only creates/updates incoming memos and never deletes other local data.
+    func upsertMemos(_ incomingMemos: [Memo]) -> [Memo] {
+        return syncMemos(incomingMemos, removeMissingLocalMemos: false)
+    }
+    
+    /// Backward-compatible wrapper.
+    /// Keep old callsites working while avoiding accidental behavior change.
     func saveMemos(_ incomingMemos: [Memo]) -> [Memo] {
-        let incomingNames = Set(incomingMemos.map { $0.name })
-        let allLocalMemos = fetchAllMemos()
-        
-        // 1. Delete local memos that are no longer on server
-        for localMemo in allLocalMemos {
-            if !incomingNames.contains(localMemo.name) {
-                // If we delete a memo, its relations/attachments will be cascade-deleted.
+        return syncMemosSnapshot(incomingMemos)
+    }
+    
+    private func syncMemos(_ incomingMemos: [Memo], removeMissingLocalMemos: Bool) -> [Memo] {
+        if removeMissingLocalMemos {
+            let incomingNames = Set(incomingMemos.map { $0.name })
+            let allLocalMemos = fetchAllMemos()
+            
+            for localMemo in allLocalMemos where !incomingNames.contains(localMemo.name) {
                 context.delete(localMemo)
             }
+            
+            // Process deletes before rebuilding maps.
+            context.processPendingChanges()
         }
         
-        // 🚨 CRITICAL: Process deletions immediately so they don't haunt our subsequent lookups
-        context.processPendingChanges()
-        
-        // 2. Re-fetch current state to build our 'clean' maps
+        // Build maps from current state.
         let remainingMemos = fetchAllMemos()
         let allLocalAttachments = (try? context.fetch(FetchDescriptor<Attachment>())) ?? []
         let allLocalRelations = (try? context.fetch(FetchDescriptor<Relation>())) ?? []
@@ -184,7 +198,7 @@ final class LocalDatabase {
             }
         }
         
-        // 4. Finalize state
+        // Finalize state
         context.processPendingChanges()
         try? context.save()
         
@@ -303,14 +317,41 @@ final class LocalDatabase {
     
     @MainActor
     func replaceLocalMemoId(oldId: String, newMemo: Memo) {
-        let descriptor = FetchDescriptor<Memo>(predicate: #Predicate { $0.numericID == oldId })
+        // Find by name (since numericID might be empty for pending)
+        let descriptor = FetchDescriptor<Memo>(predicate: #Predicate { $0.name == oldId })
         if let existing = try? context.fetch(descriptor).first {
             existing.numericID = newMemo.numericID
             existing.name = newMemo.name
-            // We should sync other fields too if server modified them
             existing.createdAt = newMemo.createdAt
             existing.updatedAt = newMemo.updatedAt
+            existing.isPendingSync = false
+            for attachment in existing.attachments {
+                attachment.memoName = newMemo.name
+            }
+            
+            // Keep pending outbox tasks pointing to the new server ID.
+            let taskDescriptor = FetchDescriptor<OutboxTask>(predicate: #Predicate<OutboxTask> { $0.memoId == oldId })
+            if let relatedTasks = try? context.fetch(taskDescriptor) {
+                for task in relatedTasks where task.state != .completed {
+                    task.memoId = newMemo.name
+                }
+            }
+            
+            // Critical: Ensure the update is pushed to the persistent store immediately
             try? context.save()
+            
+            // Notify UI that an ID has changed
+            NotificationCenter.default.post(name: Notification.Name("syncCompleted"), object: nil)
         }
+    }
+    
+    @MainActor
+    func deletePendingOutboxTasks(forMemoId memoId: String) {
+        let descriptor = FetchDescriptor<OutboxTask>(predicate: #Predicate<OutboxTask> { $0.memoId == memoId })
+        guard let tasks = try? context.fetch(descriptor) else { return }
+        for task in tasks where task.state != .completed {
+            context.delete(task)
+        }
+        try? context.save()
     }
 }

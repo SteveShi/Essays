@@ -190,26 +190,44 @@ struct QuickInputWindowView: View {
         
         Task {
             do {
-                _ = try await MemosAPIClient.shared.createMemo(
+                let tempId = "local_\(UUID().uuidString)"
+                let newMemo = Memo(
+                    name: tempId,
+                    numericID: "",
                     content: trimmed,
                     visibility: visibility,
                     tags: tags,
-                    attachmentNames: [],
-                    location: currentLocation
+                    attachments: [],
+                    location: currentLocation,
+                    isPendingSync: true
                 )
+                LocalDatabase.shared.context.insert(newMemo)
+                
+                let payload = CreateMemoPayload(
+                    content: trimmed,
+                    visibility: visibility.rawValue,
+                    pinned: false,
+                    tags: tags,
+                    attachmentNames: [],
+                    locationPlaceholder: currentLocation?.placeholder,
+                    locationLatitude: currentLocation?.latitude,
+                    locationLongitude: currentLocation?.longitude
+                )
+                let payloadData = try JSONEncoder().encode(payload)
+                let task = OutboxTask(type: .createMemo, payload: payloadData, memoId: tempId)
+                LocalDatabase.shared.context.insert(task)
+                try LocalDatabase.shared.context.save()
+                SyncEngine.shared.triggerSync()
                 
                 await MainActor.run {
                     self.text = ""
                     self.currentLocation = nil
                     self.isSaving = false
                     QuickInputPanelManager.shared.togglePanel() // Hide
-                    
-                    // Fire refresh in background if possible
                 }
             } catch {
                 await MainActor.run {
                     self.isSaving = false
-                    // Ideally show error toast
                 }
             }
         }

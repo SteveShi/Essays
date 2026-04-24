@@ -42,12 +42,11 @@ class MemosAPIClient {
     }
     
     func signIn(username: String, password: String) async throws -> User {
-        let user = try await activeStrategy.signIn(username: username, password: password)
-        // Token logic might need adjusting depending on strategy behavior, but generally the strategy 
-        // doesn"t hold state for the singleton. We need to grab the token from the strategy if it changed it.
-        // Actually, signIn usually returns the User and sets the access token globally.
-        // For now, let"s rely on AccountManager to store the token and re-configure.
-        return user
+        let result = try await activeStrategy.signIn(username: username, password: password)
+        if let token = result.accessToken, !token.isEmpty {
+            self._accessToken = token
+        }
+        return result.user
     }
     
     func getCurrentUser() async throws -> User {
@@ -56,7 +55,7 @@ class MemosAPIClient {
     
     func fetchMemos() async throws -> [Memo] {
         let memos = try await activeStrategy.fetchMemos()
-        return LocalDatabase.shared.saveMemos(memos)
+        return LocalDatabase.shared.syncMemosSnapshot(memos)
     }
     
     func fetchTags() async throws -> [Tag] {
@@ -75,7 +74,7 @@ class MemosAPIClient {
             attachmentNames: attachmentNames,
             location: location.map { LocationDTO(placeholder: $0.placeholder, latitude: $0.latitude, longitude: $0.longitude) }
         )
-        return LocalDatabase.shared.saveMemos([memo]).first ?? memo
+        return LocalDatabase.shared.upsertMemos([memo]).first(where: { $0.name == memo.name }) ?? memo
     }
     
     func updateMemo(
@@ -91,7 +90,7 @@ class MemosAPIClient {
             attachmentNames: attachmentNames,
             location: location.map { LocationDTO(placeholder: $0.placeholder, latitude: $0.latitude, longitude: $0.longitude) }
         )
-        return LocalDatabase.shared.saveMemos([memo]).first ?? memo
+        return LocalDatabase.shared.upsertMemos([memo]).first(where: { $0.name == memo.name }) ?? memo
     }
     
     func deleteMemo(memoName: String) async throws {
@@ -100,17 +99,17 @@ class MemosAPIClient {
     
     func togglePinMemo(pinned: Bool, memoName: String) async throws -> Memo {
         let memo = try await activeStrategy.togglePinMemo(pinned: pinned, memoName: memoName)
-        return LocalDatabase.shared.saveMemos([memo]).first ?? memo
+        return LocalDatabase.shared.upsertMemos([memo]).first(where: { $0.name == memo.name }) ?? memo
     }
     
     func archiveMemo(memoName: String) async throws -> Memo {
         let memo = try await activeStrategy.archiveMemo(memoName: memoName)
-        return LocalDatabase.shared.saveMemos([memo]).first ?? memo
+        return LocalDatabase.shared.upsertMemos([memo]).first(where: { $0.name == memo.name }) ?? memo
     }
     
     func unarchiveMemo(memoName: String) async throws -> Memo {
         let memo = try await activeStrategy.unarchiveMemo(memoName: memoName)
-        return LocalDatabase.shared.saveMemos([memo]).first ?? memo
+        return LocalDatabase.shared.upsertMemos([memo]).first(where: { $0.name == memo.name }) ?? memo
     }
     func uploadAttachment(data: Data, filename: String, mimeType: String) async throws -> Attachment {
         return try await activeStrategy.uploadAttachment(data: data, filename: filename, mimeType: mimeType)
@@ -123,6 +122,6 @@ class MemosAPIClient {
     
     func createComment(parentId: String, content: String, visibility: MemoVisibility = .private) async throws -> Memo {
         let memo = try await activeStrategy.createComment(parentId: parentId, content: content, visibility: visibility)
-        return LocalDatabase.shared.saveMemos([memo]).first ?? memo
+        return LocalDatabase.shared.upsertMemos([memo]).first(where: { $0.name == memo.name }) ?? memo
     }
 }

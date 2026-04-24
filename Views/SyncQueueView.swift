@@ -2,50 +2,96 @@ import SwiftUI
 import SwiftData
 
 struct SyncQueueView: View {
-    @Environment(AppState.self) var appState
+    @Environment(AppState.self) var appState: AppState
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \OutboxTask.createdAt, order: .reverse) private var tasks: [OutboxTask]
     
     var body: some View {
-        Group {
-            if tasks.isEmpty {
-                emptyStateView
-            } else {
-                taskList
+        VStack(spacing: 0) {
+            header
+            
+            Divider()
+            
+            Group {
+                if tasks.isEmpty {
+                    VStack {
+                        emptyStateView
+                            .padding(.top, 40)
+                        Spacer()
+                    }
+                } else {
+                    taskList
+                }
             }
         }
         .background(LiquidGlassTheme.colors.background)
-        .navigationTitle(String(localized: "Sync Queue", comment: "Navigation title for sync queue"))
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    SyncEngine.shared.triggerSync()
-                } label: {
-                    Label(String(localized: "Sync Now", comment: "Trigger sync button"), systemImage: "arrow.clockwise.icloud")
-                }
-                .disabled(SyncEngine.shared.isSyncing)
+    }
+    
+    private var header: some View {
+        HStack {
+            Text(String(localized: "Sync Queue", comment: "Header title for sync queue popover"))
+                .font(LiquidGlassTheme.typography.headline)
+            
+            Spacer()
+            
+            Button {
+                SyncEngine.shared.triggerSync()
+            } label: {
+                Image(systemName: "arrow.clockwise.icloud")
             }
+            .disabled(SyncEngine.shared.isSyncing)
+            .help(String(localized: "Sync Now", comment: "Trigger sync button"))
         }
+        .padding()
     }
     
     private var taskList: some View {
         List {
-            Section {
-                let pendingCount = tasks.filter { $0.state == .pending || $0.state == .retry || $0.state == .running }.count
-                Text("\(pendingCount) tasks pending")
-                    .font(LiquidGlassTheme.typography.subheadline)
-                    .foregroundStyle(LiquidGlassTheme.colors.secondaryText)
-                    .listRowBackground(Color.clear)
+            let pendingTasks = tasks.filter { $0.state != .completed }
+            let completedTasks = tasks.filter { $0.state == .completed }
+            
+            if !pendingTasks.isEmpty {
+                Section(header: Text(String(localized: "Pending", comment: "Section header for pending tasks"))) {
+                    ForEach(pendingTasks) { task in
+                        taskRow(for: task)
+                            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                            .listRowBackground(Color.clear)
+                            .listRowSeparator(.hidden)
+                    }
+                }
             }
             
-            ForEach(tasks) { task in
-                taskRow(for: task)
-                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-                    .listRowBackground(Color.clear)
-                    .listRowSeparator(.hidden)
+            if !completedTasks.isEmpty {
+                Section(header: headerWithClearButton(completedTasks: completedTasks)) {
+                    ForEach(completedTasks) { task in
+                        taskRow(for: task)
+                            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                            .listRowBackground(Color.clear)
+                            .listRowSeparator(.hidden)
+                            .opacity(0.7)
+                    }
+                }
             }
         }
         .listStyle(.inset)
+    }
+    
+    private func headerWithClearButton(completedTasks: [OutboxTask]) -> some View {
+        HStack {
+            Text(String(localized: "Recently Completed", comment: "Section header for completed tasks"))
+            Spacer()
+            Button {
+                for task in completedTasks {
+                    modelContext.delete(task)
+                }
+                try? modelContext.save()
+            } label: {
+                Text(String(localized: "Clear", comment: "Clear history button"))
+                    .font(.caption)
+                    .foregroundStyle(LiquidGlassTheme.colors.accent)
+            }
+            .buttonStyle(.plain)
+        }
     }
     
     private func taskRow(for task: OutboxTask) -> some View {
@@ -60,7 +106,10 @@ struct SyncQueueView: View {
             }
             
             if let memoId = task.memoId {
-                Text("Memo: \(memoId)")
+                Text(
+                    String(
+                        localized: "Memo: \(memoId)",
+                        comment: "Label showing the memo resource identifier in sync queue"))
                     .font(LiquidGlassTheme.typography.caption)
                     .foregroundStyle(LiquidGlassTheme.colors.tertiaryText)
             }
@@ -102,6 +151,7 @@ struct SyncQueueView: View {
         case .running: (String(localized: "Syncing"), Color.blue, "arrow.triangle.2.circlepath")
         case .retry: (String(localized: "Retrying"), Color.orange, "arrow.clockwise")
         case .error: (String(localized: "Failed"), Color.red, "exclamationmark.circle")
+        case .completed: (String(localized: "Completed"), Color.green, "checkmark.circle.fill")
         }
         
         return Label(text, systemImage: icon)

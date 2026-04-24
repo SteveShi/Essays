@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct LoginView: View {
-    @Environment(AppState.self) var appState
+    @Environment(AppState.self) var appState: AppState
 
     enum ServiceMode: String, CaseIterable {
         case local
@@ -410,9 +410,21 @@ struct LoginView: View {
                 return
             }
 
-            MemosAPIClient.shared.configure(serverURL: normalizedServerURL, accessToken: "")
+            MemosAPIClient.shared.configure(
+                serverURL: normalizedServerURL,
+                accessToken: "",
+                apiVersion: selectedAPIVersion
+            )
             let user = try await MemosAPIClient.shared.signIn(username: normalizedUsername, password: password)
-            let token = MemosAPIClient.shared.accessToken
+            let token = MemosAPIClient.shared.accessToken.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !token.isEmpty else {
+                throw MemosAPIError.serverError(
+                    String(
+                        localized: "Sign-in succeeded but no access token was returned. Please use Access Token mode.",
+                        comment: "Error shown when credential sign-in response does not include a token"
+                    )
+                )
+            }
 
             // 保存远程账户
             let account = Account.remoteAccount(
@@ -438,7 +450,10 @@ struct LoginView: View {
             }
 
             MemosAPIClient.shared.configure(
-                serverURL: normalizedServerURL, accessToken: normalizedAccessToken)
+                serverURL: normalizedServerURL,
+                accessToken: normalizedAccessToken,
+                apiVersion: selectedAPIVersion
+            )
             let user = try await MemosAPIClient.shared.getCurrentUser()
 
             // 保存远程账户

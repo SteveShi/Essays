@@ -256,7 +256,7 @@ struct MemosAPIV026: MemosAPIProtocol {
         return profile.version
     }
     
-    func signIn(username: String, password: String) async throws -> User {
+    func signIn(username: String, password: String) async throws -> (user: User, accessToken: String?) {
         guard let url = buildURL("/api/v1/auth/signin") else {
             throw MemosAPIError.invalidURL
         }
@@ -293,14 +293,18 @@ struct MemosAPIV026: MemosAPIProtocol {
         
         let signInResponse = try makeDecoder().decode(SignInResponse.self, from: data)
         
-        if let token = signInResponse.accessToken {
-            
-        } else if let authHeader = httpResponse.value(forHTTPHeaderField: "Authorization") {
-            // Fallback for older versions if still needed, but prioritize body token
-            
-        }
-        
-        return signInResponse.user
+        let tokenFromHeader: String? = {
+            guard let authHeader = httpResponse.value(forHTTPHeaderField: "Authorization") else {
+                return nil
+            }
+            let prefix = "Bearer "
+            if authHeader.hasPrefix(prefix) {
+                return String(authHeader.dropFirst(prefix.count))
+            }
+            return authHeader.isEmpty ? nil : authHeader
+        }()
+
+        return (signInResponse.user, signInResponse.accessToken ?? tokenFromHeader)
     }
     
     
@@ -634,44 +638,7 @@ struct MemosAPIV026: MemosAPIProtocol {
         let request = buildRequest(url: url, method: "PATCH", body: try? JSONSerialization.data(withJSONObject: body))
         
         let data: MemoData = try await performRequest(request)
-        let visibility = MemoVisibility(rawValue: data.visibility) ?? .private
-        
-        let attachments = (data.attachments ?? []).map {
-            Attachment(
-                name: $0.name, filename: $0.filename, type: $0.type, size: $0.sizeInt,
-                content: $0.content, externalLink: $0.externalLink, createTime: $0.createTime)
-        }
-
-        let locationValue = data.location.map {
-            Location(placeholder: $0.placeholder, latitude: $0.latitude, longitude: $0.longitude)
-        }
-
-        let relations = (data.relations ?? []).map {
-            Relation(
-                memo: $0.memo.value, relatedMemo: $0.relatedMemo.value,
-                type: Relation.RelationType(rawValue: $0.type) ?? .unspecified)
-        }
-
-        let memoModel = Memo(
-            name: data.name,
-            numericID: data.extractedId,
-            content: data.content,
-            createdAt: data.createTime,
-            updatedAt: data.updateTime,
-            visibility: visibility,
-            pinned: data.pinned ?? false,
-            state: MemoState(rawValue: data.state ?? "NORMAL") ?? .normal,
-            tags: data.tags ?? [],
-            attachments: attachments,
-            location: locationValue,
-            relations: relations,
-        )
-        
-        if memoModel.tags.isEmpty {
-            memoModel.extractTagsFromContent()
-        }
-
-        return memoModel
+        return mapMemoDataToModel(data)
     }
 
     func unarchiveMemo(memoName: String) async throws -> Memo {
@@ -689,44 +656,7 @@ struct MemosAPIV026: MemosAPIProtocol {
         let request = buildRequest(url: url, method: "PATCH", body: try? JSONSerialization.data(withJSONObject: body))
 
         let data: MemoData = try await performRequest(request)
-        let visibility = MemoVisibility(rawValue: data.visibility) ?? .private
-
-        let attachments = (data.attachments ?? []).map {
-            Attachment(
-                name: $0.name, filename: $0.filename, type: $0.type, size: $0.sizeInt,
-                content: $0.content, externalLink: $0.externalLink, createTime: $0.createTime)
-        }
-
-        let locationValue = data.location.map {
-            Location(placeholder: $0.placeholder, latitude: $0.latitude, longitude: $0.longitude)
-        }
-
-        let relations = (data.relations ?? []).map {
-            Relation(
-                memo: $0.memo.value, relatedMemo: $0.relatedMemo.value,
-                type: Relation.RelationType(rawValue: $0.type) ?? .unspecified)
-        }
-
-        let memoModel = Memo(
-            name: data.name,
-            numericID: data.extractedId,
-            content: data.content,
-            createdAt: data.createTime,
-            updatedAt: data.updateTime,
-            visibility: visibility,
-            pinned: data.pinned ?? false,
-            state: MemoState(rawValue: data.state ?? "NORMAL") ?? .normal,
-            tags: data.tags ?? [],
-            attachments: attachments,
-            location: locationValue,
-            relations: relations,
-        )
-
-        if memoModel.tags.isEmpty {
-            memoModel.extractTagsFromContent()
-        }
-
-        return memoModel
+        return mapMemoDataToModel(data)
     }
     
     func togglePinMemo(pinned: Bool, memoName: String) async throws -> Memo {
@@ -745,44 +675,7 @@ struct MemosAPIV026: MemosAPIProtocol {
         let request = buildRequest(url: url, method: "PATCH", body: try? JSONSerialization.data(withJSONObject: body))
         
         let data: MemoData = try await performRequest(request)
-        let visibility = MemoVisibility(rawValue: data.visibility) ?? .private
-        
-        let attachments = (data.attachments ?? []).map {
-            Attachment(
-                name: $0.name, filename: $0.filename, type: $0.type, size: $0.sizeInt,
-                content: $0.content, externalLink: $0.externalLink, createTime: $0.createTime)
-        }
-
-        let locationValue = data.location.map {
-            Location(placeholder: $0.placeholder, latitude: $0.latitude, longitude: $0.longitude)
-        }
-
-        let relations = (data.relations ?? []).map {
-            Relation(
-                memo: $0.memo.value, relatedMemo: $0.relatedMemo.value,
-                type: Relation.RelationType(rawValue: $0.type) ?? .unspecified)
-        }
-
-        let memoModel = Memo(
-            name: data.name,
-            numericID: data.extractedId,
-            content: data.content,
-            createdAt: data.createTime,
-            updatedAt: data.updateTime,
-            visibility: visibility,
-            pinned: data.pinned ?? false,
-            state: MemoState(rawValue: data.state ?? "NORMAL") ?? .normal,
-            tags: data.tags ?? [],
-            attachments: attachments,
-            location: locationValue,
-            relations: relations,
-        )
-        
-        if memoModel.tags.isEmpty {
-            memoModel.extractTagsFromContent()
-        }
-
-        return memoModel
+        return mapMemoDataToModel(data)
     }
     
     func fetchTags() async throws -> [Tag] {
@@ -902,6 +795,7 @@ struct MemosAPIV026: MemosAPIProtocol {
             updatedAt: data.updateTime,
             visibility: memoVisibility,
             pinned: data.pinned ?? false,
+            state: MemoState(rawValue: data.state ?? "NORMAL") ?? .normal,
             tags: data.tags ?? [],
             attachments: localAttachments,
             location: locationValue,

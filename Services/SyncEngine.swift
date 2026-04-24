@@ -63,10 +63,9 @@ class SyncEngine {
             // 1. Process Outbox (Push local changes to server)
             try await processOutbox()
             
-            // 2. Optional: Pull changes from server if outbox is clear
-            if pendingTasksCount == 0 {
-                // await pullLatestMemos()
-            }
+            // 2. Pull changes from server (even if outbox had tasks, we want the latest state)
+            // This captures server-side archives, deletes, and new memos.
+            await pullLatestMemos()
             
         } catch {
             print("Sync failed: \(error)")
@@ -75,8 +74,30 @@ class SyncEngine {
     
     private func processOutbox() async throws {
         let tasks = try LocalDatabase.shared.fetchOutboxTasks()
-        let runnableTasks = tasks.filter { $0.state == .pending || $0.state == .retry }
-                               .sorted { $0.createdAt < $1.createdAt }
+        let now = Date()
+        
+        // Recover tasks that were left in `running` due to interruption/crash.
+        for task in tasks where task.state == .running {
+            task.state = .retry
+            task.retryAt = now
+        }
+        try? LocalDatabase.shared.context.save()
+        
+        let runnableTasks = tasks
+            .filter { task in
+                switch task.state {
+                case .pending:
+                    return true
+                case .retry:
+                    guard let retryAt = task.retryAt else { return true }
+                    return retryAt <= now
+                case .running:
+                    return true
+                default:
+                    return false
+                }
+            }
+            .sorted { $0.createdAt < $1.createdAt }
         
         guard !runnableTasks.isEmpty else { return }
         
@@ -90,8 +111,11 @@ class SyncEngine {
             
             do {
                 try await executeTask(task)
-                // Success: remove from outbox
-                LocalDatabase.shared.deleteOutboxTask(task)
+                // Success: mark as completed instead of deleting immediately
+                task.state = .completed
+                task.retryAt = nil
+                task.lastError = nil
+                try? LocalDatabase.shared.context.save()
             } catch let error as MemosAPIError {
                 handleTaskError(task, error: error)
             } catch {
@@ -104,6 +128,14 @@ class SyncEngine {
         switch task.type {
         case .createMemo:
             if let payload = try? JSONDecoder().decode(CreateMemoPayload.self, from: task.payload) {
+                if let localMemoId = task.memoId, localMemoId.hasPrefix("local_") {
+                    let localMemoDescriptor = FetchDescriptor<Memo>(predicate: #Predicate<Memo> { $0.name == localMemoId })
+                    let localMemoExists = ((try? LocalDatabase.shared.context.fetch(localMemoDescriptor)) ?? []).isEmpty == false
+                    if !localMemoExists {
+                        return
+                    }
+                }
+                
                 var loc: Location? = nil
                 if let lat = payload.locationLatitude, let lon = payload.locationLongitude {
                     loc = Location(placeholder: payload.locationPlaceholder ?? "", latitude: lat, longitude: lon)
@@ -140,6 +172,9 @@ class SyncEngine {
             
         case .deleteMemo:
             if let memoId = task.memoId {
+                if memoId.hasPrefix("local_") {
+                    return
+                }
                 try await MemosAPIClient.shared.deleteMemo(memoName: memoId)
             }
             
@@ -163,6 +198,47 @@ class SyncEngine {
         }
     }
     
+    private func pullLatestMemos() async {
+        do {
+            // MemosAPIClient.shared.fetchMemos() already handles fetching both NORMAL and ARCHIVED
+            let allServerMemos = try await MemosAPIClient.shared.fetchMemos()
+            
+            // Merge into local DB
+            for serverMemo in allServerMemos {
+                let name = serverMemo.name
+                let descriptor = FetchDescriptor<Memo>(predicate: #Predicate<Memo> { $0.name == name })
+                if let existing = try? LocalDatabase.shared.context.fetch(descriptor).first {
+                    
+                    // CRITICAL: Check if we have pending local changes for this memo in the Outbox.
+                    // If we do, do NOT let server data overwrite our local 'optimistic' state.
+                    let taskDescriptor = FetchDescriptor<OutboxTask>(predicate: #Predicate<OutboxTask> { $0.memoId == name })
+                    let pendingTasks = (try? LocalDatabase.shared.context.fetch(taskDescriptor)) ?? []
+                    let hasPendingChanges = pendingTasks.contains { $0.state != .completed }
+                    
+                    if !hasPendingChanges {
+                        // Only update if we don't have un-synced local changes
+                        existing.content = serverMemo.content
+                        existing.state = serverMemo.state
+                        existing.pinned = serverMemo.pinned
+                        existing.visibility = serverMemo.visibility
+                        existing.updatedAt = serverMemo.updatedAt
+                    }
+                } else {
+                    // Insert new memo from server
+                    LocalDatabase.shared.context.insert(serverMemo)
+                }
+            }
+            
+            try? LocalDatabase.shared.context.save()
+            
+            // Re-trigger AppState refresh
+            NotificationCenter.default.post(name: .syncCompleted, object: nil)
+            
+        } catch {
+            print("Failed to pull memos: \(error)")
+        }
+    }
+
     private func handleTaskError(_ task: OutboxTask, error: Error) {
         task.attempts += 1
         task.lastError = error.localizedDescription
@@ -174,7 +250,10 @@ class SyncEngine {
         } else {
             task.state = .error
         }
-        
         try? LocalDatabase.shared.context.save()
     }
+}
+
+extension Notification.Name {
+    static let syncCompleted = Notification.Name("syncCompleted")
 }

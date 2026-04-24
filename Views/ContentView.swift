@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct ContentView: View {
-    @Environment(AppState.self) var appState
+    @Environment(AppState.self) var appState: AppState
     @State private var showComposeSheet = false
     @AppStorage("theme") private var theme = "system"
 
@@ -24,6 +24,9 @@ struct ContentView: View {
         .preferredColorScheme(preferredColorScheme)
         .onReceive(NotificationCenter.default.publisher(for: .createNewMemo)) { _ in
             showComposeSheet = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .syncCompleted)) { _ in
+            appState.loadLocalCachedMemos()
         }
         .environment(appState)
         .sheet(isPresented: $showComposeSheet) {
@@ -63,11 +66,7 @@ struct ContentView: View {
                 .navigationTitle(String(localized: "Timeline", comment: "Navigation title for the main list view"))
                 #endif
         } detail: {
-            if appState.sidebarSelection == .outbox {
-                SyncQueueView()
-            } else {
-                detailColumn
-            }
+            detailColumn
         }
         .navigationSplitViewStyle(.balanced)
         .onAppear {
@@ -110,14 +109,11 @@ struct ContentView: View {
 
             MemosAPIClient.shared.configure(
                 serverURL: appState.serverURL,
-                accessToken: appState.accessToken
+                accessToken: appState.accessToken,
+                apiVersion: appState.activeAccount?.apiVersion ?? .v027
             )
 
-            let fetchedMemos = try await MemosAPIClient.shared.fetchMemos()
-            let fetchedTags = try await MemosAPIClient.shared.fetchTags()
-
-            appState.memos = fetchedMemos
-            appState.tags = fetchedTags
+            _ = try await MemosAPIClient.shared.fetchMemos()
         } catch {
             appState.errorMessage = error.localizedDescription
         }

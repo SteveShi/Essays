@@ -58,60 +58,50 @@ class AppState {
         return "\(version) (\(build))"
     }
 
+    // App Data - Reactive Selection State
+    var searchText: String = "" {
+        didSet { scheduleFilteredUpdate() }
+    }
+    var selectedTag: String? {
+        didSet { scheduleFilteredUpdate() }
+    }
+    var isGalleryMode: Bool = false {
+        didSet { scheduleFilteredUpdate() }
+    }
+    var isLoading: Bool = false
+    var errorMessage: String?
+    var isLoggedIn: Bool = false
+    var currentUser: User?
+    var user: User? { currentUser }
+    
+    var scrollToMemoID: String?
+    var selectedMemo: Memo?
+    var selectedMemoForDetail: Memo?
+
+    // Data source and derived states
     var memos: [Memo] = [] {
         didSet {
             updateRawDataDerivedStates()
-            updateFilteredMemosState()
-        }
-    }
-    var tags: [Tag] = []
-    var isLoading: Bool = false
-    var errorMessage: String?
-    var selectedMemo: Memo?
-    var searchText: String = "" {
-        didSet { 
             scheduleFilteredUpdate()
-            selectedMemoForDetail = nil
-            isGalleryMode = false
         }
     }
-    private var updateTask: Task<Void, Error>?
-    var selectedTag: String? {
-        didSet { 
-            updateFilteredMemosState()
-            selectedMemoForDetail = nil
-            isGalleryMode = false
-        }
-    }
-    var isGalleryMode: Bool = false {
-        didSet {
-            updateFilteredMemosState()
-        }
-    }
-    var showArchived: Bool = false
-    var isLoggedIn: Bool = false
-    var currentUser: User?
-    var user: User? { currentUser }  // 为向后兼容保留
+    var filteredMemos: [Memo] = []
+    var pinnedMemosList: [Memo] = []
+    var timelineGroups: [MemoGroup] = []
+    var memosByName: [String: Memo] = [:]
+    var tags: [Tag] = []
 
-    // Pre-computed filtered and grouped results
-    private(set) var memosByName: [String: Memo] = [:]
-    private(set) var filteredMemos: [Memo] = []
-    private(set) var pinnedMemosList: [Memo] = []
-    private(set) var timelineGroups: [MemoGroup] = []
-    private(set) var memoDateComponents: Set<DateComponents> = []
-    private(set) var todayMemosCount: Int = 0
-    private(set) var recentWeekMemosCount: Int = 0
-    private(set) var publicMemosCount: Int = 0
-    private(set) var protectedMemosCount: Int = 0
-    private(set) var privateMemosCount: Int = 0
-    private(set) var archivedMemosCount: Int = 0
-    private(set) var imageAttachmentMemosCount: Int = 0
-    
-    // For navigation jumping
-    var scrollToMemoID: String?
-    
-    // For detail view
-    var selectedMemoForDetail: Memo?
+    var memoDateComponents: Set<DateComponents> = []
+    var todayMemosCount: Int = 0
+    var recentWeekMemosCount: Int = 0
+    var publicMemosCount: Int = 0
+    var protectedMemosCount: Int = 0
+    var privateMemosCount: Int = 0
+    var archivedMemosCount: Int = 0
+    var imageAttachmentMemosCount: Int = 0
+
+    @ObservationIgnored
+    private var updateTask: Task<Void, Never>?
     
     // For NavigationSplitView column control (iPhone navigation)
     var columnVisibility: NavigationSplitViewVisibility = .all
@@ -121,9 +111,10 @@ class AppState {
             updateFiltersFromSelection()
         }
     }
-    
+
     private func updateFiltersFromSelection() {
         guard let selection = sidebarSelection else { return }
+        isGalleryMode = false
         switch selection {
         case .all:
             searchText = ""
@@ -171,11 +162,10 @@ class AppState {
     
     init() {
         loadSavedCredentials()
-        loadLocalCachedMemos()  // 优先加载本地缓存
+        loadLocalCachedMemos()
         setupConnectivityActions()
         checkServerReachability()
         startServerStatusTimer()
-        updateFilteredMemosState()  // Initial computation
     }
 
     private func setupConnectivityActions() {
@@ -191,9 +181,13 @@ class AppState {
     }
 
     private func startServerStatusTimer() {
-        Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
+        // Check connectivity and trigger background sync every 5 minutes
+        Timer.scheduledTimer(withTimeInterval: 300, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 self?.checkServerReachability()
+                if self?.isServerReachable == true {
+                    SyncEngine.shared.triggerSync()
+                }
             }
         }
     }
@@ -215,7 +209,11 @@ class AppState {
         
         Task {
             do {
-                MemosAPIClient.shared.configure(serverURL: serverURL, accessToken: accessToken)
+                MemosAPIClient.shared.configure(
+                    serverURL: serverURL,
+                    accessToken: accessToken,
+                    apiVersion: activeAccount?.apiVersion ?? .v027
+                )
                 _ = try await MemosAPIClient.shared.checkServerStatus()
                 await MainActor.run {
                     self.isServerReachable = true
@@ -253,14 +251,16 @@ class AppState {
         }
     }
 
-    private func loadLocalCachedMemos() {
-        let cached = LocalDatabase.shared.fetchAllMemos()
-        if !cached.isEmpty {
-            for memo in cached {
-                memo.extractTagsFromContent()
-            }
-            self.memos = cached
+    @MainActor
+    func loadLocalCachedMemos() {
+        // Fetch fresh from context every time, bypassing any stale AppState array cache
+        LocalDatabase.shared.context.processPendingChanges()
+        let fetched = LocalDatabase.shared.fetchAllMemos()
+        for memo in fetched {
+            memo.extractTagsFromContent()
         }
+        self.memos = fetched
+        updateFilteredMemosState()
     }
 
     private func syncPendingMemos() {
@@ -447,30 +447,42 @@ class AppState {
     
     @MainActor
     func archiveMemo(_ memo: Memo) async {
+        // Optimistic UI update: change state immediately
+        let previousState = memo.state
+        memo.state = .archived
+        updateFilteredMemosState()
+        
         do {
-            _ = try await MemosAPIClient.shared.archiveMemo(memoName: memo.name)
-            // Update local state
-            if let index = memos.firstIndex(where: { $0.id == memo.id }) {
-                memos[index].state = .archived
-                // SwiftData auto-saves via mainContext if configured, 
-                // but we trigger an update for observation
-                updateFilteredMemosState()
-            }
+            // Enqueue outbox task only; SyncEngine will execute network request.
+            let task = OutboxTask(type: .archiveMemo, payload: Data(), memoId: memo.name)
+            LocalDatabase.shared.context.insert(task)
+            try LocalDatabase.shared.context.save()
+            SyncEngine.shared.triggerSync()
         } catch {
+            // Revert on failure
+            memo.state = previousState
+            updateFilteredMemosState()
             self.errorMessage = error.localizedDescription
         }
     }
     
     @MainActor
     func unarchiveMemo(_ memo: Memo) async {
+        // Optimistic UI update: change state immediately
+        let previousState = memo.state
+        memo.state = .normal
+        updateFilteredMemosState()
+        
         do {
-            _ = try await MemosAPIClient.shared.unarchiveMemo(memoName: memo.name)
-            // Update local state
-            if let index = memos.firstIndex(where: { $0.id == memo.id }) {
-                memos[index].state = .normal
-                updateFilteredMemosState()
-            }
+            // Enqueue outbox task only; SyncEngine will execute network request.
+            let task = OutboxTask(type: .unarchiveMemo, payload: Data(), memoId: memo.name)
+            LocalDatabase.shared.context.insert(task)
+            try LocalDatabase.shared.context.save()
+            SyncEngine.shared.triggerSync()
         } catch {
+            // Revert on failure
+            memo.state = previousState
+            updateFilteredMemosState()
             self.errorMessage = error.localizedDescription
         }
     }

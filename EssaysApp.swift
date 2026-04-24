@@ -30,6 +30,7 @@ struct EssaysApp: App {
         WindowGroup {
             ContentView()
                 .environment(appState)
+                .modelContainer(LocalDatabase.shared.container)
                 .preferredColorScheme(preferredColorScheme)
                 #if os(macOS)
                 .frame(minWidth: 900, minHeight: 600)
@@ -82,6 +83,7 @@ struct EssaysApp: App {
         Settings {
             SettingsView()
                 .environment(appState)
+                .modelContainer(LocalDatabase.shared.container)
                 .preferredColorScheme(preferredColorScheme)
         }
         #endif

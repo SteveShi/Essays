@@ -5,7 +5,7 @@ import QuickLook
 
 struct MemoDetailView: View {
     let memo: Memo
-    @Environment(AppState.self) var appState
+    @Environment(AppState.self) var appState: AppState
     @State private var commentText = ""
     @State private var isSubmitting = false
     @Environment(\.colorScheme) var colorScheme
@@ -59,53 +59,62 @@ struct MemoDetailView: View {
     @State private var showMapPopover = false
 
     private var originalMemoCard: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Text(memo.createdAt, style: .date)
-                    .font(LiquidGlassTheme.typography.caption)
-                    .foregroundColor(LiquidGlassTheme.colors.secondaryText)
-                Text(memo.createdAt, style: .time)
-                    .font(LiquidGlassTheme.typography.caption)
-                    .foregroundColor(LiquidGlassTheme.colors.tertiaryText)
-                
-                Spacer()
-                
-                if memo.pinned {
-                    Image(systemName: "pin.fill")
-                        .font(.system(size: 12))
-                        .foregroundColor(LiquidGlassTheme.colors.accent)
-                }
-            }
-
-            MemoMarkdownContent(content: memo.contentWithoutTags)
-                .textSelection(.enabled)
-            
-            if !memo.tags.isEmpty {
-                FlowLayout(spacing: 6) {
-                    ForEach(memo.tags, id: \.self) { tag in
-                        Text("#\(tag)")
+        Group {
+            if (memo.modelContext != nil && !memo.isDeleted) || memo.isPendingSync {
+                VStack(alignment: .leading, spacing: 16) {
+                    HStack {
+                        Text(memo.createdAt, style: .date)
                             .font(LiquidGlassTheme.typography.caption)
-                            .foregroundColor(LiquidGlassTheme.colors.accent)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(
-                                Capsule()
-                                    .fill(LiquidGlassTheme.colors.accent.opacity(0.1))
-                            )
+                            .foregroundColor(LiquidGlassTheme.colors.secondaryText)
+                        Text(memo.createdAt, style: .time)
+                            .font(LiquidGlassTheme.typography.caption)
+                            .foregroundColor(LiquidGlassTheme.colors.tertiaryText)
+                        
+                        Spacer()
+                        
+                        if memo.pinned {
+                            Image(systemName: "pin.fill")
+                                .font(.system(size: 12))
+                                .foregroundColor(LiquidGlassTheme.colors.accent)
+                        }
+                    }
+
+                    MemoMarkdownContent(content: memo.contentWithoutTags)
+                        .textSelection(.enabled)
+                    
+                    let tags = memo.tags
+                    if !tags.isEmpty {
+                        FlowLayout(spacing: 6) {
+                            ForEach(tags, id: \.self) { tag in
+                                Text("#\(tag)")
+                                    .font(LiquidGlassTheme.typography.caption)
+                                    .foregroundColor(LiquidGlassTheme.colors.accent)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(
+                                        Capsule()
+                                            .fill(LiquidGlassTheme.colors.accent.opacity(0.1))
+                                    )
+                            }
+                        }
+                    }
+
+                    let attachments = memo.attachments
+                    if !attachments.isEmpty {
+                        attachmentsView(for: memo)
+                    }
+
+                    if let location = memo.location {
+                        locationView(location)
                     }
                 }
-            }
-
-            if !memo.attachments.isEmpty {
-                attachmentsView(for: memo)
-            }
-
-            if let location = memo.location {
-                locationView(location)
+                .padding(20)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                ProgressView()
+                    .frame(maxWidth: .infinity, minHeight: 200)
             }
         }
-        .padding(20)
-        .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 18)
                 .fill(LiquidGlassTheme.colors.secondaryBackground.opacity(0.4))
@@ -187,7 +196,7 @@ struct MemoDetailView: View {
 
 struct CommentCard: View {
     let memo: Memo
-    @Environment(AppState.self) var appState
+    @Environment(AppState.self) var appState: AppState
     @Environment(\.colorScheme) var colorScheme
 
     var body: some View {

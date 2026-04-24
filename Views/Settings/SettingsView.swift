@@ -4,7 +4,7 @@ import KeyboardShortcuts
 #endif
 
 struct SettingsView: View {
-    @Environment(AppState.self) var appState
+    @Environment(AppState.self) var appState: AppState
     @Environment(\.dismiss) private var dismiss
     
     @AppStorage("editorFontSize") private var editorFontSize: Double = 14
@@ -114,7 +114,10 @@ struct SettingsView: View {
                     HStack {
                         Text(String(localized: "Font Size", comment: "Font size slider label"))
                         Spacer()
-                        Text("\(Int(editorFontSize)) pt")
+                        Text(
+                            String(
+                                localized: "\(Int(editorFontSize)) pt",
+                                comment: "Font size value with points unit"))
                             .foregroundColor(LiquidGlassTheme.colors.secondaryText)
                     }
                 }
@@ -249,13 +252,11 @@ struct SettingsView: View {
                 
                 LabeledContent(
                     String(localized: "Total Memos", comment: "Memos count label"),
-                    value: String(
-                        localized: "\(appState.memos.count)", comment: "Total memos count value"))
+                    value: "--")
                 
                 LabeledContent(
                     String(localized: "Total Tags", comment: "Tags count label"),
-                    value: String(
-                        localized: "\(appState.tags.count)", comment: "Total tags count value"))
+                    value: "--")
             } header: {
                 Text(String(localized: "Statistics", comment: "Statistics section header"))
                     .font(LiquidGlassTheme.typography.headline)

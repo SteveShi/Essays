@@ -3,13 +3,15 @@ import CoreLocation
 import QuickLook
 import MapKit
 import UniformTypeIdentifiers
+import SwiftData
 #if os(macOS)
 import AppKit
 #endif
 
 struct MemoListView: View {
-    @Environment(AppState.self) var appState
+    @Environment(AppState.self) var appState: AppState
     @State private var showComposeSheet = false
+    @State private var showSyncQueue = false
     @State private var memoToEdit: Memo?
     @State private var showAIAssistant = false
 
@@ -24,7 +26,88 @@ struct MemoListView: View {
     @State private var isQuickUploading = false
     @AppStorage("enableAIFeatures") private var enableAIFeatures = true
     
+    @Query(sort: \Memo.createdAt, order: .reverse) private var allMemos: [Memo]
+    
     private var locationManager = LocationManager.shared
+    
+    private func computeFilteredMemos() -> [Memo] {
+        var filtered = allMemos
+        
+        // 1. Sidebar Selection / State Filter
+        if let selection = appState.sidebarSelection {
+            switch selection {
+            case .all:
+                filtered = filtered.filter { $0.state == .normal }
+            case .today:
+                let today = Calendar.current.startOfDay(for: Date())
+                filtered = filtered.filter { $0.state == .normal && $0.createdAt >= today }
+            case .past7Days:
+                let weekAgo = Calendar.current.date(byAdding: .day, value: -7, to: Date()) ?? Date()
+                filtered = filtered.filter { $0.state == .normal && $0.createdAt >= weekAgo }
+            case .archived:
+                filtered = filtered.filter { $0.state == .archived }
+            case .attachments:
+                filtered = filtered.filter { $0.state == .normal && !$0.attachments.isEmpty }
+            case .publicMemos:
+                filtered = filtered.filter { $0.state == .normal && $0.visibility == .public }
+            case .protectedMemos:
+                filtered = filtered.filter { $0.state == .normal && $0.visibility == .protected }
+            case .privateMemos:
+                filtered = filtered.filter { $0.state == .normal && $0.visibility == .private }
+            case .tag(let tagName):
+                filtered = filtered.filter { memo in
+                    memo.state == .normal && memo.tags.contains(tagName)
+                }
+            case .date(let date):
+                let start = Calendar.current.startOfDay(for: date)
+                let end = Calendar.current.date(byAdding: .day, value: 1, to: start)!
+                filtered = filtered.filter { $0.createdAt >= start && $0.createdAt < end }
+            case .outbox:
+                filtered = filtered.filter { $0.state == .normal }
+            }
+        }
+        
+        // 2. Search Text Filter
+        let search = appState.searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !search.isEmpty {
+            let keywordTerms = search
+                .split(whereSeparator: \.isWhitespace)
+                .map(String.init)
+                .map { $0.lowercased() }
+                .filter { term in
+                    !term.hasPrefix("is:")
+                        && !term.hasPrefix("visibility:")
+                        && !term.hasPrefix("pinned:")
+                        && !term.hasPrefix("created:")
+                }
+            
+            if !keywordTerms.isEmpty {
+                filtered = filtered.filter { memo in
+                    keywordTerms.allSatisfy { term in
+                        memo.content.localizedCaseInsensitiveContains(term)
+                            || memo.tags.contains { $0.localizedCaseInsensitiveContains(term) }
+                    }
+                }
+            }
+        }
+        
+        return filtered
+    }
+    
+    private struct MemoDayGroup: Identifiable {
+        let id = UUID()
+        let date: Date
+        let memos: [Memo]
+    }
+    
+    private func groupMemosByDate(_ memos: [Memo]) -> [MemoDayGroup] {
+        let calendar = Calendar.current
+        let grouped = Dictionary(grouping: memos) { memo in
+            calendar.startOfDay(for: memo.createdAt)
+        }
+        return grouped.map { MemoDayGroup(date: $0.key, memos: $0.value) }
+            .sorted { $0.date > $1.date }
+    }
     @State private var hoveredMemoId: String? = nil
     @Environment(\.colorScheme) private var colorScheme
     @State private var showQuickFilePicker = false
@@ -37,7 +120,7 @@ struct MemoListView: View {
         return false
         #endif
     }
-
+    
     var body: some View {
         VStack(spacing: 0) {
             if appState.isGalleryMode {
@@ -67,16 +150,26 @@ struct MemoListView: View {
                 ScrollViewReader { proxy in
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 24) {
-                            if appState.filteredMemos.isEmpty {
+                            let filtered = computeFilteredMemos()
+                            
+                            if filtered.isEmpty {
                                 emptyStateView
                                     .padding(.top, 40)
                             } else {
-                                if !appState.pinnedMemosList.isEmpty {
-                                    pinnedSection
+                                let showingArchivedOnly = appState.sidebarSelection == .archived
+                                let pinned = showingArchivedOnly
+                                    ? []
+                                    : filtered.filter { $0.pinned && $0.state == .normal }
+                                let unpinned = showingArchivedOnly
+                                    ? filtered.filter { $0.state == .archived }
+                                    : filtered.filter { !$0.pinned && $0.state == .normal }
+                                
+                                if !pinned.isEmpty {
+                                    pinnedSection(pinned)
                                 }
 
-                                if !appState.timelineGroups.isEmpty {
-                                    memosSection
+                                if !unpinned.isEmpty {
+                                    memosSection(unpinned)
                                 }
                             }
                         }
@@ -112,7 +205,7 @@ struct MemoListView: View {
         .navigationTitle(String(localized: "Timeline", comment: "Navigation title for the main list view"))
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                HStack(spacing: 8) {
+                HStack(spacing: 12) {
                     if enableAIFeatures {
                         Button {
                             showAIAssistant.toggle()
@@ -149,6 +242,18 @@ struct MemoListView: View {
                                 .frame(width: 200, height: 100)
                             }
                         }
+                    }
+                    
+                    Button {
+                        showSyncQueue.toggle()
+                    } label: {
+                        Image(systemName: SyncEngine.shared.isSyncing ? "arrow.triangle.2.circlepath.icloud.fill" : "icloud.and.arrow.up")
+                            .symbolEffect(.bounce, value: SyncEngine.shared.isSyncing)
+                    }
+                    .help(String(localized: "Sync Queue", comment: "Help text for sync queue button"))
+                    .popover(isPresented: $showSyncQueue, arrowEdge: .bottom) {
+                        SyncQueueView()
+                            .frame(width: 350, height: 450)
                     }
 
                     Button {
@@ -420,12 +525,12 @@ struct MemoListView: View {
         .frame(maxWidth: .infinity, minHeight: 320)
     }
 
-    private var pinnedSection: some View {
+    private func pinnedSection(_ pinned: [Memo]) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             SectionHeader(title: String(localized: "Pinned Inspiration", comment: "Section header for pinned memos"))
 
             VStack(spacing: 12) {
-                ForEach(appState.pinnedMemosList) { memo in
+                ForEach(pinned) { memo in
                     NavigationLink(value: memo) {
                         MemoCard(memo: memo, onEdit: {
                             memoToEdit = memo
@@ -438,13 +543,12 @@ struct MemoListView: View {
         }
     }
 
-    private var memosSection: some View {
+    private func memosSection(_ memos: [Memo]) -> some View {
         VStack(alignment: .leading, spacing: 14) {
-            if !appState.pinnedMemosList.isEmpty {
-                SectionHeader(title: String(localized: "Timeline", comment: "Section header for the timeline of memos"))
-            }
+            SectionHeader(title: String(localized: "Timeline", comment: "Section header for the timeline of memos"))
 
-            ForEach(appState.timelineGroups) { group in
+            let groups = groupMemosByDate(memos)
+            ForEach(groups) { group in
                 VStack(alignment: .leading, spacing: 10) {
                     DaySectionHeader(date: group.date)
 
@@ -608,14 +712,13 @@ struct MemoListView: View {
         do {
             MemosAPIClient.shared.configure(
                 serverURL: appState.serverURL,
-                accessToken: appState.accessToken
+                accessToken: appState.accessToken,
+                apiVersion: appState.activeAccount?.apiVersion ?? .v027
             )
             
-            let fetchedMemos = try await MemosAPIClient.shared.fetchMemos()
-            let fetchedTags = try await MemosAPIClient.shared.fetchTags()
-            
-            appState.memos = fetchedMemos
-            appState.tags = fetchedTags
+            _ = try await MemosAPIClient.shared.fetchMemos()
+            // In SwiftData, we don't manually assign to an array. 
+            // We just let the Query refresh.
         } catch {
             appState.errorMessage = error.localizedDescription
         }
@@ -661,7 +764,7 @@ private struct DaySectionHeader: View {
 }
 
 struct MemoCard: View {
-    @Environment(AppState.self) var appState
+    @Environment(AppState.self) var appState: AppState
     @Environment(\.colorScheme) private var colorScheme
     let memo: Memo
     var onEdit: () -> Void
@@ -703,24 +806,31 @@ struct MemoCard: View {
             headerView
 
             if !memo.content.isEmpty {
+                // Truncated content safe access
                 MemoMarkdownContent(content: memo.truncatedContent)
                     .textSelection(.enabled)
             }
 
-            if !memo.tags.isEmpty {
-                tagsView
-            }
+            // Defensive access to collections
+            if memo.modelContext != nil && !memo.isDeleted {
+                let tags = memo.tags
+                if !tags.isEmpty {
+                    tagsView
+                }
 
-            if !memo.attachments.isEmpty {
-                attachmentsView
-            }
+                let attachments = memo.attachments
+                if !attachments.isEmpty {
+                    attachmentsView
+                }
 
-            if let location = memo.location {
-                locationView(location)
-            }
+                if let location = memo.location {
+                    locationView(location)
+                }
 
-            if !memo.relations.isEmpty {
-                relationsView
+                let relations = memo.relations
+                if !relations.isEmpty {
+                    relationsView
+                }
             }
         }
         .padding(16)
@@ -1150,12 +1260,19 @@ struct MemoCard: View {
 
     private func deleteMemo() {
         do {
+            if memo.name.hasPrefix("local_") {
+                // Local-only memo: cancel queued tasks and remove it locally.
+                LocalDatabase.shared.deletePendingOutboxTasks(forMemoId: memo.name)
+                LocalDatabase.shared.deleteMemo(memo)
+                try LocalDatabase.shared.context.save()
+                return
+            }
+            
             // 1. Enqueue Outbox FIRST (while we still have memo name)
             let task = OutboxTask(type: .deleteMemo, payload: Data(), memoId: memo.name)
             LocalDatabase.shared.context.insert(task)
             
             // 2. Delete locally
-            appState.memos.removeAll { $0.name == memo.name }
             LocalDatabase.shared.deleteMemo(memo)
             
             try LocalDatabase.shared.context.save()

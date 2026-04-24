@@ -28,7 +28,11 @@ struct MemoIntent: AppIntent {
             throw MemoIntentError.missingCredentials
         }
         
-        MemosAPIClient.shared.configure(serverURL: serverURL, accessToken: accessToken)
+        MemosAPIClient.shared.configure(
+            serverURL: serverURL,
+            accessToken: accessToken,
+            apiVersion: AccountManager.shared.activeAccount?.apiVersion ?? .v027
+        )
         
         if let tags = tags, !tags.isEmpty {
             let tagList = tags.split(separator: ",").map { "#\($0.trimmingCharacters(in: .whitespaces))" }

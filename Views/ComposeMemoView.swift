@@ -6,7 +6,7 @@ import AppKit
 #endif
 
 struct ComposeMemoView: View {
-    @Environment(AppState.self) var appState
+    @Environment(AppState.self) var appState: AppState
     @Environment(\.dismiss) private var dismiss
     
     var editingMemo: Memo? = nil
@@ -617,7 +617,7 @@ struct ComposeMemoView: View {
 }
 
 struct MemoPicker: View {
-    @Environment(AppState.self) var appState
+    @Environment(AppState.self) var appState: AppState
     var onSelect: (Memo) -> Void
 
     var body: some View {

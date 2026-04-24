@@ -2,7 +2,7 @@ import SwiftUI
 import QuickLook
 
 struct AttachmentsGridView: View {
-    @Environment(AppState.self) var appState
+    @Environment(AppState.self) var appState: AppState
     @Environment(\.colorScheme) private var colorScheme
     
     @State private var quickLookURL: URL?
@@ -46,7 +46,7 @@ struct GalleryItemView: View {
     let memo: Memo
     let attachment: Attachment
     @Binding var quickLookURL: URL?
-    @Environment(AppState.self) var appState
+    @Environment(AppState.self) var appState: AppState
     @Environment(\.colorScheme) private var colorScheme
     @State private var isHovered = false
     

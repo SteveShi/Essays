@@ -1,37 +1,62 @@
 import SwiftUI
+import SwiftData
 
 struct SidebarView: View {
-    @Environment(AppState.self) var appState
+    @Environment(AppState.self) var appState: AppState
+    @Query(sort: \Memo.createdAt, order: .reverse) private var allMemos: [Memo]
     @FocusState private var isSearchFocused: Bool
+    
+    // Computed counts
+    private var allCount: Int { allMemos.filter { $0.state == .normal }.count }
+    private var todayCount: Int {
+        let today = Calendar.current.startOfDay(for: Date())
+        return allMemos.filter { $0.state == .normal && $0.createdAt >= today }.count
+    }
+    private var archivedCount: Int { allMemos.filter { $0.state == .archived }.count }
+    private var attachmentCount: Int { allMemos.filter { $0.state == .normal && !$0.attachments.isEmpty }.count }
+    
+    private var publicCount: Int { allMemos.filter { $0.state == .normal && $0.visibility == .public }.count }
+    private var protectedCount: Int { allMemos.filter { $0.state == .normal && $0.visibility == .protected }.count }
+    private var privateCount: Int { allMemos.filter { $0.state == .normal && $0.visibility == .private }.count }
+    
+    private var tags: [Tag] {
+        var dict: [String: Int] = [:]
+        for memo in allMemos where memo.state == .normal {
+            for tag in memo.tags {
+                dict[tag, default: 0] += 1
+            }
+        }
+        return dict.map { Tag(name: $0.key, count: $0.value) }.sorted { $0.count > $1.count }
+    }
+    
+    private var memoDateComponents: Set<DateComponents> {
+        Set(allMemos.map { Calendar.current.dateComponents([.year, .month, .day], from: $0.createdAt) })
+    }
     
     var body: some View {
         @Bindable var appState = appState
         #if os(iOS)
         List(selection: $appState.sidebarSelection) {
             Section(String(localized: "Inbox", comment: "Sidebar section header for main actions")) {
-                sidebarLabel(.all, icon: "note.text", title: String(localized: "All Memos", comment: "Sidebar item for all memos"), count: appState.memos.count)
-                sidebarLabel(.today, icon: "sun.max", title: String(localized: "Today", comment: "Sidebar item for today's memos"), count: appState.todayMemosCount)
-                sidebarLabel(.past7Days, icon: "clock.arrow.circlepath", title: String(localized: "Past 7 Days", comment: "Sidebar item for memos in the last week"), count: appState.recentWeekMemosCount)
-                sidebarLabel(.archived, icon: "archivebox", title: String(localized: "Archived", comment: "Sidebar item for archived memos"), count: appState.archivedMemosCount)
-                sidebarLabel(.attachments, icon: "photo.on.rectangle.angled", title: String(localized: "Attachments", comment: "Sidebar item for image gallery"), count: appState.imageAttachmentMemosCount)
+                sidebarLabel(.all, icon: "note.text", title: String(localized: "All Memos", comment: "Sidebar item for all memos"), count: allCount)
+                sidebarLabel(.today, icon: "sun.max", title: String(localized: "Today", comment: "Sidebar item for today's memos"), count: todayCount)
+                sidebarLabel(.past7Days, icon: "clock.arrow.circlepath", title: String(localized: "Past 7 Days", comment: "Sidebar item for memos in the last week"), count: 0) // Placeholder
+                sidebarLabel(.archived, icon: "archivebox", title: String(localized: "Archived", comment: "Sidebar item for archived memos"), count: archivedCount)
+                sidebarLabel(.attachments, icon: "photo.on.rectangle.angled", title: String(localized: "Attachments", comment: "Sidebar item for image gallery"), count: attachmentCount)
             }
             
-            if !appState.tags.isEmpty {
+            if !tags.isEmpty {
                 Section(String(localized: "Tags", comment: "Sidebar section header for tags")) {
-                    ForEach(appState.tags.prefix(20)) { tag in
+                    ForEach(tags.prefix(20)) { tag in
                         sidebarLabel(.tag(tag.name), icon: "tag", title: tag.name, count: tag.count)
                     }
                 }
             }
             
             Section(String(localized: "Visibility", comment: "Sidebar section header for visibility filters")) {
-                sidebarLabel(.publicMemos, icon: "globe", title: String(localized: "Public", comment: "Sidebar item for public memos"), count: appState.publicMemosCount)
-                sidebarLabel(.protectedMemos, icon: MemoVisibility.protected.icon, title: MemoVisibility.protected.displayName, count: appState.protectedMemosCount)
-                sidebarLabel(.privateMemos, icon: "lock", title: String(localized: "Private", comment: "Sidebar item for private memos"), count: appState.privateMemosCount)
-            }
-            
-            Section(String(localized: "System", comment: "Sidebar section header for system items")) {
-                sidebarLabel(.outbox, icon: "arrow.triangle.2.circlepath.icloud", title: String(localized: "Sync Queue", comment: "Sidebar item for sync queue"), count: SyncEngine.shared.pendingTasksCount + SyncEngine.shared.errorTasksCount)
+                sidebarLabel(.publicMemos, icon: "globe", title: String(localized: "Public", comment: "Sidebar item for public memos"), count: publicCount)
+                sidebarLabel(.protectedMemos, icon: MemoVisibility.protected.icon, title: MemoVisibility.protected.displayName, count: protectedCount)
+                sidebarLabel(.privateMemos, icon: "lock", title: String(localized: "Private", comment: "Sidebar item for private memos"), count: privateCount)
             }
         }
         .listStyle(.sidebar)
@@ -138,56 +163,56 @@ struct SidebarView: View {
                     selection: .all,
                     icon: "note.text",
                     title: String(localized: "All Memos", comment: "Sidebar item for all memos"),
-                    count: appState.memos.count
+                    count: allCount
                 )
                 
                 SidebarLinkItem(
                     selection: .today,
                     icon: "sun.max",
                     title: String(localized: "Today", comment: "Sidebar item for today's memos"),
-                    count: appState.todayMemosCount
+                    count: todayCount
                 )
                 
                 SidebarLinkItem(
                     selection: .past7Days,
                     icon: "clock.arrow.circlepath",
                     title: String(localized: "Past 7 Days", comment: "Sidebar item for memos in the last week"),
-                    count: appState.recentWeekMemosCount
+                    count: 0
                 )
                 
                 SidebarLinkItem(
                     selection: .archived,
                     icon: "archivebox",
                     title: String(localized: "Archived", comment: "Sidebar item for archived memos"),
-                    count: appState.archivedMemosCount
+                    count: archivedCount
                 )
 
                 SidebarLinkItem(
                     selection: .attachments,
                     icon: "photo.on.rectangle.angled",
                     title: String(localized: "Attachments", comment: "Sidebar item for image gallery"),
-                    count: appState.memos.reduce(0) { $0 + $1.attachments.filter { $0.isImage }.count }
+                    count: attachmentCount
                 )
             }
         }
     }
     
     private var calendarSection: some View {
-        SidebarCalendarView()
+        SidebarCalendarView(memoDateComponents: memoDateComponents)
     }
     
     private var tagsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             SectionHeader(title: String(localized: "Tags", comment: "Sidebar section header for tags"))
             
-            if appState.tags.isEmpty {
+            if tags.isEmpty {
                 Text(String(localized: "No tags yet", comment: "Message shown when no tags are available"))
                     .font(LiquidGlassTheme.typography.footnote)
                     .foregroundColor(LiquidGlassTheme.colors.tertiaryText)
                     .padding(.leading, 4)
             } else {
                 FlowLayout(spacing: 6) {
-                    ForEach(appState.tags.prefix(20)) { tag in
+                    ForEach(tags.prefix(20)) { tag in
                         TagLinkChip(tag: tag)
                     }
                 }
@@ -204,38 +229,29 @@ struct SidebarView: View {
                     selection: .publicMemos,
                     icon: "globe",
                     title: String(localized: "Public", comment: "Sidebar item for public memos"),
-                    count: appState.publicMemosCount
+                    count: publicCount
                 )
                 
                 SidebarLinkItem(
                     selection: .protectedMemos,
                     icon: MemoVisibility.protected.icon,
                     title: MemoVisibility.protected.displayName,
-                    count: appState.memos.filter { $0.visibility == .protected }.count
+                    count: protectedCount
                 )
 
                 SidebarLinkItem(
                     selection: .privateMemos,
                     icon: "lock",
                     title: String(localized: "Private", comment: "Sidebar item for private memos"),
-                    count: appState.privateMemosCount
-                )
-            }
-            
-            VStack(alignment: .leading, spacing: 8) {
-                SectionHeader(title: String(localized: "System", comment: "Sidebar section header for system items"))
-                
-                SidebarLinkItem(
-                    selection: .outbox,
-                    icon: "arrow.triangle.2.circlepath.icloud",
-                    title: String(localized: "Sync Queue", comment: "Sidebar item for sync queue"),
-                    count: SyncEngine.shared.pendingTasksCount + SyncEngine.shared.errorTasksCount
+                    count: privateCount
                 )
             }
         }
     }
     
     @State private var showAddAccountSheet = false
+    
+    init() {}
 
     private var userSection: some View {
         HStack(spacing: 12) {
@@ -351,7 +367,7 @@ struct SidebarLinkItem: View {
     let title: String
     let count: Int
     
-    @Environment(AppState.self) var appState
+    @Environment(AppState.self) var appState: AppState
     @State private var isHovered = false
     
     private var isSelected: Bool {
@@ -412,7 +428,7 @@ struct SidebarLinkItem: View {
 
 struct TagLinkChip: View {
     let tag: Tag
-    @Environment(AppState.self) var appState
+    @Environment(AppState.self) var appState: AppState
     @State private var isHovered = false
     
     private var selection: AppState.SidebarSelection {
@@ -546,7 +562,8 @@ struct FlowLayout: Layout {
 }
 
 struct SidebarCalendarView: View {
-    @Environment(AppState.self) var appState
+    let memoDateComponents: Set<DateComponents>
+    @Environment(AppState.self) var appState: AppState
     @State private var currentMonth: Date = Date()
     @State private var days: [Date] = []
     
@@ -555,11 +572,6 @@ struct SidebarCalendarView: View {
         cal.firstWeekday = 1 // Sunday
         return cal
     }()
-    
-    // 缓存日期组件以提高查找性能
-    private var memoDateComponents: Set<DateComponents> {
-        appState.memoDateComponents
-    }
 
     private func computeDays() {
         // 只有当月份真正改变时才重新计算
@@ -662,7 +674,8 @@ struct SidebarCalendarView: View {
             }
             
             ForEach(days, id: \.timeIntervalSince1970) { date in
-                DayButton(date: date, currentMonth: currentMonth, calendar: calendar)
+                let comps = calendar.dateComponents([.year, .month, .day], from: date)
+                DayButton(date: date, currentMonth: currentMonth, calendar: calendar, hasMemo: memoDateComponents.contains(comps))
             }
         }
     }
@@ -681,7 +694,8 @@ struct DayButton: View {
     let date: Date
     let currentMonth: Date
     let calendar: Calendar
-    @Environment(AppState.self) var appState
+    let hasMemo: Bool
+    @Environment(AppState.self) var appState: AppState
 
     private var selection: AppState.SidebarSelection {
         .date(date)
@@ -689,8 +703,6 @@ struct DayButton: View {
 
     var body: some View {
         let isCurrentMonth = calendar.isDate(date, equalTo: currentMonth, toGranularity: .month)
-        let components = calendar.dateComponents([.year, .month, .day], from: date)
-        let hasMemo = appState.memoDateComponents.contains(components)
         let isSelected = appState.sidebarSelection == selection
         let isToday = calendar.isDateInToday(date)
 
@@ -705,35 +717,44 @@ struct DayButton: View {
             dayLabel(isCurrentMonth: isCurrentMonth, isSelected: isSelected, isToday: isToday, hasMemo: hasMemo)
         }
         .buttonStyle(.plain)
-        .disabled(!hasMemo && !isToday && !isSelected)
     }
 
     private func dayLabel(isCurrentMonth: Bool, isSelected: Bool, isToday: Bool, hasMemo: Bool) -> some View {
-        Text("\(calendar.component(.day, from: date))")
-            .font(
-                .system(
-                    size: 12, weight: isSelected || isToday ? .semibold : .regular,
-                    design: .rounded)
-            )
-            .frame(width: 24, height: 24)
-            .foregroundStyle(
-                isCurrentMonth
-                    ? (isSelected
-                        ? .white
-                        : (isToday
-                            ? LiquidGlassTheme.colors.accent
-                            : LiquidGlassTheme.colors.text))
-                    : LiquidGlassTheme.colors.tertiaryText.opacity(0.3)
-            )
-            .background(
-                ZStack {
-                    if isSelected {
-                        Circle().fill(LiquidGlassTheme.colors.accent)
-                    } else if hasMemo {
-                        Circle().fill(LiquidGlassTheme.colors.accent.opacity(0.15))
+        VStack(spacing: 2) {
+            Text("\(calendar.component(.day, from: date))")
+                .font(
+                    .system(
+                        size: 12, weight: isSelected || isToday ? .semibold : .regular,
+                        design: .rounded)
+                )
+                .frame(width: 24, height: 24)
+                .foregroundStyle(
+                    isCurrentMonth
+                        ? (isSelected
+                            ? .white
+                            : (isToday
+                                ? LiquidGlassTheme.colors.accent
+                                : LiquidGlassTheme.colors.text))
+                        : LiquidGlassTheme.colors.tertiaryText.opacity(0.3)
+                )
+                .background(
+                    ZStack {
+                        if isSelected {
+                            Circle().fill(LiquidGlassTheme.colors.accent)
+                        }
                     }
-                }
-            )
+                )
+            
+            Circle()
+                .fill(
+                    hasMemo
+                        ? (isSelected
+                            ? .white
+                            : (isCurrentMonth ? LiquidGlassTheme.colors.accent : LiquidGlassTheme.colors.accent.opacity(0.3)))
+                        : Color.clear
+                )
+                .frame(width: 4, height: 4)
+        }
     }
     
     private static let sharedDateFormatter: DateFormatter = {
