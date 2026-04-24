@@ -60,14 +60,21 @@ class MemosAPIClient {
     }
     
     func fetchMemos() async throws -> [Memo] {
-        let memos = try await activeStrategy.fetchMemos()
-        let accountID = activeAccountID
+        let strategy = try activeStrategy
+        let requestAccountID = activeAccountID
+        let memos = try await strategy.fetchMemos()
 
-        for memo in memos {
-            memo.accountID = accountID
+        // If account switched while request was in flight, drop stale response
+        // to avoid flashing memos from another account.
+        guard requestAccountID == activeAccountID else {
+            return LocalDatabase.shared.fetchMemos(forAccountID: activeAccountID)
         }
 
-        return LocalDatabase.shared.syncMemosSnapshot(memos, forAccountID: accountID)
+        for memo in memos {
+            memo.accountID = requestAccountID
+        }
+
+        return LocalDatabase.shared.syncMemosSnapshot(memos, forAccountID: requestAccountID)
     }
     
     func fetchTags() async throws -> [Tag] {

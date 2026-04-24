@@ -402,6 +402,9 @@ struct LoginView: View {
                 try await signInRemote()
             }
         } catch {
+            if error.isCancellationLike {
+                return
+            }
             errorMessage = error.localizedDescription
         }
     }

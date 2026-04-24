@@ -4,6 +4,36 @@ All notable changes to this project will be documented in this file.
 
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.2] - 2026-04-24
+
+### Added
+- 🗂️ **Remote Account Data Isolation by Name**: Each online account now stores data in its own folder under `~/Library/Application Support/Essays/<AccountName>`, with automatic path-safe name sanitization.
+
+### Fixed
+- 🔁 **Account Switch Flashing Data**: Prevented stale in-flight responses from a previous account from overwriting the current account view during account switching.
+- 🚫 **Canceled Request Noise**: Suppressed cancellation-like transient errors to avoid misleading “Canceled” error popups during normal account transitions.
+
+### Changed
+- ✨ **Sparkle Upgrade**: Updated Sparkle dependency from `2.9.0` to `2.9.1`.
+- ⚙️ **CI Sparkle Tool Sync**: Updated GitHub Actions release workflow Sparkle tool download from `2.9.0` to `2.9.1` to keep CI and local versions aligned.
+
+---
+
+### Chinese
+
+### 新增
+- 🗂️ **按账户名隔离远程数据目录**: 每个在线账户的数据现已独立存储在 `~/Library/Application Support/Essays/<账户名称>` 下，并自动进行路径安全清洗。
+
+### 修复
+- 🔁 **切换账户数据闪烁**: 修复了切换账户时旧请求回包覆盖当前账户视图，导致数据“一闪而过”的问题。
+- 🚫 **已取消误报弹窗**: 屏蔽了取消类瞬态错误，避免正常账户切换过程中出现误导性的“已取消”错误提示。
+
+### 变更
+- ✨ **Sparkle 升级**: Sparkle 依赖已从 `2.9.0` 升级到 `2.9.1`。
+- ⚙️ **CI Sparkle 工具同步**: GitHub Actions 发布流程中的 Sparkle 工具下载版本已同步更新到 `2.9.1`，确保 CI 与本地一致。
+
+---
+
 ## [2.5.1] - 2026-04-24
 
 ### Fixed

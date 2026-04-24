@@ -165,8 +165,8 @@ jobs:
         env:
           SPARKLE_SECRET: ${{ secrets.SPARKLE_PRIVATE_KEY }}
         run: |
-          curl -L -O https://github.com/sparkle-project/Sparkle/releases/download/2.9.0/Sparkle-2.9.0.tar.xz
-          tar -xf Sparkle-2.9.0.tar.xz
+          curl -L -O https://github.com/sparkle-project/Sparkle/releases/download/2.9.1/Sparkle-2.9.1.tar.xz
+          tar -xf Sparkle-2.9.1.tar.xz
 
           CLEAN_KEY=$(echo "$SPARKLE_SECRET" | sed 's/EdDSAPrivateKey://' | tr -dc 'A-Za-z0-9+/=')
           

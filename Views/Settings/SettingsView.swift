@@ -13,6 +13,9 @@ struct SettingsView: View {
     @AppStorage("theme") private var theme = "system"
     @AppStorage("enableAIFeatures") private var enableAIFeatures = true
     @AppStorage("targetTranslationLanguage") private var targetTranslationLanguage = "auto"
+    #if os(macOS)
+    @State private var updaterViewModel = UpdaterViewModel.shared
+    #endif
     
     var body: some View {
         TabView {
@@ -98,6 +101,15 @@ struct SettingsView: View {
                 }
 
                 Toggle(String(localized: "Auto-save drafts", comment: "Toggle for auto-save"), isOn: $autoSave)
+                #if os(macOS)
+                Toggle(
+                    String(localized: "Automatically check for updates", comment: "Toggle for Sparkle automatic update checks"),
+                    isOn: Binding(
+                        get: { updaterViewModel.automaticallyChecksForUpdates },
+                        set: { updaterViewModel.automaticallyChecksForUpdates = $0 }
+                    )
+                )
+                #endif
             } header: {
                 Text(String(localized: "Behavior", comment: "Behavior section header"))
                     .font(LiquidGlassTheme.typography.headline)

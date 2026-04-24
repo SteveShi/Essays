@@ -71,8 +71,21 @@ class AppState {
     }
 
     static func normalizedRemoteAccountID(from rawServerURL: String) -> String {
-        let trimmed = rawServerURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        var trimmed = rawServerURL.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return "" }
+
+        // Backward compatibility:
+        // Older builds might persist server URLs without scheme, e.g. "example.com".
+        // Normalize them to the same canonical form as network configuration.
+        if !trimmed.lowercased().hasPrefix("http://") && !trimmed.lowercased().hasPrefix("https://") {
+            if trimmed.lowercased().contains("localhost")
+                || trimmed.range(of: "^[0-9.]+$", options: .regularExpression) != nil {
+                trimmed = "http://" + trimmed
+            } else {
+                trimmed = "https://" + trimmed
+            }
+        }
+
         let fallback = trimmed.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         guard let components = URLComponents(string: trimmed),
               let scheme = components.scheme?.lowercased(),
@@ -300,6 +313,9 @@ class AppState {
                     self.lastConnectionError = nil
                 }
             } catch {
+                if error.isCancellationLike {
+                    return
+                }
                 let errorDescription = error.localizedDescription
                 print("Server reachability check failed: \(errorDescription)")
                 await MainActor.run {

@@ -119,6 +119,9 @@ struct ContentView: View {
 
             _ = try await MemosAPIClient.shared.fetchMemos()
         } catch {
+            if error.isCancellationLike {
+                return
+            }
             appState.errorMessage = error.localizedDescription
         }
     }

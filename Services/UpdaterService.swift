@@ -5,10 +5,22 @@ import Observation
 @MainActor
 @Observable
 final class UpdaterViewModel {
+    static let shared = UpdaterViewModel()
+
     private let controller: SPUStandardUpdaterController
     
     var canCheckForUpdates: Bool {
         controller.updater.canCheckForUpdates
+    }
+
+    var automaticallyChecksForUpdates: Bool {
+        get {
+            controller.updater.automaticallyChecksForUpdates
+        }
+        set {
+            UserDefaults.standard.set(newValue, forKey: "SUEnableAutomaticChecks")
+            controller.updater.automaticallyChecksForUpdates = newValue
+        }
     }
     
     init() {

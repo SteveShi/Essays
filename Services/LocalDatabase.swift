@@ -5,7 +5,7 @@ import SwiftData
 final class LocalDatabase {
     static let shared = LocalDatabase()
     
-    private static let storesRootDirectoryName = "Essays/Stores"
+    private static let storesRootDirectoryName = "Essays"
     
     private(set) var container: ModelContainer
     private(set) var context: ModelContext
@@ -52,12 +52,18 @@ final class LocalDatabase {
         if var account = resolved {
             let trimmed = account.dataDirectoryPath?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             if trimmed.isEmpty {
-                if account.mode == .remote, Self.legacyStoreFileExists() {
+                if account.mode == .local, Self.legacyStoreFileExists() {
                     account.dataDirectoryPath = Self.legacyStoreDirectoryURL().path
                 } else {
                     let defaultDirectory = Self.defaultDirectory(for: account)
                     account.dataDirectoryPath = defaultDirectory.path
                 }
+                AccountManager.shared.updateAccount(account)
+                resolved = account
+            } else if account.mode == .remote,
+                      let migratedPath = Self.migratedRemoteStorePathIfNeeded(for: account, currentPath: trimmed)
+            {
+                account.dataDirectoryPath = migratedPath
                 AccountManager.shared.updateAccount(account)
                 resolved = account
             }
@@ -115,10 +121,14 @@ final class LocalDatabase {
 
     private static func defaultDirectory(for account: Account) -> URL {
         let root = storesRootDirectoryURL()
-        let modeFolder = account.mode == .local ? "local" : "remote"
-        return root
-            .appendingPathComponent(modeFolder, isDirectory: true)
-            .appendingPathComponent(account.id.uuidString, isDirectory: true)
+        if account.mode == .local {
+            return root
+                .appendingPathComponent("local", isDirectory: true)
+                .appendingPathComponent(account.id.uuidString, isDirectory: true)
+        }
+
+        let folderName = remoteAccountFolderName(for: account)
+        return root.appendingPathComponent(folderName, isDirectory: true)
     }
 
     private static func defaultDirectoryForNoAccount() -> URL {
@@ -129,6 +139,51 @@ final class LocalDatabase {
     private static func storesRootDirectoryURL() -> URL {
         let appSupportURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         return appSupportURL.appendingPathComponent(storesRootDirectoryName, isDirectory: true)
+    }
+
+    private static func remoteAccountFolderName(for account: Account) -> String {
+        let rawName = account.displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let invalid = CharacterSet(charactersIn: "/\\:*?\"<>|")
+        let sanitizedScalars = rawName.unicodeScalars.map { invalid.contains($0) ? "_" : Character($0) }
+        let sanitized = String(sanitizedScalars)
+            .replacingOccurrences(of: "\n", with: "_")
+            .replacingOccurrences(of: "\r", with: "_")
+            .trimmingCharacters(in: CharacterSet(charactersIn: " ."))
+
+        if !sanitized.isEmpty {
+            return sanitized
+        }
+        return account.id.uuidString
+    }
+
+    private static func migratedRemoteStorePathIfNeeded(for account: Account, currentPath: String) -> String? {
+        let legacyRemoteRoot = storesRootDirectoryURL()
+            .appendingPathComponent("remote", isDirectory: true).path
+        guard currentPath.hasPrefix(legacyRemoteRoot) else {
+            return nil
+        }
+
+        let targetURL = defaultDirectory(for: account)
+        let targetPath = targetURL.path
+        guard currentPath != targetPath else {
+            return nil
+        }
+
+        let currentURL = URL(fileURLWithPath: currentPath, isDirectory: true)
+        do {
+            if FileManager.default.fileExists(atPath: currentURL.path),
+               !FileManager.default.fileExists(atPath: targetURL.path) {
+                try FileManager.default.createDirectory(
+                    at: targetURL.deletingLastPathComponent(),
+                    withIntermediateDirectories: true
+                )
+                try FileManager.default.moveItem(at: currentURL, to: targetURL)
+            }
+            return targetPath
+        } catch {
+            print("Failed to migrate remote store path from \(currentPath) to \(targetPath): \(error)")
+            return nil
+        }
     }
 
     private static func legacyStoreDirectoryURL() -> URL {

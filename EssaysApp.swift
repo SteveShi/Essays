@@ -15,7 +15,7 @@ struct EssaysApp: App {
     @State private var appState = AppState()
     @State private var databaseReloadToken = UUID()
     #if os(macOS)
-    @State private var updaterViewModel = UpdaterViewModel()
+    @State private var updaterViewModel = UpdaterViewModel.shared
     #endif
     @AppStorage("theme") private var theme = "system"
     
