@@ -79,7 +79,6 @@ struct EssaysApp: App {
                 Button(String(localized: "Check for Updates...", comment: "Menu command to check for updates")) {
                     updaterViewModel.checkForUpdates()
                 }
-                .disabled(!updaterViewModel.canCheckForUpdates)
             }
         }
 #endif
