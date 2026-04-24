@@ -150,7 +150,7 @@ struct ComposeMemoView: View {
                                 }
                                 Spacer()
                             }
-                            .padding(.top, 10)
+                            .padding(.top, 8)
                             .padding(.leading, 5)
                             .allowsHitTesting(false)
                         }

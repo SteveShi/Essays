@@ -60,6 +60,19 @@ final class OutboxTask {
         get { OutboxTaskState(rawValue: stateRaw) ?? .pending }
         set { stateRaw = newValue.rawValue }
     }
+    
+    var contentSummary: String? {
+        switch type {
+        case .createMemo:
+            return (try? JSONDecoder().decode(CreateMemoPayload.self, from: payload))?.content
+        case .updateMemo:
+            return (try? JSONDecoder().decode(UpdateMemoPayload.self, from: payload))?.content
+        case .togglePinMemo:
+            return (try? JSONDecoder().decode(TogglePinPayload.self, from: payload))?.contentSummary
+        default:
+            return (try? JSONDecoder().decode(SimpleMemoPayload.self, from: payload))?.contentSummary
+        }
+    }
 }
 
 enum OutboxTaskType: String, Codable {
@@ -107,4 +120,9 @@ struct UpdateMemoPayload: Codable {
 
 struct TogglePinPayload: Codable {
     let pinned: Bool
+    let contentSummary: String?
+}
+
+struct SimpleMemoPayload: Codable {
+    let contentSummary: String
 }

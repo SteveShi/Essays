@@ -1223,7 +1223,7 @@ struct MemoCard: View {
             memo.pinned = newPinnedStatus
             
             // 2. Enqueue Outbox
-            let payload = TogglePinPayload(pinned: newPinnedStatus)
+            let payload = TogglePinPayload(pinned: newPinnedStatus, contentSummary: memo.truncatedContent)
             let payloadData = try JSONEncoder().encode(payload)
             let task = OutboxTask(type: .togglePinMemo, payload: payloadData, memoId: memo.name)
             
@@ -1269,7 +1269,9 @@ struct MemoCard: View {
             }
             
             // 1. Enqueue Outbox FIRST (while we still have memo name)
-            let task = OutboxTask(type: .deleteMemo, payload: Data(), memoId: memo.name)
+            let payload = SimpleMemoPayload(contentSummary: memo.truncatedContent)
+            let payloadData = (try? JSONEncoder().encode(payload)) ?? Data()
+            let task = OutboxTask(type: .deleteMemo, payload: payloadData, memoId: memo.name)
             LocalDatabase.shared.context.insert(task)
             
             // 2. Delete locally

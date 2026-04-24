@@ -106,12 +106,28 @@ struct SyncQueueView: View {
             }
             
             if let memoId = task.memoId {
-                Text(
-                    String(
-                        localized: "Memo: \(memoId)",
-                        comment: "Label showing the memo resource identifier in sync queue"))
-                    .font(LiquidGlassTheme.typography.caption)
-                    .foregroundStyle(LiquidGlassTheme.colors.tertiaryText)
+                let content = task.contentSummary ?? appState.memos.first(where: { $0.name == memoId })?.content
+                
+                if let content = content {
+                    Text(content)
+                        .font(LiquidGlassTheme.typography.body)
+                        .lineLimit(2)
+                        .padding(.vertical, 4)
+                        .foregroundColor(LiquidGlassTheme.colors.text)
+                } else if task.type == .deleteMemo {
+                    Text(String(localized: "Deleted Memo", comment: "Placeholder for deleted memo in sync queue"))
+                        .font(LiquidGlassTheme.typography.body)
+                        .italic()
+                        .padding(.vertical, 4)
+                        .foregroundColor(LiquidGlassTheme.colors.tertiaryText)
+                } else {
+                    Text(
+                        String(
+                            localized: "Memo: \(memoId)",
+                            comment: "Label showing the memo resource identifier in sync queue"))
+                        .font(LiquidGlassTheme.typography.caption)
+                        .foregroundStyle(LiquidGlassTheme.colors.tertiaryText)
+                }
             }
             
             if let error = task.lastError {

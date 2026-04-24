@@ -454,7 +454,9 @@ class AppState {
         
         do {
             // Enqueue outbox task only; SyncEngine will execute network request.
-            let task = OutboxTask(type: .archiveMemo, payload: Data(), memoId: memo.name)
+            let payload = SimpleMemoPayload(contentSummary: memo.truncatedContent)
+            let payloadData = (try? JSONEncoder().encode(payload)) ?? Data()
+            let task = OutboxTask(type: .archiveMemo, payload: payloadData, memoId: memo.name)
             LocalDatabase.shared.context.insert(task)
             try LocalDatabase.shared.context.save()
             SyncEngine.shared.triggerSync()
@@ -475,7 +477,9 @@ class AppState {
         
         do {
             // Enqueue outbox task only; SyncEngine will execute network request.
-            let task = OutboxTask(type: .unarchiveMemo, payload: Data(), memoId: memo.name)
+            let payload = SimpleMemoPayload(contentSummary: memo.truncatedContent)
+            let payloadData = (try? JSONEncoder().encode(payload)) ?? Data()
+            let task = OutboxTask(type: .unarchiveMemo, payload: payloadData, memoId: memo.name)
             LocalDatabase.shared.context.insert(task)
             try LocalDatabase.shared.context.save()
             SyncEngine.shared.triggerSync()
