@@ -44,12 +44,12 @@
 ## 安装指南
 
 ### 直接下载
-从 [Releases](https://github.com/lpgneg19/Essays/releases) 页面下载最新的 `.dmg` 或 `.app` 文件。
+从 [Releases](https://github.com/SteveShi/Essays/releases) 页面下载最新的 `.dmg` 或 `.app` 文件。
 
 ### Homebrew
 通过 Homebrew tap 安装：
 ```bash
-brew tap lpgneg19/tap
+brew tap SteveShi/tap
 brew install --cask essays
 ```
 

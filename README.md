@@ -44,12 +44,12 @@ All AI processing happens **locally on your Mac**, ensuring your thoughts and da
 ## Installation
 
 ### Direct Download
-Download the latest `.dmg` or `.app` from the [Releases](https://github.com/lpgneg19/Essays/releases) page.
+Download the latest `.dmg` or `.app` from the [Releases](https://github.com/SteveShi/Essays/releases) page.
 
 ### Homebrew
 Install via Homebrew tap:
 ```bash
-brew tap lpgneg19/tap
+brew tap SteveShi/tap
 brew install --cask essays
 ```
 

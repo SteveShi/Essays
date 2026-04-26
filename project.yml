@@ -45,7 +45,7 @@ targets:
         ENABLE_APP_SANDBOX: NO
         SUEnableAutomaticChecks: true
         SUScheduledCheckInterval: 86400
-        SUFeedURL: https://github.com/lpgneg19/Essays/releases/latest/download/appcast.xml
+        SUFeedURL: https://github.com/SteveShi/Essays/releases/latest/download/appcast.xml
         SUPublicEDKey: MkHAeSDd//tR7+jzLDuwomA0aHHe5+35hbQ4csagwF0=
         CODE_SIGN_ENTITLEMENTS: Resources/Essays.entitlements
     entitlements:

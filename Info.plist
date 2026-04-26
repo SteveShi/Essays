@@ -33,7 +33,7 @@
     <key>NSLocationWhenInUseUsageDescription</key>
     <string>We use your location to automatically add geotags to your memos, making it easier to remember where you captured your thoughts.</string>
     <key>SUFeedURL</key>
-    <string>https://github.com/lpgneg19/Essays/releases/latest/download/appcast.xml</string>
+    <string>https://github.com/SteveShi/Essays/releases/latest/download/appcast.xml</string>
     <key>SUPublicEDKey</key>
     <string>MkHAeSDd//tR7+jzLDuwomA0aHHe5+35hbQ4csagwF0=</string>
     <key>SUEnableAutomaticChecks</key>
