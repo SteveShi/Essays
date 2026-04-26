@@ -32,4 +32,8 @@ final class UpdaterViewModel {
     func checkForUpdates() {
         controller.checkForUpdates(nil)
     }
+
+    func checkForUpdatesInBackground() {
+        controller.updater.checkForUpdatesInBackground()
+    }
 }

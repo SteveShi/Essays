@@ -103,6 +103,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupMenuBar()
+        UpdaterViewModel.shared.checkForUpdatesInBackground()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
