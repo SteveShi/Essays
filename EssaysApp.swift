@@ -143,35 +143,46 @@ private struct MainWindowAutosaveConfigurator: NSViewRepresentable {
     @MainActor private static var configuredWindows = Set<ObjectIdentifier>()
 
     func makeNSView(context: Context) -> NSView {
-        let view = NSView(frame: .zero)
-        DispatchQueue.main.async {
-            guard let window = view.window else { return }
+        let view = WindowAttachObserverView(frame: .zero)
+        view.onAttachWindow = { window in
             configureWindow(window)
         }
         return view
     }
 
     func updateNSView(_ nsView: NSView, context: Context) {
-        DispatchQueue.main.async {
-            guard let window = nsView.window else { return }
-            configureWindow(window)
-        }
+        guard let window = nsView.window else { return }
+        configureWindow(window)
     }
 
     @MainActor
     private func configureWindow(_ window: NSWindow) {
         let windowID = ObjectIdentifier(window)
         if !Self.configuredWindows.contains(windowID) {
-            let hasSavedFrame = UserDefaults.standard.string(forKey: Self.autosaveDefaultsKey) != nil
-            if !hasSavedFrame {
+            let hasSavedFrame = UserDefaults.standard.object(forKey: Self.autosaveDefaultsKey) != nil
+            window.setFrameAutosaveName(Self.autosaveName)
+            if hasSavedFrame {
+                _ = window.setFrameUsingName(Self.autosaveName)
+            } else {
                 window.setContentSize(Self.defaultSize)
                 window.center()
             }
             Self.configuredWindows.insert(windowID)
+            return
         }
 
         if window.frameAutosaveName != Self.autosaveName {
             window.setFrameAutosaveName(Self.autosaveName)
+        }
+    }
+
+    private final class WindowAttachObserverView: NSView {
+        var onAttachWindow: ((NSWindow) -> Void)?
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            guard let window else { return }
+            onAttachWindow?(window)
         }
     }
 }
