@@ -14,7 +14,7 @@ class QuickInputPanelManager: NSObject {
             let contentView = QuickInputWindowView()
             let newPanel = QuickInputPanel(
                 contentRect: NSRect(x: 0, y: 0, width: 450, height: 180),
-                styleMask: [.titled, .fullSizeContentView, .hudWindow],
+                styleMask: [.titled, .closable, .fullSizeContentView],
                 backing: .buffered,
                 defer: false
             )
@@ -27,11 +27,15 @@ class QuickInputPanelManager: NSObject {
             newPanel.isMovableByWindowBackground = false
             newPanel.isReleasedWhenClosed = false
             newPanel.contentView = NSHostingView(rootView: contentView)
+            enforcePanelStyle(for: newPanel)
+            configureWindowButtons(for: newPanel)
             newPanel.center()
             self.panel = newPanel
         }
         
         if let panel = panel {
+            enforcePanelStyle(for: panel)
+            ensureCloseButtonAvailability(for: panel)
             if panel.isVisible {
                 panel.orderOut(nil)
             } else {
@@ -39,6 +43,25 @@ class QuickInputPanelManager: NSObject {
                 NSApp.activate(ignoringOtherApps: true)
                 // Need to focus text field inside
             }
+        }
+    }
+
+    private func configureWindowButtons(for panel: NSPanel) {
+        panel.standardWindowButton(.closeButton)?.isHidden = false
+        panel.standardWindowButton(.miniaturizeButton)?.isHidden = true
+        panel.standardWindowButton(.zoomButton)?.isHidden = true
+    }
+
+    private func ensureCloseButtonAvailability(for panel: NSPanel) {
+        if !panel.styleMask.contains(.closable) {
+            panel.styleMask.insert(.closable)
+        }
+        configureWindowButtons(for: panel)
+    }
+
+    private func enforcePanelStyle(for panel: NSPanel) {
+        if panel.styleMask.contains(.hudWindow) {
+            panel.styleMask.remove(.hudWindow)
         }
     }
 }
@@ -58,6 +81,7 @@ class QuickInputPanel: NSPanel {
 }
 
 struct QuickInputWindowView: View {
+    @AppStorage("theme") private var theme = "system"
     @State private var text: String = ""
     @State private var visibility: MemoVisibility = .private
     @State private var isSaving = false
@@ -74,6 +98,41 @@ struct QuickInputWindowView: View {
 
     private var activeAccountID: String {
         AccountManager.shared.activeAccount.map { AppState.accountIdentifier(for: $0) } ?? "local"
+    }
+
+    private var preferredColorScheme: ColorScheme? {
+        switch theme {
+        case "light":
+            return .light
+        case "dark":
+            return .dark
+        default:
+            return nil
+        }
+    }
+
+    private var panelMaterial: NSVisualEffectView.Material {
+        switch theme {
+        case "light":
+            return .underWindowBackground
+        case "dark":
+            return .hudWindow
+        default:
+            let best = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua])
+            return best == .darkAqua ? .hudWindow : .underWindowBackground
+        }
+    }
+
+    private var panelOverlay: Color {
+        switch theme {
+        case "light":
+            return Color.white.opacity(0.06)
+        case "dark":
+            return Color.black.opacity(0.10)
+        default:
+            let best = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua])
+            return best == .darkAqua ? Color.black.opacity(0.10) : Color.white.opacity(0.06)
+        }
     }
     
     var body: some View {
@@ -178,10 +237,11 @@ struct QuickInputWindowView: View {
         }
         .background(
             ZStack {
-                VisualEffectView(material: .hudWindow, blendingMode: .behindWindow)
-                Color.black.opacity(0.1) // Subtle dimming for QuickInput
+                VisualEffectView(material: panelMaterial, blendingMode: .behindWindow)
+                panelOverlay
             }
         )
+        .preferredColorScheme(preferredColorScheme)
         .onAppear {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 shouldFocusEditor = true

@@ -842,6 +842,9 @@ struct MemoCard: View {
         }
         #else
         cardContent
+            .onTapGesture(count: 2) {
+                onEdit()
+            }
             .onTapGesture {
                 withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
                     appState.selectedMemoForDetail = memo

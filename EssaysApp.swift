@@ -36,6 +36,7 @@ struct EssaysApp: App {
                 .preferredColorScheme(preferredColorScheme)
                 #if os(macOS)
                 .frame(minWidth: 900, minHeight: 600)
+                .background(MainWindowAutosaveConfigurator())
                 #endif
                 .task {
                     #if os(macOS)
@@ -130,6 +131,46 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             statusItem.menu = nil
         } else {
             QuickInputPanelManager.shared.togglePanel()
+        }
+    }
+}
+
+private struct MainWindowAutosaveConfigurator: NSViewRepresentable {
+    private static let autosaveName = NSWindow.FrameAutosaveName("EssaysMainWindowFrame")
+    private static let autosaveDefaultsKey = "NSWindow Frame EssaysMainWindowFrame"
+    private static let defaultSize = NSSize(width: 1200, height: 780)
+    @MainActor private static var configuredWindows = Set<ObjectIdentifier>()
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView(frame: .zero)
+        DispatchQueue.main.async {
+            guard let window = view.window else { return }
+            configureWindow(window)
+        }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        DispatchQueue.main.async {
+            guard let window = nsView.window else { return }
+            configureWindow(window)
+        }
+    }
+
+    @MainActor
+    private func configureWindow(_ window: NSWindow) {
+        let windowID = ObjectIdentifier(window)
+        if !Self.configuredWindows.contains(windowID) {
+            let hasSavedFrame = UserDefaults.standard.string(forKey: Self.autosaveDefaultsKey) != nil
+            if !hasSavedFrame {
+                window.setContentSize(Self.defaultSize)
+                window.center()
+            }
+            Self.configuredWindows.insert(windowID)
+        }
+
+        if window.frameAutosaveName != Self.autosaveName {
+            window.setFrameAutosaveName(Self.autosaveName)
         }
     }
 }

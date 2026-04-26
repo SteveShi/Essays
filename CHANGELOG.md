@@ -4,6 +4,32 @@ All notable changes to this project will be documented in this file.
 
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.3] - 2026-04-26
+
+### Added
+- 🔴 **Quick Input Native Close Button**: Added a macOS native close button in the top-left corner of the Quick Input panel for consistent system behavior.
+- 🖱️ **Double-Click to Edit Memo Card**: Added macOS double-click editing on timeline cards to open the existing memo editor directly.
+
+### Fixed
+- 🪟 **Main Window Size Persistence**: The main window now uses frame autosave so your manually adjusted size and position are remembered reliably.
+- 🎯 **First-Launch Window Defaults**: On first launch (when no saved frame exists), the main window now opens centered at a default size, then fully follows user-resized dimensions afterward.
+- 🌗 **Quick Input Theme Adaptation**: Quick Input panel now follows light/dark/system theme correctly instead of being forced to dark HUD style.
+
+---
+
+### Chinese
+
+### 新增
+- 🔴 **快捷输入原生关闭按钮**: 在快捷输入面板左上角新增 macOS 系统原生关闭按钮，交互与系统窗口保持一致。
+- 🖱️ **卡片双击编辑**: 新增 macOS 时间线卡片双击编辑能力，双击即可直接打开现有便签编辑器。
+
+### 修复
+- 🪟 **主窗口尺寸记忆**: 主窗口已启用 frame autosave，可稳定记住你手动调整后的窗口大小与位置。
+- 🎯 **首次启动默认窗口行为**: 当没有历史窗口记录时，首次启动将以默认尺寸并居中打开；之后完全按用户调整结果记忆显示。
+- 🌗 **快捷输入主题适配**: 快捷输入面板现已正确跟随浅色/深色/系统主题，不再被 HUD 样式强制为暗色外观。
+
+---
+
 ## [2.5.2] - 2026-04-24
 
 ### Added
