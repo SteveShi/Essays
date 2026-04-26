@@ -3,6 +3,11 @@ import MapKit
 import CoreLocation
 import QuickLook
 import SwiftData
+#if os(macOS)
+import AppKit
+#elseif os(iOS)
+import UIKit
+#endif
 
 struct MemoDetailView: View {
     let memo: Memo
@@ -76,6 +81,9 @@ struct MemoDetailView: View {
             commentInputView
         }
         .navigationTitle(String(localized: "Memo Details", comment: "Detail view title"))
+        .onReceive(NotificationCenter.default.publisher(for: .syncCompleted)) { _ in
+            loadComments()
+        }
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
@@ -260,8 +268,11 @@ struct MemoDetailView: View {
 
 struct CommentCard: View {
     let memo: Memo
+    let onCommentChanged: () -> Void
     @Environment(AppState.self) var appState: AppState
     @Environment(\.colorScheme) var colorScheme
+    @State private var isHovered = false
+    @State private var showEditSheet = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -271,10 +282,56 @@ struct CommentCard: View {
                     .foregroundColor(LiquidGlassTheme.colors.secondaryText)
                 
                 Spacer()
+
+                Menu {
+                    Button {
+                        showEditSheet = true
+                    } label: {
+                        Label(
+                            String(localized: "Edit", comment: "Context menu item to edit memo"),
+                            systemImage: "pencil"
+                        )
+                    }
+
+                    Button {
+                        copyContent()
+                    } label: {
+                        Label(
+                            String(
+                                localized: "Copy Content",
+                                comment: "Context menu item to copy memo content"
+                            ),
+                            systemImage: "doc.on.doc"
+                        )
+                    }
+
+                    Divider()
+
+                    Button(role: .destructive) {
+                        deleteComment()
+                    } label: {
+                        Label(
+                            String(localized: "Delete", comment: "Context menu item to delete memo"),
+                            systemImage: "trash"
+                        )
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(LiquidGlassTheme.colors.tertiaryText)
+                        .frame(width: 24, height: 24)
+                        .contentShape(Rectangle())
+                }
+                .menuStyle(.borderlessButton)
+                .opacity(isHovered ? 1 : 0.6)
             }
             
             MemoMarkdownContent(content: memo.contentWithoutTags)
                 .textSelection(.enabled)
+
+            if !nonCommentRelations.isEmpty {
+                commentRelationsView
+            }
 
             if !memo.attachments.isEmpty {
                 attachmentsView(for: memo)
@@ -290,6 +347,14 @@ struct CommentCard: View {
                         .stroke(LiquidGlassTheme.colors.border.opacity(0.1), lineWidth: 0.5)
                 )
         )
+        .onHover { hovering in
+            withAnimation(LiquidGlassTheme.animation.easeOut) {
+                isHovered = hovering
+            }
+        }
+        .sheet(isPresented: $showEditSheet, onDismiss: onCommentChanged) {
+            ComposeMemoView(editingMemo: memo, isCommentEditor: true)
+        }
     }
 
     private func attachmentsView(for memo: Memo) -> some View {
@@ -314,6 +379,156 @@ struct CommentCard: View {
                 }
             }
         }
+    }
+
+    private func copyContent() {
+        #if os(macOS)
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(memo.content, forType: .string)
+        #else
+        UIPasteboard.general.string = memo.content
+        #endif
+    }
+
+    private func deleteComment() {
+        do {
+            guard appState.matchesActiveAccount(accountID: memo.accountID, memoName: memo.name) else {
+                return
+            }
+
+            let context = LocalDatabase.shared.context
+
+            // Keep comment counters and relation graph consistent when removing a comment memo.
+            let relationDescriptor = FetchDescriptor<Relation>()
+            let relatedCommentRelations = (try? context.fetch(relationDescriptor))?.filter {
+                $0.type == .comment && ($0.relatedMemo == memo.name || $0.memo == memo.name)
+            } ?? []
+            for relation in relatedCommentRelations {
+                context.delete(relation)
+            }
+
+            if memo.name.hasPrefix("local_") || memo.name.hasPrefix("local_comment_") {
+                LocalDatabase.shared.deletePendingOutboxTasks(forMemoId: memo.name)
+                LocalDatabase.shared.deleteMemo(memo)
+                try context.save()
+                onCommentChanged()
+                return
+            }
+
+            if appState.isLocalMode {
+                LocalDatabase.shared.deleteMemo(memo)
+                try context.save()
+                onCommentChanged()
+                return
+            }
+
+            let payload = SimpleMemoPayload(
+                contentSummary: memo.truncatedContent,
+                accountID: appState.activeAccountID
+            )
+            let payloadData = (try? JSONEncoder().encode(payload)) ?? Data()
+            let task = OutboxTask(type: .deleteMemo, payload: payloadData, memoId: memo.name)
+            context.insert(task)
+            LocalDatabase.shared.deleteMemo(memo)
+            try context.save()
+            SyncEngine.shared.triggerSync()
+            onCommentChanged()
+        } catch {
+            appState.errorMessage = error.localizedDescription
+        }
+    }
+
+    private var nonCommentRelations: [Relation] {
+        let sourceRelations: [Relation]
+        if memo.modelContext != nil {
+            sourceRelations = memo.validRelations
+        } else {
+            sourceRelations = memo.relations
+        }
+        return sourceRelations.filter { $0.type != .comment }
+    }
+
+    private var commentRelationsView: some View {
+        let outgoing = nonCommentRelations.filter { $0.memo == memo.name }
+        let incoming = nonCommentRelations.filter { $0.relatedMemo == memo.name }
+
+        return VStack(alignment: .leading, spacing: 8) {
+            if !outgoing.isEmpty {
+                relationBlock(
+                    title: String(localized: "References", comment: "Reference section"),
+                    icon: "link",
+                    items: outgoing
+                )
+            }
+
+            if !incoming.isEmpty {
+                relationBlock(
+                    title: String(localized: "Referenced By", comment: "Referenced by section"),
+                    icon: "arrow.uturn.left",
+                    items: incoming
+                )
+            }
+        }
+    }
+
+    private func relationBlock(title: String, icon: String, items: [Relation]) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.system(size: 10))
+                Text(title)
+                Text(items.count, format: .number)
+            }
+            .font(LiquidGlassTheme.typography.caption)
+            .foregroundColor(LiquidGlassTheme.colors.tertiaryText)
+
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(items) { relation in
+                    let targetName = relation.memo == memo.name ? relation.relatedMemo : relation.memo
+
+                    if let targetMemo = appState.memosByName[targetName] {
+                        HStack(alignment: .top, spacing: 6) {
+                            Image(systemName: "doc.text")
+                                .font(.system(size: 10))
+                                .foregroundColor(LiquidGlassTheme.colors.tertiaryText)
+
+                            Text(
+                                targetMemo.relationPreviewContent.prefix(80)
+                                    + (targetMemo.relationPreviewContent.count > 80 ? "..." : "")
+                            )
+                            .font(LiquidGlassTheme.typography.caption)
+                            .lineLimit(2)
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 6)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(LiquidGlassTheme.colors.tertiaryBackground)
+                        )
+                        .onTapGesture {
+                            appState.scrollToMemoID = targetName
+                        }
+                        .help(String(localized: "Jump to this memo", comment: "Tooltip for jumping to referenced memo"))
+                    } else {
+                        HStack(spacing: 6) {
+                            Image(systemName: "doc.text")
+                                .font(.system(size: 10))
+                                .foregroundColor(LiquidGlassTheme.colors.tertiaryText)
+                            Text(targetName)
+                                .font(LiquidGlassTheme.typography.caption)
+                                .lineLimit(1)
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 6)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(LiquidGlassTheme.colors.tertiaryBackground)
+                        )
+                    }
+                }
+            }
+        }
+        .padding(.top, 4)
     }
 }
 
@@ -460,7 +675,9 @@ extension MemoDetailView {
             } else {
                 LazyVStack(spacing: 12) {
                     ForEach(comments) { comment in
-                        CommentCard(memo: comment)
+                        CommentCard(memo: comment) {
+                            loadComments()
+                        }
                     }
                 }
             }

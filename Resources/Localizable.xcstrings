@@ -1177,6 +1177,23 @@
         }
       }
     },
+    "Edit Comment" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Edit Comment"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "编辑评论"
+          }
+        }
+      }
+    },
     "Editor" : {
       "extractionState" : "manual",
       "localizations" : {

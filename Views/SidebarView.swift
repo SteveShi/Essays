@@ -5,65 +5,127 @@ struct SidebarView: View {
     @Environment(AppState.self) var appState: AppState
     @Query(sort: \Memo.createdAt, order: .reverse) private var allMemos: [Memo]
     @FocusState private var isSearchFocused: Bool
-    
-    // Computed counts
-    private var currentAccountMemos: [Memo] {
-        allMemos.filter {
+
+    private struct SidebarMetrics {
+        let allCount: Int
+        let todayCount: Int
+        let past7DaysCount: Int
+        let archivedCount: Int
+        let attachmentCount: Int
+        let publicCount: Int
+        let protectedCount: Int
+        let privateCount: Int
+        let tags: [Tag]
+        let memoDateComponents: Set<DateComponents>
+    }
+
+    private func computeSidebarMetrics() -> SidebarMetrics {
+        let currentAccountMemos = allMemos.filter {
             appState.matchesActiveAccount(accountID: $0.accountID, memoName: $0.name)
                 && !$0.isSystemCommentMemo
         }
-    }
-    
-    private var allCount: Int { currentAccountMemos.filter { $0.state == .normal }.count }
-    private var todayCount: Int {
-        let today = Calendar.current.startOfDay(for: Date())
-        return currentAccountMemos.filter { $0.state == .normal && $0.createdAt >= today }.count
-    }
-    private var archivedCount: Int { currentAccountMemos.filter { $0.state == .archived }.count }
-    private var attachmentCount: Int { currentAccountMemos.filter { $0.state == .normal && !$0.attachments.isEmpty }.count }
-    
-    private var publicCount: Int { currentAccountMemos.filter { $0.state == .normal && $0.visibility == .public }.count }
-    private var protectedCount: Int { currentAccountMemos.filter { $0.state == .normal && $0.visibility == .protected }.count }
-    private var privateCount: Int { currentAccountMemos.filter { $0.state == .normal && $0.visibility == .private }.count }
-    
-    private var tags: [Tag] {
-        var dict: [String: Int] = [:]
-        for memo in currentAccountMemos where memo.state == .normal {
+
+        var allCount = 0
+        var todayCount = 0
+        var past7DaysCount = 0
+        var archivedCount = 0
+        var attachmentCount = 0
+        var publicCount = 0
+        var protectedCount = 0
+        var privateCount = 0
+        var tagDict: [String: Int] = [:]
+        var memoDateComponents = Set<DateComponents>()
+
+        let calendar = Calendar.current
+        let now = Date()
+        let today = calendar.startOfDay(for: now)
+        let weekAgo = calendar.date(byAdding: .day, value: -7, to: now) ?? .distantPast
+
+        for memo in currentAccountMemos {
+            memoDateComponents.insert(calendar.dateComponents([.year, .month, .day], from: memo.createdAt))
+
+            if memo.state == .archived {
+                archivedCount += 1
+                continue
+            }
+            guard memo.state == .normal else { continue }
+
+            allCount += 1
+            if memo.createdAt >= today {
+                todayCount += 1
+            }
+            if memo.createdAt >= weekAgo {
+                past7DaysCount += 1
+            }
+            if !memo.attachments.isEmpty {
+                attachmentCount += 1
+            }
+
+            switch memo.visibility {
+            case .public:
+                publicCount += 1
+            case .protected:
+                protectedCount += 1
+            case .private:
+                privateCount += 1
+            }
+
             for tag in memo.tags {
-                dict[tag, default: 0] += 1
+                tagDict[tag, default: 0] += 1
             }
         }
-        return dict.map { Tag(name: $0.key, count: $0.value) }.sorted { $0.count > $1.count }
-    }
-    
-    private var memoDateComponents: Set<DateComponents> {
-        Set(currentAccountMemos.map { Calendar.current.dateComponents([.year, .month, .day], from: $0.createdAt) })
+
+        var tags: [Tag] = []
+        tags.reserveCapacity(tagDict.count)
+        for (name, count) in tagDict {
+            tags.append(Tag(name: name, count: count))
+        }
+        tags.sort { lhs, rhs in
+            if lhs.count == rhs.count {
+                return lhs.name < rhs.name
+            }
+            return lhs.count > rhs.count
+        }
+
+        return SidebarMetrics(
+            allCount: allCount,
+            todayCount: todayCount,
+            past7DaysCount: past7DaysCount,
+            archivedCount: archivedCount,
+            attachmentCount: attachmentCount,
+            publicCount: publicCount,
+            protectedCount: protectedCount,
+            privateCount: privateCount,
+            tags: tags,
+            memoDateComponents: memoDateComponents
+        )
     }
     
     var body: some View {
         @Bindable var appState = appState
+        let metrics = computeSidebarMetrics()
         #if os(iOS)
         List(selection: $appState.sidebarSelection) {
             Section(String(localized: "Inbox", comment: "Sidebar section header for main actions")) {
-                sidebarLabel(.all, icon: "note.text", title: String(localized: "All Memos", comment: "Sidebar item for all memos"), count: allCount)
-                sidebarLabel(.today, icon: "sun.max", title: String(localized: "Today", comment: "Sidebar item for today's memos"), count: todayCount)
-                sidebarLabel(.past7Days, icon: "clock.arrow.circlepath", title: String(localized: "Past 7 Days", comment: "Sidebar item for memos in the last week"), count: 0) // Placeholder
-                sidebarLabel(.archived, icon: "archivebox", title: String(localized: "Archived", comment: "Sidebar item for archived memos"), count: archivedCount)
-                sidebarLabel(.attachments, icon: "photo.on.rectangle.angled", title: String(localized: "Attachments", comment: "Sidebar item for image gallery"), count: attachmentCount)
+                sidebarLabel(.all, icon: "note.text", title: String(localized: "All Memos", comment: "Sidebar item for all memos"), count: metrics.allCount)
+                sidebarLabel(.today, icon: "sun.max", title: String(localized: "Today", comment: "Sidebar item for today's memos"), count: metrics.todayCount)
+                sidebarLabel(.past7Days, icon: "clock.arrow.circlepath", title: String(localized: "Past 7 Days", comment: "Sidebar item for memos in the last week"), count: metrics.past7DaysCount)
+                sidebarLabel(.archived, icon: "archivebox", title: String(localized: "Archived", comment: "Sidebar item for archived memos"), count: metrics.archivedCount)
+                sidebarLabel(.attachments, icon: "photo.on.rectangle.angled", title: String(localized: "Attachments", comment: "Sidebar item for image gallery"), count: metrics.attachmentCount)
             }
             
-            if !tags.isEmpty {
+            if !metrics.tags.isEmpty {
                 Section(String(localized: "Tags", comment: "Sidebar section header for tags")) {
-                    ForEach(tags.prefix(20)) { tag in
+                    ForEach(metrics.tags.prefix(20)) { tag in
                         sidebarLabel(.tag(tag.name), icon: "tag", title: tag.name, count: tag.count)
                     }
                 }
             }
             
             Section(String(localized: "Visibility", comment: "Sidebar section header for visibility filters")) {
-                sidebarLabel(.publicMemos, icon: "globe", title: String(localized: "Public", comment: "Sidebar item for public memos"), count: publicCount)
-                sidebarLabel(.protectedMemos, icon: MemoVisibility.protected.icon, title: MemoVisibility.protected.displayName, count: protectedCount)
-                sidebarLabel(.privateMemos, icon: "lock", title: String(localized: "Private", comment: "Sidebar item for private memos"), count: privateCount)
+                sidebarLabel(.publicMemos, icon: "globe", title: String(localized: "Public", comment: "Sidebar item for public memos"), count: metrics.publicCount)
+                sidebarLabel(.protectedMemos, icon: MemoVisibility.protected.icon, title: MemoVisibility.protected.displayName, count: metrics.protectedCount)
+                sidebarLabel(.privateMemos, icon: "lock", title: String(localized: "Private", comment: "Sidebar item for private memos"), count: metrics.privateCount)
             }
         }
         .listStyle(.sidebar)
@@ -75,13 +137,13 @@ struct SidebarView: View {
             
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
-                    quickActionsSection
+                    quickActionsSection(metrics: metrics)
                     
-                    calendarSection
+                    calendarSection(metrics: metrics)
                     
-                    tagsSection
+                    tagsSection(metrics: metrics)
                     
-                    filtersSection
+                    filtersSection(metrics: metrics)
                 }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 20)
@@ -161,7 +223,7 @@ struct SidebarView: View {
         }
     }
     
-    private var quickActionsSection: some View {
+    private func quickActionsSection(metrics: SidebarMetrics) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             SectionHeader(title: String(localized: "Inbox", comment: "Sidebar section header for main actions"))
             
@@ -170,56 +232,56 @@ struct SidebarView: View {
                     selection: .all,
                     icon: "note.text",
                     title: String(localized: "All Memos", comment: "Sidebar item for all memos"),
-                    count: allCount
+                    count: metrics.allCount
                 )
                 
                 SidebarLinkItem(
                     selection: .today,
                     icon: "sun.max",
                     title: String(localized: "Today", comment: "Sidebar item for today's memos"),
-                    count: todayCount
+                    count: metrics.todayCount
                 )
                 
                 SidebarLinkItem(
                     selection: .past7Days,
                     icon: "clock.arrow.circlepath",
                     title: String(localized: "Past 7 Days", comment: "Sidebar item for memos in the last week"),
-                    count: 0
+                    count: metrics.past7DaysCount
                 )
                 
                 SidebarLinkItem(
                     selection: .archived,
                     icon: "archivebox",
                     title: String(localized: "Archived", comment: "Sidebar item for archived memos"),
-                    count: archivedCount
+                    count: metrics.archivedCount
                 )
 
                 SidebarLinkItem(
                     selection: .attachments,
                     icon: "photo.on.rectangle.angled",
                     title: String(localized: "Attachments", comment: "Sidebar item for image gallery"),
-                    count: attachmentCount
+                    count: metrics.attachmentCount
                 )
             }
         }
     }
     
-    private var calendarSection: some View {
-        SidebarCalendarView(memoDateComponents: memoDateComponents)
+    private func calendarSection(metrics: SidebarMetrics) -> some View {
+        SidebarCalendarView(memoDateComponents: metrics.memoDateComponents)
     }
     
-    private var tagsSection: some View {
+    private func tagsSection(metrics: SidebarMetrics) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             SectionHeader(title: String(localized: "Tags", comment: "Sidebar section header for tags"))
             
-            if tags.isEmpty {
+            if metrics.tags.isEmpty {
                 Text(String(localized: "No tags yet", comment: "Message shown when no tags are available"))
                     .font(LiquidGlassTheme.typography.footnote)
                     .foregroundColor(LiquidGlassTheme.colors.tertiaryText)
                     .padding(.leading, 4)
             } else {
                 FlowLayout(spacing: 6) {
-                    ForEach(tags.prefix(20)) { tag in
+                    ForEach(metrics.tags.prefix(20)) { tag in
                         TagLinkChip(tag: tag)
                     }
                 }
@@ -227,7 +289,7 @@ struct SidebarView: View {
         }
     }
     
-    private var filtersSection: some View {
+    private func filtersSection(metrics: SidebarMetrics) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             SectionHeader(title: String(localized: "Visibility", comment: "Sidebar section header for visibility filters"))
             
@@ -236,21 +298,21 @@ struct SidebarView: View {
                     selection: .publicMemos,
                     icon: "globe",
                     title: String(localized: "Public", comment: "Sidebar item for public memos"),
-                    count: publicCount
+                    count: metrics.publicCount
                 )
                 
                 SidebarLinkItem(
                     selection: .protectedMemos,
                     icon: MemoVisibility.protected.icon,
                     title: MemoVisibility.protected.displayName,
-                    count: protectedCount
+                    count: metrics.protectedCount
                 )
 
                 SidebarLinkItem(
                     selection: .privateMemos,
                     icon: "lock",
                     title: String(localized: "Private", comment: "Sidebar item for private memos"),
-                    count: privateCount
+                    count: metrics.privateCount
                 )
             }
         }
@@ -592,7 +654,10 @@ struct SidebarCalendarView: View {
         var date = monthFirstWeek.start
         while date < monthLastWeek.end {
             dates.append(date)
-            date = calendar.date(byAdding: .day, value: 1, to: date)!
+            guard let nextDate = calendar.date(byAdding: .day, value: 1, to: date) else {
+                break
+            }
+            date = nextDate
         }
         self.days = dates
     }

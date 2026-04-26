@@ -2,15 +2,21 @@ import Foundation
 import SwiftUI
 import Observation
 import SwiftData
+import OSLog
 
 @MainActor
 @Observable
 class AppState {
-    struct MemoGroup: Identifiable {
-        let id: String
-        let date: Date
-        let memos: [Memo]
-    }
+    private static let logger = Logger(
+        subsystem: Bundle.main.bundleIdentifier ?? "com.steveshi.essays",
+        category: "AppState"
+    )
+
+    private static let sidebarDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
 
     enum SidebarSelection: Hashable {
         case all
@@ -127,15 +133,9 @@ class AppState {
     }
 
     // App Data - Reactive Selection State
-    var searchText: String = "" {
-        didSet { scheduleFilteredUpdate() }
-    }
-    var selectedTag: String? {
-        didSet { scheduleFilteredUpdate() }
-    }
-    var isGalleryMode: Bool = false {
-        didSet { scheduleFilteredUpdate() }
-    }
+    var searchText: String = ""
+    var selectedTag: String?
+    var isGalleryMode: Bool = false
     var isLoading: Bool = false
     var errorMessage: String?
     var isLoggedIn: Bool = false
@@ -150,12 +150,8 @@ class AppState {
     var memos: [Memo] = [] {
         didSet {
             updateRawDataDerivedStates()
-            scheduleFilteredUpdate()
         }
     }
-    var filteredMemos: [Memo] = []
-    var pinnedMemosList: [Memo] = []
-    var timelineGroups: [MemoGroup] = []
     var memosByName: [String: Memo] = [:]
     var tags: [Tag] = []
 
@@ -168,9 +164,6 @@ class AppState {
     var archivedMemosCount: Int = 0
     var imageAttachmentMemosCount: Int = 0
 
-    @ObservationIgnored
-    private var updateTask: Task<Void, Never>?
-    
     // For NavigationSplitView column control (iPhone navigation)
     var columnVisibility: NavigationSplitViewVisibility = .all
     
@@ -213,9 +206,7 @@ class AppState {
             searchText = ""
             selectedTag = tagName
         case .date(let date):
-            let formatter = DateFormatter()
-            formatter.dateFormat = "yyyy-MM-dd"
-            searchText = "created:\(formatter.string(from: date))"
+            searchText = "created:\(Self.sidebarDateFormatter.string(from: date))"
             selectedTag = nil
         case .outbox:
             searchText = ""
@@ -293,21 +284,21 @@ class AppState {
                 }
             } catch MemosAPIError.serverError(let json) where json.contains("\"code\":") {
                 // If it's a valid Memos JSON error (like 404/401), the server IS reachable!
-                print("Server reachable (but returned status error): \(json)")
+                Self.logger.warning("Server reachable (status error payload): \(json, privacy: .public)")
                 await MainActor.run {
                     self.isServerReachable = true
                     self.lastConnectionError = nil
                 }
             } catch MemosAPIError.decodingError {
                 // If the server responded but we couldn't decode, the server IS reachable
-                print("Server reachable (response decoded with unexpected format)")
+                Self.logger.warning("Server reachable with unexpected response format")
                 await MainActor.run {
                     self.isServerReachable = true
                     self.lastConnectionError = nil
                 }
             } catch MemosAPIError.unauthorized {
                 // Server is reachable but token is invalid/expired
-                print("Server reachable (but unauthorized)")
+                Self.logger.warning("Server reachable but unauthorized")
                 await MainActor.run {
                     self.isServerReachable = true
                     self.lastConnectionError = nil
@@ -317,7 +308,7 @@ class AppState {
                     return
                 }
                 let errorDescription = error.localizedDescription
-                print("Server reachability check failed: \(errorDescription)")
+                Self.logger.error("Server reachability check failed: \(errorDescription, privacy: .public)")
                 await MainActor.run {
                     self.isServerReachable = false
                     self.lastConnectionError = errorDescription
@@ -340,7 +331,6 @@ class AppState {
             memo.extractTagsFromContent()
         }
         self.memos = scoped
-        updateFilteredMemosState()
     }
 
     @MainActor
@@ -360,18 +350,7 @@ class AppState {
 
     private func syncPendingMemos() {
         // 同步逻辑将在后续 MemosAPIClient 改造中完善
-        print("Network restored, checking for pending syncs...")
-    }
-
-
-
-    private func scheduleFilteredUpdate() {
-        updateTask?.cancel()
-        updateTask = Task {
-            try? await Task.sleep(nanoseconds: 300_000_000)  // 300ms debounce
-            if Task.isCancelled { return }
-            updateFilteredMemosState()
-        }
+        Self.logger.debug("Network restored, checking for pending syncs")
     }
 
     /// 仅在 memos 原始数据改变时调用的昂贵计算（日历点位、字典索引、全局计数）
@@ -419,42 +398,6 @@ class AppState {
         }
     }
 
-    /// 在搜索、标签过滤或数据变动时调用的过滤状态更新（主要针对当前视图显示）
-    @MainActor
-    func updateFilteredMemosState() {
-        let allFiltered = computeFilteredMemos()
-        self.filteredMemos = allFiltered
-        
-        // Timeline normally only shows NORMAL memos even if filtered, 
-        // unless explicitly searching for archived
-        let visibleMemos: [Memo]
-        if searchText.lowercased().contains("is:archived") {
-            visibleMemos = allFiltered
-        } else {
-            visibleMemos = allFiltered.filter { $0.state == .normal }
-        }
-        
-        self.pinnedMemosList = visibleMemos.filter { $0.pinned }
-        let unpinned = visibleMemos.filter { !$0.pinned }
-        let calendar = Calendar.current
-
-        // Grouping for the timeline
-        let grouped = Dictionary(grouping: unpinned) { memo in
-            calendar.startOfDay(for: memo.createdAt)
-        }
-
-        self.timelineGroups =
-            grouped
-            .map {
-                MemoGroup(
-                    id: "group-\($0.key.timeIntervalSince1970)",
-                    date: $0.key,
-                    memos: $0.value.sorted { $0.createdAt > $1.createdAt }
-                )
-            }
-            .sorted { $0.date > $1.date }
-    }
-    
     func loadSavedCredentials() {
         // 优先从 AccountManager 加载活跃账户
         if let account = AccountManager.shared.activeAccount {
@@ -566,7 +509,6 @@ class AppState {
         // Optimistic UI update: change state immediately
         let previousState = memo.state
         memo.state = .archived
-        updateFilteredMemosState()
         
         do {
             if isLocalMode {
@@ -587,7 +529,6 @@ class AppState {
         } catch {
             // Revert on failure
             memo.state = previousState
-            updateFilteredMemosState()
             self.errorMessage = error.localizedDescription
         }
     }
@@ -598,7 +539,6 @@ class AppState {
         // Optimistic UI update: change state immediately
         let previousState = memo.state
         memo.state = .normal
-        updateFilteredMemosState()
         
         do {
             if isLocalMode {
@@ -619,140 +559,7 @@ class AppState {
         } catch {
             // Revert on failure
             memo.state = previousState
-            updateFilteredMemosState()
             self.errorMessage = error.localizedDescription
         }
-    }
-    
-    private func computeFilteredMemos() -> [Memo] {
-        print(
-            "Computing filters: total memos: \(memos.count), searchText: '\(searchText)', selectedTag: '\(selectedTag ?? "nil")'")
-        var result = memos
-        let (keywordTerms, pinnedFilter, visibilityFilter, stateFilter, createdFilter) = parseSearchFilters(from: searchText)
-        
-        if let pinnedFilter {
-            result = result.filter { $0.pinned == pinnedFilter }
-            print("After pinned filter: \(result.count)")
-        }
-        
-        if let visibilityFilter {
-            result = result.filter { $0.visibility == visibilityFilter }
-            print("After visibility filter (\(visibilityFilter)): \(result.count)")
-        }
-        
-        if let createdFilter {
-            let calendar = Calendar.current
-            let now = Date()
-            switch createdFilter {
-            case .today:
-                result = result.filter { calendar.isDate($0.createdAt, inSameDayAs: now) }
-            case .last7Days:
-                guard let start = calendar.date(byAdding: .day, value: -7, to: now) else { break }
-                result = result.filter { $0.createdAt >= start }
-            case .specificDate(let date):
-                result = result.filter { calendar.isDate($0.createdAt, inSameDayAs: date) }
-            }
-            print("After created filter: \(result.count)")
-        }
-        
-        if !keywordTerms.isEmpty {
-            result = result.filter { memo in
-                keywordTerms.allSatisfy { term in
-                    guard !term.isEmpty else { return true }
-                    return memo.content.localizedCaseInsensitiveContains(term)
-                        || memo.tags.contains { $0.localizedCaseInsensitiveContains(term) }
-                }
-            }
-            print("After keyword filter: \(result.count)")
-        }
-        
-        if let tag = selectedTag {
-            result = result.filter { $0.tags.contains(tag) }
-            print("After tag filter: \(result.count)")
-        }
-        
-        if let stateFilter {
-            result = result.filter { $0.state == stateFilter }
-        } else if !searchText.lowercased().contains("is:archived") {
-            // Default to normal if not searching for archived
-            result = result.filter { $0.state == .normal }
-        }
-        
-        if isGalleryMode {
-            // Gallery mode shows all memos with image attachments
-            result = memos.filter { memo in
-                memo.attachments.contains { $0.isImage }
-            }
-            print("Gallery mode filtered: \(result.count)")
-        }
-
-        print("Final filtered memos: \(result.count)")
-        return result.sorted { $0.pinned && !$1.pinned || ($0.pinned == $1.pinned && $0.createdAt > $1.createdAt) }
-    }
-    
-    private func parseSearchFilters(from rawSearch: String) -> ([String], Bool?, MemoVisibility?, MemoState?, CreatedFilter?) {
-        // We should split by whitespace, but allow for combining spaces inside quotes if needed.
-        // For simplicity, sticking to the whitespace split but ignoring empty.
-        let terms = rawSearch.split(whereSeparator: \.isWhitespace).map { String($0) }
-        
-        var keywordTerms: [String] = []
-        var pinnedFilter: Bool?
-        var visibilityFilter: MemoVisibility?
-        var stateFilter: MemoState?
-        var createdFilter: CreatedFilter?
-        
-        for term in terms {
-            let normalized = term.lowercased()
-            switch normalized {
-            case "is:archived":
-                stateFilter = .archived
-            case "is:normal":
-                stateFilter = .normal
-            case "pinned:true":
-                pinnedFilter = true
-            case "pinned:false":
-                pinnedFilter = false
-            case "visibility:public":
-                visibilityFilter = .public
-            case "visibility:workspace", "visibility:protected":
-                visibilityFilter = .protected
-            case "visibility:private":
-                visibilityFilter = .private
-            case "created:today":
-                createdFilter = .today
-            case "created:7d":
-                createdFilter = .last7Days
-            default:
-                if normalized.hasPrefix("created:") {
-                    let dateStr = String(normalized.dropFirst("created:".count))
-                    let components = dateStr.split(separator: "-").compactMap { Int($0) }
-                    
-                    if components.count == 3 {
-                        var dateComps = DateComponents()
-                        dateComps.year = components[0]
-                        dateComps.month = components[1]
-                        dateComps.day = components[2]
-                        
-                        if let date = Calendar.current.date(from: dateComps) {
-                            createdFilter = .specificDate(date)
-                        } else {
-                            keywordTerms.append(term)
-                        }
-                    } else {
-                        keywordTerms.append(term)
-                    }
-                } else {
-                    keywordTerms.append(term)
-                }
-            }
-        }
-        
-        return (keywordTerms, pinnedFilter, visibilityFilter, stateFilter, createdFilter)
-    }
-
-    private enum CreatedFilter {
-        case today
-        case last7Days
-        case specificDate(Date)
     }
 }

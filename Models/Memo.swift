@@ -123,6 +123,20 @@ extension Memo {
         return joined
     }
 
+    var relationPreviewContent: String {
+        let plainContent = MemoUtility.stripMarkdownLinks(from: contentWithoutTags)
+        let lines = plainContent.components(separatedBy: "\n")
+        let limitedLines = lines.prefix(10)
+        let joined = limitedLines.joined(separator: "\n")
+        if joined.count > 500 {
+            return String(joined.prefix(500)) + "…"
+        }
+        if lines.count > 10 {
+            return joined + "\n…"
+        }
+        return joined
+    }
+
     @MainActor
     var relativeCreatedAtDescription: String {
         Memo.relativeFormatter.localizedString(for: createdAt, relativeTo: Date())

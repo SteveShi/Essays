@@ -10,9 +10,11 @@ struct ComposeMemoView: View {
     @Environment(\.dismiss) private var dismiss
     
     var editingMemo: Memo? = nil
+    var isCommentEditor = false
     
-    init(editingMemo: Memo? = nil) {
+    init(editingMemo: Memo? = nil, isCommentEditor: Bool = false) {
         self.editingMemo = editingMemo
+        self.isCommentEditor = isCommentEditor
     }
     
     @State private var content: String = ""
@@ -60,6 +62,9 @@ struct ComposeMemoView: View {
                 uploadedAttachments = memo.attachments
                 currentLocation = memo.location
             }
+            if isCommentEditor {
+                suggestedTags = []
+            }
             isContentFocused = true
         }
         .onChange(of: content, initial: false) { _, newValue in
@@ -91,7 +96,15 @@ struct ComposeMemoView: View {
             Spacer()
             
             
-            Text(editingMemo == nil ? String(localized: "New Memo", comment: "Header title for new memo") : String(localized: "Edit Memo", comment: "Header title for editing memo"))
+            Text(
+                editingMemo == nil
+                    ? String(localized: "New Memo", comment: "Header title for new memo")
+                    : (
+                        isCommentEditor
+                            ? String(localized: "Edit Comment", comment: "Header title for editing comment")
+                            : String(localized: "Edit Memo", comment: "Header title for editing memo")
+                    )
+            )
                 .font(LiquidGlassTheme.typography.headline)
                 .foregroundColor(LiquidGlassTheme.colors.text)
             
@@ -157,7 +170,7 @@ struct ComposeMemoView: View {
                     }
                 )
             
-            if !suggestedTags.isEmpty {
+            if !isCommentEditor && !suggestedTags.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 6) {
                         ForEach(suggestedTags, id: \.self) { tag in
@@ -221,15 +234,17 @@ struct ComposeMemoView: View {
             Spacer()
             
             HStack(spacing: 12) {
-                Button {
-                    insertTag("")
-                } label: {
-                    Image(systemName: "number")
-                        .font(.system(size: 14, weight: .medium))
+                if !isCommentEditor {
+                    Button {
+                        insertTag("")
+                    } label: {
+                        Image(systemName: "number")
+                            .font(.system(size: 14, weight: .medium))
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundColor(LiquidGlassTheme.colors.secondaryText)
+                    .help(String(localized: "Insert Tag", comment: "Help tooltip for tag button"))
                 }
-                .buttonStyle(.plain)
-                .foregroundColor(LiquidGlassTheme.colors.secondaryText)
-                .help(String(localized: "Insert Tag", comment: "Help tooltip for tag button"))
                 
                 Button {
                     content += "**bold**"
@@ -346,6 +361,11 @@ struct ComposeMemoView: View {
     }
     
     private func updateSuggestedTags(from text: String) {
+        if isCommentEditor {
+            suggestedTags = []
+            return
+        }
+
         var tags: [String] = []
         
         let tagPattern = "#([a-zA-Z0-9_\\u4e00-\\u9fff]+)"
@@ -574,7 +594,7 @@ struct ComposeMemoView: View {
     }
 
     private func saveMemo() {
-        let extractedTags = MemoUtility.extractTags(from: content)
+        let extractedTags = isCommentEditor ? [] : MemoUtility.extractTags(from: content)
         let attachmentNames = uploadedAttachments.map { $0.name }
         
         do {
@@ -591,6 +611,8 @@ struct ComposeMemoView: View {
                     attr.parentMemo = memo
                     memo.attachments.append(attr)
                 }
+
+                syncReferenceRelations(for: memo, content: content)
                 
                 // 2. Enqueue OutboxTask
                 let payload = UpdateMemoPayload(
@@ -630,6 +652,7 @@ struct ComposeMemoView: View {
                     accountID: appState.activeAccountID
                 )
                 LocalDatabase.shared.context.insert(newMemo)
+                syncReferenceRelations(for: newMemo, content: content)
                 
                 // 2. Enqueue OutboxTask
                 if !appState.isLocalMode {
@@ -657,6 +680,32 @@ struct ComposeMemoView: View {
             dismiss()
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+
+    private func syncReferenceRelations(for memo: Memo, content: String) {
+        let context = LocalDatabase.shared.context
+        let referencedMemoNames = Set(MemoUtility.extractReferencedMemoNames(from: content))
+
+        let existingOutgoingReferences = memo.relations.filter {
+            $0.type == .reference && $0.memo == memo.name
+        }
+        let existingRelatedNames = Set(existingOutgoingReferences.map(\.relatedMemo))
+
+        for relation in existingOutgoingReferences where !referencedMemoNames.contains(relation.relatedMemo) {
+            context.delete(relation)
+        }
+
+        for relatedMemoName in referencedMemoNames
+        where relatedMemoName != memo.name && !existingRelatedNames.contains(relatedMemoName) {
+            let relation = Relation(
+                memo: memo.name,
+                relatedMemo: relatedMemoName,
+                type: .reference,
+                parentMemo: memo
+            )
+            context.insert(relation)
+            memo.relations.append(relation)
         }
     }
 }

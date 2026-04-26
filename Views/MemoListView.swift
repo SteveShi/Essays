@@ -32,70 +32,78 @@ struct MemoListView: View {
     private var locationManager = LocationManager.shared
     
     private func computeFilteredMemos() -> [Memo] {
-        var filtered = allMemos.filter {
+        let base = baseMemosForActiveAccount()
+        let sidebarFiltered = applySidebarSelectionFilter(base, selection: appState.sidebarSelection)
+        let keywordTerms = keywordTerms(from: appState.searchText)
+        return applyKeywordFilter(sidebarFiltered, terms: keywordTerms)
+    }
+
+    private func baseMemosForActiveAccount() -> [Memo] {
+        allMemos.filter {
             appState.matchesActiveAccount(accountID: $0.accountID, memoName: $0.name)
                 && !$0.isSystemCommentMemo
         }
-        
-        // 1. Sidebar Selection / State Filter
-        if let selection = appState.sidebarSelection {
-            switch selection {
-            case .all:
-                filtered = filtered.filter { $0.state == .normal }
-            case .today:
-                let today = Calendar.current.startOfDay(for: Date())
-                filtered = filtered.filter { $0.state == .normal && $0.createdAt >= today }
-            case .past7Days:
-                let weekAgo = Calendar.current.date(byAdding: .day, value: -7, to: Date()) ?? Date()
-                filtered = filtered.filter { $0.state == .normal && $0.createdAt >= weekAgo }
-            case .archived:
-                filtered = filtered.filter { $0.state == .archived }
-            case .attachments:
-                filtered = filtered.filter { $0.state == .normal && !$0.attachments.isEmpty }
-            case .publicMemos:
-                filtered = filtered.filter { $0.state == .normal && $0.visibility == .public }
-            case .protectedMemos:
-                filtered = filtered.filter { $0.state == .normal && $0.visibility == .protected }
-            case .privateMemos:
-                filtered = filtered.filter { $0.state == .normal && $0.visibility == .private }
-            case .tag(let tagName):
-                filtered = filtered.filter { memo in
-                    memo.state == .normal && memo.tags.contains(tagName)
-                }
-            case .date(let date):
-                let start = Calendar.current.startOfDay(for: date)
-                let end = Calendar.current.date(byAdding: .day, value: 1, to: start)!
-                filtered = filtered.filter { $0.createdAt >= start && $0.createdAt < end }
-            case .outbox:
-                filtered = filtered.filter { $0.state == .normal }
+    }
+
+    private func applySidebarSelectionFilter(_ memos: [Memo], selection: AppState.SidebarSelection?) -> [Memo] {
+        guard let selection else { return memos }
+        switch selection {
+        case .all:
+            return memos.filter { $0.state == .normal }
+        case .today:
+            let today = Calendar.current.startOfDay(for: Date())
+            return memos.filter { $0.state == .normal && $0.createdAt >= today }
+        case .past7Days:
+            let weekAgo = Calendar.current.date(byAdding: .day, value: -7, to: Date()) ?? Date()
+            return memos.filter { $0.state == .normal && $0.createdAt >= weekAgo }
+        case .archived:
+            return memos.filter { $0.state == .archived }
+        case .attachments:
+            return memos.filter { $0.state == .normal && !$0.attachments.isEmpty }
+        case .publicMemos:
+            return memos.filter { $0.state == .normal && $0.visibility == .public }
+        case .protectedMemos:
+            return memos.filter { $0.state == .normal && $0.visibility == .protected }
+        case .privateMemos:
+            return memos.filter { $0.state == .normal && $0.visibility == .private }
+        case .tag(let tagName):
+            return memos.filter { memo in
+                memo.state == .normal && memo.tags.contains(tagName)
+            }
+        case .date(let date):
+            let start = Calendar.current.startOfDay(for: date)
+            guard let end = Calendar.current.date(byAdding: .day, value: 1, to: start) else {
+                return memos
+            }
+            return memos.filter { $0.createdAt >= start && $0.createdAt < end }
+        case .outbox:
+            return memos.filter { $0.state == .normal }
+        }
+    }
+
+    private func keywordTerms(from searchText: String) -> [String] {
+        let search = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !search.isEmpty else { return [] }
+        return search
+            .split(whereSeparator: \.isWhitespace)
+            .map(String.init)
+            .map { $0.lowercased() }
+            .filter { term in
+                !term.hasPrefix("is:")
+                    && !term.hasPrefix("visibility:")
+                    && !term.hasPrefix("pinned:")
+                    && !term.hasPrefix("created:")
+            }
+    }
+
+    private func applyKeywordFilter(_ memos: [Memo], terms: [String]) -> [Memo] {
+        guard !terms.isEmpty else { return memos }
+        return memos.filter { memo in
+            terms.allSatisfy { term in
+                memo.content.localizedCaseInsensitiveContains(term)
+                    || memo.tags.contains { $0.localizedCaseInsensitiveContains(term) }
             }
         }
-        
-        // 2. Search Text Filter
-        let search = appState.searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !search.isEmpty {
-            let keywordTerms = search
-                .split(whereSeparator: \.isWhitespace)
-                .map(String.init)
-                .map { $0.lowercased() }
-                .filter { term in
-                    !term.hasPrefix("is:")
-                        && !term.hasPrefix("visibility:")
-                        && !term.hasPrefix("pinned:")
-                        && !term.hasPrefix("created:")
-                }
-            
-            if !keywordTerms.isEmpty {
-                filtered = filtered.filter { memo in
-                    keywordTerms.allSatisfy { term in
-                        memo.content.localizedCaseInsensitiveContains(term)
-                            || memo.tags.contains { $0.localizedCaseInsensitiveContains(term) }
-                    }
-                }
-            }
-        }
-        
-        return filtered
     }
     
     private struct MemoDayGroup: Identifiable {
@@ -223,7 +231,7 @@ struct MemoListView: View {
                         }
                         .help(String(localized: "AI Assistant", comment: "Help text for AI assistant button"))
                         .popover(isPresented: $showAIAssistant) {
-                            if let memo = appState.selectedMemoForDetail ?? appState.selectedMemo ?? appState.filteredMemos.first {
+                            if let memo = appState.selectedMemoForDetail ?? appState.selectedMemo ?? computeFilteredMemos().first {
                                 if #available(macOS 26.0, *) {
                                     AIAssistantView(memo: memo)
                                 } else {
@@ -1223,8 +1231,8 @@ struct MemoCard: View {
                                         .fill(LiquidGlassTheme.colors.secondaryBackground)
                                 )
                             Text(
-                                targetMemo.truncatedContent.prefix(100)
-                                    + (targetMemo.truncatedContent.count > 100 ? "..." : "")
+                                targetMemo.relationPreviewContent.prefix(100)
+                                    + (targetMemo.relationPreviewContent.count > 100 ? "..." : "")
                             )
                             .font(LiquidGlassTheme.typography.caption)
                             .lineLimit(2)

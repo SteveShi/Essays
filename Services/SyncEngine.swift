@@ -1,10 +1,16 @@
 import Foundation
 import SwiftData
 import Observation
+import OSLog
 
 @MainActor
 @Observable
 class SyncEngine {
+    private static let logger = Logger(
+        subsystem: Bundle.main.bundleIdentifier ?? "com.steveshi.essays",
+        category: "SyncEngine"
+    )
+
     static let shared = SyncEngine()
     
     var isSyncing = false
@@ -50,7 +56,7 @@ class SyncEngine {
             self.pendingTasksCount = scopedTasks.filter { $0.state == .pending || $0.state == .retry }.count
             self.errorTasksCount = scopedTasks.filter { $0.state == .error }.count
         } catch {
-            print("Failed to fetch outbox stats: \(error)")
+            Self.logger.error("Failed to fetch outbox stats: \(error.localizedDescription, privacy: .public)")
         }
     }
     
@@ -81,7 +87,7 @@ class SyncEngine {
             await pullLatestMemos()
             
         } catch {
-            print("Sync failed: \(error)")
+            Self.logger.error("Sync failed: \(error.localizedDescription, privacy: .public)")
         }
     }
     
@@ -266,7 +272,7 @@ class SyncEngine {
             NotificationCenter.default.post(name: .syncCompleted, object: nil)
             
         } catch {
-            print("Failed to pull memos: \(error)")
+            Self.logger.error("Failed to pull memos: \(error.localizedDescription, privacy: .public)")
         }
     }
 

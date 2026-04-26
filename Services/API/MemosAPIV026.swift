@@ -1,8 +1,14 @@
 import Foundation
 import SwiftData
 import Observation
+import OSLog
 
 struct MemosAPIV026: MemosAPIProtocol {
+    private static let logger = Logger(
+        subsystem: Bundle.main.bundleIdentifier ?? "com.steveshi.essays",
+        category: "MemosAPIV026"
+    )
+
     private let baseURL: String
     private let accessToken: String
     private let session: URLSession
@@ -134,9 +140,9 @@ struct MemosAPIV026: MemosAPIProtocol {
         do {
             return try makeDecoder().decode(T.self, from: data)
         } catch {
-            print("Decoding error: \(error)")
+            Self.logger.error("Decoding error: \(error.localizedDescription, privacy: .public)")
             if let jsonString = String(data: data, encoding: .utf8) {
-                print("JSON: \(jsonString)")
+                Self.logger.debug("Decoding payload: \(jsonString, privacy: .public)")
             }
             throw MemosAPIError.decodingError(error)
         }
@@ -337,7 +343,7 @@ struct MemosAPIV026: MemosAPIProtocol {
     /// Implementation of full pagination sync.
     /// Fetches ALL memos from the server by following 'nextPageToken' before saving to local database.
     func fetchMemos() async throws -> [Memo] {
-        print("Starting full memo sync...")
+        Self.logger.debug("Starting full memo sync")
         
         let normalMemos = try await fetchMemosByState("NORMAL")
         let archivedMemos = try await fetchMemosByState("ARCHIVED")
@@ -346,7 +352,7 @@ struct MemosAPIV026: MemosAPIProtocol {
         
         // Map all collected pages to models
         let memos = allMemosData.map { mapMemoDataToModel($0) }
-        print("Sync complete. Total memos to save: \(memos.count)")
+        Self.logger.debug("Sync complete. Total memos to save: \(memos.count)")
         
         // Save to local database and return the managed versions
         return memos
@@ -356,7 +362,7 @@ struct MemosAPIV026: MemosAPIProtocol {
         var allMemosData: [MemoData] = []
         var nextPageToken: String? = nil
         
-        print("Fetching memos with state: \(state)...")
+        Self.logger.debug("Fetching memos with state: \(state, privacy: .public)")
         
         repeat {
             guard var urlComponents = URLComponents(string: "\(baseURL)/api/v1/memos") else {
@@ -459,7 +465,7 @@ struct MemosAPIV026: MemosAPIProtocol {
                 let detailed = try await self.fetchAttachment(resourceName: attachment.name)
                 results[index] = detailed
             } catch {
-                print("Failed to hydrate attachment: \(error)")
+                Self.logger.error("Failed to hydrate attachment: \(error.localizedDescription, privacy: .public)")
             }
         }
         return results
