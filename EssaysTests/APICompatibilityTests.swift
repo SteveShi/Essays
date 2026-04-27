@@ -6,7 +6,7 @@ struct APICompatibilityTests {
 
     @Test("Verify OutboxTask Payload Serialization")
     func testOutboxPayloadSerialization() throws {
-        let payload = CreateMemoPayload(
+        let payload = MemoPayload(
             content: "Test Content #tag",
             visibility: "PRIVATE",
             pinned: true,
@@ -16,13 +16,13 @@ struct APICompatibilityTests {
             locationLatitude: 1.23,
             locationLongitude: 4.56
         )
-        
+
         let encoder = JSONEncoder()
         let data = try encoder.encode(payload)
-        
+
         let decoder = JSONDecoder()
-        let decoded = try decoder.decode(CreateMemoPayload.self, from: data)
-        
+        let decoded = try decoder.decode(MemoPayload.self, from: data)
+
         #expect(decoded.content == "Test Content #tag")
         #expect(decoded.tags?.contains("tag") == true)
         #expect(decoded.locationPlaceholder == "Office")
@@ -33,7 +33,7 @@ struct APICompatibilityTests {
         // This test ensures the SyncEngine correctly interprets task types
         let task = OutboxTask(
             type: .createMemo,
-            payload: try JSONEncoder().encode(CreateMemoPayload(content: "Sync Test", visibility: "PRIVATE", pinned: false, tags: nil, attachmentNames: nil, locationPlaceholder: nil, locationLatitude: nil, locationLongitude: nil))
+            payload: try JSONEncoder().encode(MemoPayload(content: "Sync Test", visibility: "PRIVATE", pinned: false, tags: nil, attachmentNames: nil, locationPlaceholder: nil, locationLatitude: nil, locationLongitude: nil))
         )
         
         #expect(task.type == .createMemo)

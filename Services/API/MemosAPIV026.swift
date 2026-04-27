@@ -50,75 +50,7 @@ struct MemosAPIV026: MemosAPIProtocol {
         request.httpBody = body
         return request
     }
-    
 
-    private let decoder: JSONDecoder = {
-        let decoder = JSONDecoder()
-        decoder.keyDecodingStrategy = .convertFromSnakeCase
-        decoder.dateDecodingStrategy = .custom { decoder in
-            let container = try decoder.singleValueContainer()
-            let dateString = try container.decode(String.self)
-            
-            // Standard ISO8601 variants
-            let formatters: [ISO8601DateFormatter] = [
-                {
-                    let f = ISO8601DateFormatter()
-                    f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-                    return f
-                }(),
-                {
-                    let f = ISO8601DateFormatter()
-                    f.formatOptions = [.withInternetDateTime]
-                    return f
-                }(),
-            ]
-
-            for formatter in formatters {
-                if let date = formatter.date(from: dateString) {
-                    return date
-                }
-            }
-
-            // Fallback for more aggressive fractional seconds (Memos Go backend sometimes returns many digits)
-            // Using a more manual approach if ISO8601DateFormatter fails
-            let commonDateFormatter = DateFormatter()
-            commonDateFormatter.calendar = Calendar(identifier: .iso8601)
-            commonDateFormatter.locale = Locale(identifier: "en_US_POSIX")
-            commonDateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
-
-            let possibleFormats = [
-                "yyyy-MM-dd'T'HH:mm:ss.SSSSSSSSSXXXXX",
-                "yyyy-MM-dd'T'HH:mm:ss.SSSSSSXXXXX",
-                "yyyy-MM-dd'T'HH:mm:ss.SSSXXXXX",
-                "yyyy-MM-dd'T'HH:mm:ssXXXXX",
-            ]
-
-            for format in possibleFormats {
-                commonDateFormatter.dateFormat = format
-                if let date = commonDateFormatter.date(from: dateString) {
-                    return date
-                }
-            }
-            
-            throw DecodingError.dataCorruptedError(in: container, debugDescription: "Cannot decode date: \(dateString)")
-        }
-        return decoder
-    }()
-
-    private func makeDecoder() -> JSONDecoder {
-        return decoder
-    }
-
-    private func parseRelationType(_ rawValue: String) -> Relation.RelationType {
-        let normalized = rawValue.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
-        if normalized.contains("COMMENT") {
-            return .comment
-        }
-        if normalized.contains("REFERENCE") {
-            return .reference
-        }
-        return Relation.RelationType(rawValue: normalized) ?? .unspecified
-    }
 
     private func performRequest<T: Decodable>(_ request: URLRequest) async throws -> T {
         let (data, response) = try await session.data(for: request)
@@ -138,7 +70,7 @@ struct MemosAPIV026: MemosAPIProtocol {
         }
         
         do {
-            return try makeDecoder().decode(T.self, from: data)
+            return try MemosAPIDecoder.shared.decode(T.self, from: data)
         } catch {
             Self.logger.error("Decoding error: \(error.localizedDescription, privacy: .public)")
             if let jsonString = String(data: data, encoding: .utf8) {
@@ -309,7 +241,7 @@ struct MemosAPIV026: MemosAPIProtocol {
             let accessToken: String?
         }
         
-        let signInResponse = try makeDecoder().decode(SignInResponse.self, from: data)
+        let signInResponse = try MemosAPIDecoder.shared.decode(SignInResponse.self, from: data)
         
         let tokenFromHeader: String? = {
             guard let authHeader = httpResponse.value(forHTTPHeaderField: "Authorization") else {
@@ -389,7 +321,7 @@ struct MemosAPIV026: MemosAPIProtocol {
                   (200...299).contains(httpResponse.statusCode) else {
                 throw MemosAPIError.invalidResponse
             }
-            let decoder = makeDecoder()
+            let decoder = MemosAPIDecoder.shared
             
             if let memoResponse = try? decoder.decode(MemoResponse.self, from: data) {
                 let filtered = (memoResponse.memos ?? []).filter { ($0.state ?? "NORMAL").uppercased() == state }
@@ -597,7 +529,7 @@ struct MemosAPIV026: MemosAPIProtocol {
         let localRelations = (data.relations ?? data.relationList ?? []).map {
             Relation(
                 memo: $0.memo.value, relatedMemo: $0.relatedMemo.value,
-                type: parseRelationType($0.type))
+                type: Relation.RelationType.parse($0.type))
         }
 
         let memoModel = Memo(
@@ -755,7 +687,7 @@ struct MemosAPIV026: MemosAPIProtocol {
                 throw MemosAPIError.invalidResponse
             }
             
-            let decoder = makeDecoder()
+            let decoder = MemosAPIDecoder.shared
             if let memoResponse = try? decoder.decode(MemoResponse.self, from: data) {
                 allMemosData.append(contentsOf: memoResponse.memos ?? [])
                 nextPageToken = memoResponse.nextPageToken
@@ -802,7 +734,7 @@ struct MemosAPIV026: MemosAPIProtocol {
         let localRelations = (data.relations ?? data.relationList ?? []).map {
             Relation(
                 memo: $0.memo.value, relatedMemo: $0.relatedMemo.value,
-                type: parseRelationType($0.type))
+                type: Relation.RelationType.parse($0.type))
         }
 
         let memoModel = Memo(

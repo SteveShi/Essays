@@ -615,7 +615,7 @@ struct ComposeMemoView: View {
                 LocalDatabase.shared.syncReferenceRelations(for: memo, content: content)
                 
                 // 2. Enqueue OutboxTask
-                let payload = UpdateMemoPayload(
+                let payload = MemoPayload(
                     content: content,
                     visibility: visibility.rawValue,
                     pinned: memo.pinned,
@@ -656,7 +656,7 @@ struct ComposeMemoView: View {
                 
                 // 2. Enqueue OutboxTask
                 if !appState.isLocalMode {
-                    let payload = CreateMemoPayload(
+                    let payload = MemoPayload(
                         content: content,
                         visibility: visibility.rawValue,
                         pinned: false,

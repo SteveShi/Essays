@@ -173,9 +173,9 @@ class SyncEngine {
     private func extractAccountID(from task: OutboxTask) -> String? {
         switch task.type {
         case .createMemo:
-            return (try? JSONDecoder().decode(CreateMemoPayload.self, from: task.payload))?.accountID
+            return (try? JSONDecoder().decode(MemoPayload.self, from: task.payload))?.accountID
         case .updateMemo:
-            return (try? JSONDecoder().decode(UpdateMemoPayload.self, from: task.payload))?.accountID
+            return (try? JSONDecoder().decode(MemoPayload.self, from: task.payload))?.accountID
         case .togglePinMemo:
             return (try? JSONDecoder().decode(TogglePinPayload.self, from: task.payload))?.accountID
         case .archiveMemo, .unarchiveMemo, .deleteMemo:
@@ -194,7 +194,7 @@ class SyncEngine {
     private func executeTask(_ task: OutboxTask) async throws {
         switch task.type {
         case .createMemo:
-            if let payload = try? JSONDecoder().decode(CreateMemoPayload.self, from: task.payload) {
+            if let payload = try? JSONDecoder().decode(MemoPayload.self, from: task.payload) {
                 if let localMemoId = task.memoId, localMemoId.hasPrefix("local_") {
                     let localMemoDescriptor = FetchDescriptor<Memo>(predicate: #Predicate<Memo> { $0.name == localMemoId })
                     let localMemoExists = ((try? LocalDatabase.shared.context.fetch(localMemoDescriptor)) ?? []).isEmpty == false
@@ -221,7 +221,7 @@ class SyncEngine {
             }
             
         case .updateMemo:
-            if let memoId = task.memoId, let payload = try? JSONDecoder().decode(UpdateMemoPayload.self, from: task.payload) {
+            if let memoId = task.memoId, let payload = try? JSONDecoder().decode(MemoPayload.self, from: task.payload) {
                 var loc: Location? = nil
                 if let lat = payload.locationLatitude, let lon = payload.locationLongitude {
                     loc = Location(placeholder: payload.locationPlaceholder ?? "", latitude: lat, longitude: lon)

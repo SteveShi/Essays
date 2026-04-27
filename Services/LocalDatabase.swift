@@ -539,7 +539,7 @@ final class LocalDatabase {
             try? context.save()
             
             // Notify UI that an ID has changed
-            NotificationCenter.default.post(name: Notification.Name("syncCompleted"), object: nil)
+            NotificationCenter.default.post(name: .syncCompleted, object: nil)
         }
     }
 
@@ -613,7 +613,7 @@ final class LocalDatabase {
             }
 
             if task.type == .createMemo,
-               let payload = try? JSONDecoder().decode(CreateMemoPayload.self, from: task.payload),
+               let payload = try? JSONDecoder().decode(MemoPayload.self, from: task.payload),
                payload.accountID == "local"
             {
                 context.delete(task)
@@ -621,7 +621,7 @@ final class LocalDatabase {
             }
 
             if task.type == .updateMemo,
-               let payload = try? JSONDecoder().decode(UpdateMemoPayload.self, from: task.payload),
+               let payload = try? JSONDecoder().decode(MemoPayload.self, from: task.payload),
                payload.accountID == "local"
             {
                 context.delete(task)
@@ -645,12 +645,10 @@ final class LocalDatabase {
 
             // No account marker and no resolvable memo: treat as orphan task and drop.
             if task.memoId == nil {
-                let createPayload = try? JSONDecoder().decode(CreateMemoPayload.self, from: task.payload)
-                let updatePayload = try? JSONDecoder().decode(UpdateMemoPayload.self, from: task.payload)
+                let memoPayload = try? JSONDecoder().decode(MemoPayload.self, from: task.payload)
                 let togglePayload = try? JSONDecoder().decode(TogglePinPayload.self, from: task.payload)
                 let simplePayload = try? JSONDecoder().decode(SimpleMemoPayload.self, from: task.payload)
-                let hasAccountHint = createPayload?.accountID != nil
-                    || updatePayload?.accountID != nil
+                let hasAccountHint = memoPayload?.accountID != nil
                     || togglePayload?.accountID != nil
                     || simplePayload?.accountID != nil
                 if !hasAccountHint {

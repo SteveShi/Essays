@@ -625,7 +625,7 @@ struct MemoListView: View {
             
             // 2. Enqueue OutboxTask
             if !appState.isLocalMode {
-                let payload = CreateMemoPayload(
+                let payload = MemoPayload(
                     content: trimmed,
                     visibility: quickCaptureVisibility.rawValue,
                     pinned: false,

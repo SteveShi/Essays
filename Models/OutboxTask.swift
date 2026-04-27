@@ -63,10 +63,8 @@ final class OutboxTask {
     
     var contentSummary: String? {
         switch type {
-        case .createMemo:
-            return (try? JSONDecoder().decode(CreateMemoPayload.self, from: payload))?.content
-        case .updateMemo:
-            return (try? JSONDecoder().decode(UpdateMemoPayload.self, from: payload))?.content
+        case .createMemo, .updateMemo:
+            return (try? JSONDecoder().decode(MemoPayload.self, from: payload))?.content
         case .togglePinMemo:
             return (try? JSONDecoder().decode(TogglePinPayload.self, from: payload))?.contentSummary
         default:
@@ -96,41 +94,8 @@ enum OutboxTaskState: Int, Codable {
 
 // MARK: - Payloads
 
-struct CreateMemoPayload: Codable {
-    let content: String
-    let visibility: String?
-    let pinned: Bool?
-    let tags: [String]?
-    let attachmentNames: [String]?
-    let locationPlaceholder: String?
-    let locationLatitude: Double?
-    let locationLongitude: Double?
-    let accountID: String?
-
-    init(
-        content: String,
-        visibility: String?,
-        pinned: Bool?,
-        tags: [String]?,
-        attachmentNames: [String]?,
-        locationPlaceholder: String?,
-        locationLatitude: Double?,
-        locationLongitude: Double?,
-        accountID: String? = nil
-    ) {
-        self.content = content
-        self.visibility = visibility
-        self.pinned = pinned
-        self.tags = tags
-        self.attachmentNames = attachmentNames
-        self.locationPlaceholder = locationPlaceholder
-        self.locationLatitude = locationLatitude
-        self.locationLongitude = locationLongitude
-        self.accountID = accountID
-    }
-}
-
-struct UpdateMemoPayload: Codable {
+/// Outbox 任务的统一负载：create/update memo 字段一致，由 OutboxTaskType 区分意图。
+struct MemoPayload: Codable {
     let content: String
     let visibility: String?
     let pinned: Bool?

@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.6] - 2026-04-27
+
+### Changed
+- 🧹 **Internal Cleanup**: Consolidated duplicate JSON decoder configuration and relation-type parsing across the v0.26/v0.27 API clients into shared helpers, and merged the identical create/update outbox payload types into a single `MemoPayload`. Pure internal refactor — no user-facing behavior change, existing pending sync tasks continue to work.
+
+---
+
+### Chinese
+
+### 修改
+- 🧹 **内部清理**：将 v0.26/v0.27 API 客户端中重复的 JSON 解码器配置与关系类型解析逻辑抽取为共享 helper，并合并字段完全一致的 create/update outbox 负载为单一 `MemoPayload`。纯内部重构，行为不变，已存在的待同步任务继续正常工作。
+
+---
+
 ## [2.5.5] - 2026-04-27
 
 ### Fixed
