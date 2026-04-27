@@ -621,6 +621,7 @@ struct MemoListView: View {
                 accountID: appState.activeAccountID
             )
             LocalDatabase.shared.context.insert(newMemo)
+            LocalDatabase.shared.syncReferenceRelations(for: newMemo, content: trimmed)
             
             // 2. Enqueue OutboxTask
             if !appState.isLocalMode {
@@ -887,7 +888,7 @@ struct MemoCard: View {
                     locationView(location)
                 }
 
-                let relations = memo.relations
+                let relations = memo.validRelations.filter { $0.type != .comment }
                 if !relations.isEmpty {
                     relationsView
                 }

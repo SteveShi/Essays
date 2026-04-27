@@ -168,10 +168,14 @@ final class Relation: Identifiable {
         self.relatedMemo = relatedMemo
         self.typeRaw = type.rawValue
         self.parentMemo = parentMemo
-        self.relationID = "\(memo)-\(relatedMemo)-\(type.rawValue)"
+        self.relationID = Self.identifier(memo: memo, relatedMemo: relatedMemo, type: type)
     }
 
     var id: String { relationID }
+
+    static func identifier(memo: String, relatedMemo: String, type: RelationType) -> String {
+        "\(memo)-\(relatedMemo)-\(type.rawValue)"
+    }
 
     enum RelationType: String, Codable, CaseIterable, Sendable {
         case reference = "REFERENCE"

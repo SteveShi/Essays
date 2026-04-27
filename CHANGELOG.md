@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.5] - 2026-04-27
+
+### Fixed
+- 🔗 **Reference and Backlink Consistency**: Centralized local memo reference syncing so edited memos, newly composed memos, timeline quick captures, and Quick Input memos all create and remove reference relations consistently.
+- 🔁 **Temporary ID Reference Migration**: Updated local reference relations when pending `local_...` memos are replaced by server `memos/...` IDs after sync.
+- ↩️ **Referenced-By Visibility**: Timeline cards now show relation sections for memos that are only referenced by other memos, not just memos with outgoing references.
+
+---
+
+### Chinese
+
+### 修复
+- 🔗 **引用与被引用一致性**: 统一本地 Memo 引用关系同步逻辑，编辑、新建、时间线快速捕获与快捷输入都会一致地创建和移除引用关系。
+- 🔁 **临时 ID 引用迁移**: 当待同步的 `local_...` Memo 在同步后替换为服务端 `memos/...` ID 时，同步更新本地引用关系。
+- ↩️ **被引用可见性**: 时间线卡片现在会显示纯“被引用”的关系区，不再只显示存在出站引用的 Memo。
+
+---
+
 ## [2.5.3] - 2026-04-26
 
 ### Added

@@ -281,6 +281,7 @@ struct QuickInputWindowView: View {
                     isPendingSync: !isLocalMode
                 )
                 LocalDatabase.shared.context.insert(newMemo)
+                LocalDatabase.shared.syncReferenceRelations(for: newMemo, content: trimmed)
                 
                 if !isLocalMode {
                     let payload = CreateMemoPayload(

@@ -427,6 +427,36 @@ final class LocalDatabase {
         }
         target.relations = finalRelations
     }
+
+    func syncReferenceRelations(for memo: Memo, content: String) {
+        let referencedMemoNames = Set(MemoUtility.extractReferencedMemoNames(from: content))
+        let memoName = memo.name
+        let referenceType = Relation.RelationType.reference.rawValue
+        let descriptor = FetchDescriptor<Relation>(
+            predicate: #Predicate<Relation> { relation in
+                relation.typeRaw == referenceType && relation.memo == memoName
+            }
+        )
+        let existingOutgoingReferences = (try? context.fetch(descriptor)) ?? []
+        let existingRelatedNames = Set(existingOutgoingReferences.map(\.relatedMemo))
+
+        for relation in existingOutgoingReferences where !referencedMemoNames.contains(relation.relatedMemo) {
+            relation.parentMemo?.relations.removeAll { $0 === relation }
+            context.delete(relation)
+        }
+
+        for relatedMemoName in referencedMemoNames
+        where relatedMemoName != memoName && !existingRelatedNames.contains(relatedMemoName) {
+            let relation = Relation(
+                memo: memoName,
+                relatedMemo: relatedMemoName,
+                type: .reference,
+                parentMemo: memo
+            )
+            context.insert(relation)
+            memo.relations.append(relation)
+        }
+    }
     
     func fetchAllMemos() -> [Memo] {
         let descriptor = FetchDescriptor<Memo>(sortBy: [SortDescriptor(\.createdAt, order: .reverse)])
@@ -494,6 +524,8 @@ final class LocalDatabase {
             for attachment in existing.attachments {
                 attachment.memoName = newMemo.name
             }
+
+            updateRelationsReplacingMemoName(oldId: oldId, newId: newMemo.name, parentMemo: existing)
             
             // Keep pending outbox tasks pointing to the new server ID.
             let taskDescriptor = FetchDescriptor<OutboxTask>(predicate: #Predicate<OutboxTask> { $0.memoId == oldId })
@@ -508,6 +540,55 @@ final class LocalDatabase {
             
             // Notify UI that an ID has changed
             NotificationCenter.default.post(name: Notification.Name("syncCompleted"), object: nil)
+        }
+    }
+
+    private func updateRelationsReplacingMemoName(oldId: String, newId: String, parentMemo: Memo) {
+        let descriptor = FetchDescriptor<Relation>(
+            predicate: #Predicate<Relation> { relation in
+                relation.memo == oldId || relation.relatedMemo == oldId
+            }
+        )
+        let affectedRelations = (try? context.fetch(descriptor)) ?? []
+
+        for relation in affectedRelations {
+            let nextMemo = relation.memo == oldId ? newId : relation.memo
+            let nextRelatedMemo = relation.relatedMemo == oldId ? newId : relation.relatedMemo
+            let nextID = Relation.identifier(
+                memo: nextMemo,
+                relatedMemo: nextRelatedMemo,
+                type: relation.type
+            )
+
+            let duplicateDescriptor = FetchDescriptor<Relation>(
+                predicate: #Predicate<Relation> { candidate in
+                    candidate.relationID == nextID
+                }
+            )
+            let duplicate = (try? context.fetch(duplicateDescriptor))?
+                .first { $0 !== relation }
+
+            if let duplicate {
+                relation.parentMemo?.relations.removeAll { $0 === relation }
+                context.delete(relation)
+                if duplicate.memo == newId {
+                    duplicate.parentMemo = parentMemo
+                    if !parentMemo.relations.contains(where: { $0 === duplicate }) {
+                        parentMemo.relations.append(duplicate)
+                    }
+                }
+                continue
+            }
+
+            relation.memo = nextMemo
+            relation.relatedMemo = nextRelatedMemo
+            relation.relationID = nextID
+            if nextMemo == newId {
+                relation.parentMemo = parentMemo
+                if !parentMemo.relations.contains(where: { $0 === relation }) {
+                    parentMemo.relations.append(relation)
+                }
+            }
         }
     }
     

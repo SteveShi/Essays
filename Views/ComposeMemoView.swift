@@ -612,7 +612,7 @@ struct ComposeMemoView: View {
                     memo.attachments.append(attr)
                 }
 
-                syncReferenceRelations(for: memo, content: content)
+                LocalDatabase.shared.syncReferenceRelations(for: memo, content: content)
                 
                 // 2. Enqueue OutboxTask
                 let payload = UpdateMemoPayload(
@@ -652,7 +652,7 @@ struct ComposeMemoView: View {
                     accountID: appState.activeAccountID
                 )
                 LocalDatabase.shared.context.insert(newMemo)
-                syncReferenceRelations(for: newMemo, content: content)
+                LocalDatabase.shared.syncReferenceRelations(for: newMemo, content: content)
                 
                 // 2. Enqueue OutboxTask
                 if !appState.isLocalMode {
@@ -683,31 +683,6 @@ struct ComposeMemoView: View {
         }
     }
 
-    private func syncReferenceRelations(for memo: Memo, content: String) {
-        let context = LocalDatabase.shared.context
-        let referencedMemoNames = Set(MemoUtility.extractReferencedMemoNames(from: content))
-
-        let existingOutgoingReferences = memo.relations.filter {
-            $0.type == .reference && $0.memo == memo.name
-        }
-        let existingRelatedNames = Set(existingOutgoingReferences.map(\.relatedMemo))
-
-        for relation in existingOutgoingReferences where !referencedMemoNames.contains(relation.relatedMemo) {
-            context.delete(relation)
-        }
-
-        for relatedMemoName in referencedMemoNames
-        where relatedMemoName != memo.name && !existingRelatedNames.contains(relatedMemoName) {
-            let relation = Relation(
-                memo: memo.name,
-                relatedMemo: relatedMemoName,
-                type: .reference,
-                parentMemo: memo
-            )
-            context.insert(relation)
-            memo.relations.append(relation)
-        }
-    }
 }
 
 struct MemoPicker: View {
