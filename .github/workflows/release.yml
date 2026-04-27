@@ -165,8 +165,13 @@ jobs:
         env:
           SPARKLE_SECRET: ${{ secrets.SPARKLE_PRIVATE_KEY }}
         run: |
-          curl -L -O https://github.com/sparkle-project/Sparkle/releases/download/2.9.1/Sparkle-2.9.1.tar.xz
-          tar -xf Sparkle-2.9.1.tar.xz
+          SPARKLE_ASSET_URL=$(
+            curl -fsSL https://api.github.com/repos/sparkle-project/Sparkle/releases/latest |
+            /usr/bin/python3 -c 'import json,sys; r=json.load(sys.stdin); print(next(a["browser_download_url"] for a in r["assets"] if a["name"].endswith(".tar.xz")))'
+          )
+
+          curl -fL -o Sparkle.tar.xz "$SPARKLE_ASSET_URL"
+          tar -xf Sparkle.tar.xz
 
           CLEAN_KEY=$(echo "$SPARKLE_SECRET" | sed 's/EdDSAPrivateKey://' | tr -dc 'A-Za-z0-9+/=')
           
