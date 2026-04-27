@@ -66,3 +66,4 @@ Essays.xcodeproj/
 skills-lock.json
 /.agents
 .vercel
+/.claude
