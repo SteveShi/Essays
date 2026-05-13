@@ -1,6 +1,8 @@
 import SwiftUI
 #if os(macOS)
+import AppKit
 import KeyboardShortcuts
+import UniformTypeIdentifiers
 #endif
 
 struct SettingsView: View {
@@ -13,6 +15,9 @@ struct SettingsView: View {
     @AppStorage("theme") private var theme = "system"
     @AppStorage("enableAIFeatures") private var enableAIFeatures = true
     @AppStorage("targetTranslationLanguage") private var targetTranslationLanguage = "auto"
+    @State private var replaceExistingOnImport = true
+    @State private var dataTransferStatus: String?
+    @State private var isDataTransferRunning = false
     #if os(macOS)
     @State private var updaterViewModel = UpdaterViewModel.shared
     #endif
@@ -280,6 +285,59 @@ struct SettingsView: View {
                 Text(String(localized: "Statistics", comment: "Statistics section header"))
                     .font(LiquidGlassTheme.typography.headline)
             }
+
+            Section {
+                Toggle(
+                    String(localized: "Replace current data when importing", comment: "Toggle for replacing data during archive import"),
+                    isOn: $replaceExistingOnImport
+                )
+
+                HStack {
+                    Button {
+                        exportDataArchive()
+                    } label: {
+                        Label(
+                            String(localized: "Export Data", comment: "Button to export all app data"),
+                            systemImage: "square.and.arrow.up"
+                        )
+                    }
+                    .disabled(isDataTransferRunning)
+
+                    Button {
+                        importDataArchive()
+                    } label: {
+                        Label(
+                            String(localized: "Import Data", comment: "Button to import all app data"),
+                            systemImage: "square.and.arrow.down"
+                        )
+                    }
+                    .disabled(isDataTransferRunning)
+                }
+
+                if appState.isLocalMode {
+                    Button {
+                        chooseActiveLocalDataFolder()
+                    } label: {
+                        Label(
+                            String(localized: "Use Existing Local Folder", comment: "Button to select an existing local data folder"),
+                            systemImage: "folder"
+                        )
+                    }
+                    .disabled(isDataTransferRunning)
+                }
+
+                if let dataTransferStatus {
+                    Text(dataTransferStatus)
+                        .font(.caption)
+                        .foregroundColor(LiquidGlassTheme.colors.secondaryText)
+                        .textSelection(.enabled)
+                }
+            } header: {
+                Text(String(localized: "Data Transfer", comment: "Data transfer settings section header"))
+                    .font(LiquidGlassTheme.typography.headline)
+            } footer: {
+                Text(String(localized: "Archives include text, images, references, comments, locations, tags, visibility, and archive state.", comment: "Data transfer archive contents footer"))
+            }
             
             // 已保存的账户列表
             if AccountManager.shared.accounts.count > 1 {
@@ -325,6 +383,95 @@ struct SettingsView: View {
         }
         .formStyle(.grouped)
         .padding()
+    }
+
+    private func exportDataArchive() {
+        #if os(macOS)
+        isDataTransferRunning = true
+        defer { isDataTransferRunning = false }
+
+        do {
+            let data = try DataTransferService.exportArchive(forAccountID: appState.activeAccountID)
+            let panel = NSSavePanel()
+            panel.canCreateDirectories = true
+            panel.allowedContentTypes = [.json]
+            panel.nameFieldStringValue = String(localized: "Essays Archive", comment: "Default export archive file name")
+                + "."
+                + DataTransferService.archiveFileExtension
+            panel.message = String(localized: "Choose where to save the Essays data archive.", comment: "Message for export archive save panel")
+            panel.prompt = String(localized: "Export", comment: "Confirm button for export archive panel")
+
+            if panel.runModal() == .OK, let url = panel.url {
+                try data.write(to: url, options: .atomic)
+                dataTransferStatus = String(localized: "Data export completed.", comment: "Status after data export succeeds")
+            }
+        } catch {
+            dataTransferStatus = String(
+                format: String(localized: "Data export failed: %@", comment: "Status after data export fails"),
+                error.localizedDescription
+            )
+        }
+        #else
+        dataTransferStatus = String(localized: "Data transfer is not available on this device.", comment: "Status when data transfer is unavailable")
+        #endif
+    }
+
+    private func importDataArchive() {
+        #if os(macOS)
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.allowedContentTypes = [.json]
+        panel.message = String(localized: "Choose an Essays data archive to import.", comment: "Message for import archive open panel")
+        panel.prompt = String(localized: "Import", comment: "Confirm button for import archive panel")
+
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        isDataTransferRunning = true
+        defer { isDataTransferRunning = false }
+
+        do {
+            let data = try Data(contentsOf: url)
+            let importedCount = try DataTransferService.importArchive(
+                from: data,
+                intoAccountID: appState.activeAccountID,
+                replaceExisting: replaceExistingOnImport
+            )
+            appState.loadLocalCachedMemos()
+            NotificationCenter.default.post(name: .syncCompleted, object: nil)
+            dataTransferStatus = String(
+                format: String(localized: "Data import completed: %lld memos.", comment: "Status after data import succeeds"),
+                Int64(importedCount)
+            )
+        } catch {
+            dataTransferStatus = String(
+                format: String(localized: "Data import failed: %@", comment: "Status after data import fails"),
+                error.localizedDescription
+            )
+        }
+        #else
+        dataTransferStatus = String(localized: "Data transfer is not available on this device.", comment: "Status when data transfer is unavailable")
+        #endif
+    }
+
+    private func chooseActiveLocalDataFolder() {
+        #if os(macOS)
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.canCreateDirectories = true
+        panel.prompt = String(localized: "Select", comment: "Confirm button for folder picker")
+        panel.message = String(localized: "Choose an existing local data folder to restore or sync local data.", comment: "Message for choosing an existing local data folder")
+
+        if panel.runModal() == .OK, let url = panel.url {
+            appState.updateLocalDataFolder(url)
+            dataTransferStatus = String(localized: "Local data folder updated.", comment: "Status after local data folder selection")
+        }
+        #else
+        dataTransferStatus = String(localized: "Local folder selection is not available on this device.", comment: "Status when local folder selection is unavailable")
+        #endif
     }
     
 

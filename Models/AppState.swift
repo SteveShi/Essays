@@ -502,6 +502,20 @@ class AppState {
         checkServerReachability()
         SyncEngine.shared.triggerSync()
     }
+
+    func updateLocalDataFolder(_ folderURL: URL) {
+        guard var account = AccountManager.shared.activeAccount, account.mode == .local else { return }
+        account.dataDirectoryPath = folderURL.path
+        let resolvedAccount = LocalDatabase.shared.activateStore(for: account) ?? account
+        AccountManager.shared.updateAccount(resolvedAccount)
+        AccountManager.shared.setActiveAccount(resolvedAccount)
+        memos = []
+        tags = []
+        selectedMemoForDetail = nil
+        loadSavedCredentials()
+        loadLocalCachedMemos()
+        checkServerReachability()
+    }
     
     @MainActor
     func archiveMemo(_ memo: Memo) async {

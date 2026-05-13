@@ -270,6 +270,33 @@ final class LocalDatabase {
     func upsertMemos(_ incomingMemos: [Memo]) -> [Memo] {
         return syncMemos(incomingMemos, removeMissingLocalMemos: false)
     }
+
+    @discardableResult
+    func importMemos(_ incomingMemos: [Memo], forAccountID accountID: String, replaceExisting: Bool) -> [Memo] {
+        let normalizedAccountID = accountID.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if replaceExisting {
+            for memo in fetchMemos(forAccountID: normalizedAccountID) {
+                context.delete(memo)
+            }
+            context.processPendingChanges()
+        }
+
+        for memo in incomingMemos {
+            memo.accountID = normalizedAccountID
+            for attachment in memo.attachments {
+                attachment.parentMemo = memo
+                attachment.memoName = memo.name
+            }
+            memo.location?.parentMemo = memo
+            for relation in memo.relations {
+                relation.parentMemo = memo
+            }
+        }
+
+        _ = syncMemos(incomingMemos, removeMissingLocalMemos: false)
+        return fetchMemos(forAccountID: normalizedAccountID)
+    }
     
     /// Backward-compatible wrapper.
     /// Keep old callsites working while avoiding accidental behavior change.
@@ -353,11 +380,15 @@ final class LocalDatabase {
                             attachmentsMap: inout [String: Attachment],
                             relationsMap: inout [String: Relation]) {
         target.content = source.content
+        target.numericID = source.numericID
+        target.createdAt = source.createdAt
         target.updatedAt = source.updatedAt
         target.pinned = source.pinned
         target.visibility = source.visibility
         target.state = source.state
         target.tags = source.tags
+        target.accountID = source.accountID
+        target.isPendingSync = source.isPendingSync
         
         // Update Location (1-to-1)
         if let incomingLoc = location {
@@ -387,6 +418,8 @@ final class LocalDatabase {
                 existingAttr.size = incomingAttr.size
                 existingAttr.content = incomingAttr.content
                 existingAttr.externalLink = incomingAttr.externalLink
+                existingAttr.createTime = incomingAttr.createTime
+                existingAttr.memoName = target.name
                 existingAttr.parentMemo = target
                 finalAttachments.append(existingAttr)
             } else {

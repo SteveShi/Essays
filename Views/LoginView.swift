@@ -201,19 +201,32 @@ struct LoginView: View {
                 .font(LiquidGlassTheme.typography.footnote)
                 .foregroundColor(LiquidGlassTheme.colors.tertiaryText)
 
-            HStack(spacing: 8) {
-                Text(localDataDirectoryPath.isEmpty
-                     ? String(localized: "No folder selected", comment: "Placeholder when local data folder is not selected")
-                     : localDataDirectoryPath)
-                    .font(LiquidGlassTheme.typography.footnote)
-                    .foregroundColor(LiquidGlassTheme.colors.secondaryText)
-                    .lineLimit(2)
-                    .textSelection(.enabled)
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    Text(localDataDirectoryPath.isEmpty
+                         ? String(localized: "No folder selected", comment: "Placeholder when local data folder is not selected")
+                         : localDataDirectoryPath)
+                        .font(LiquidGlassTheme.typography.footnote)
+                        .foregroundColor(LiquidGlassTheme.colors.secondaryText)
+                        .lineLimit(2)
+                        .textSelection(.enabled)
 
-                Spacer()
+                    Spacer()
 
-                Button(String(localized: "Choose Folder", comment: "Button to choose local data folder")) {
-                    chooseLocalDataFolder()
+                    Button(String(localized: "Choose Folder", comment: "Button to choose local data folder")) {
+                        chooseLocalDataFolderForNewStorage()
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
+
+                Button {
+                    chooseExistingLocalDataFolder()
+                } label: {
+                    Label(
+                        String(localized: "Use Existing Local Folder", comment: "Button to select an existing local data folder"),
+                        systemImage: "folder"
+                    )
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
@@ -511,14 +524,28 @@ struct LoginView: View {
     }
 
     #if os(macOS)
-    private func chooseLocalDataFolder() {
+    private func chooseLocalDataFolderForNewStorage() {
+        chooseLocalDataFolder(
+            canCreateDirectories: true,
+            message: String(localized: "Choose a folder to store local account data.", comment: "Message for local data folder picker")
+        )
+    }
+
+    private func chooseExistingLocalDataFolder() {
+        chooseLocalDataFolder(
+            canCreateDirectories: false,
+            message: String(localized: "Choose an existing local data folder to restore or sync local data.", comment: "Message for choosing an existing local data folder")
+        )
+    }
+
+    private func chooseLocalDataFolder(canCreateDirectories: Bool, message: String) {
         let panel = NSOpenPanel()
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = false
-        panel.canCreateDirectories = true
+        panel.canCreateDirectories = canCreateDirectories
         panel.prompt = String(localized: "Select", comment: "Confirm button for folder picker")
-        panel.message = String(localized: "Choose a folder to store local account data.", comment: "Message for local data folder picker")
+        panel.message = message
 
         if panel.runModal() == .OK, let url = panel.url {
             localDataDirectoryPath = url.path

@@ -4,6 +4,28 @@ All notable changes to this project will be documented in this file.
 
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.0] - 2026-05-14
+
+### Added
+- 📦 **Data Archive Import and Export**: Added a data transfer workflow in Settings for exporting and importing Essays archives, including memo text, attachments, references, comments, locations, tags, visibility, and archive state.
+- 🗂️ **Existing Local Folder Selection**: Added support for choosing an existing local data folder from both Settings and the login screen local mode area, making it easier to restore or continue with existing local data.
+
+### Fixed
+- 🔁 **Imported Data Integrity**: Improved local import merging so restored memos keep their original timestamps, account ownership, pending-sync state, attachment metadata, and relation structure.
+
+---
+
+### Chinese
+
+### 新增
+- 📦 **数据归档导入与导出**：在设置中新增数据迁移流程，可导出和导入 Essays 数据归档，包含备忘正文、附件、引用、评论、位置、标签、可见性与归档状态。
+- 🗂️ **选择已有本地文件夹**：设置页与登录界面的本地模式区域现在都支持选择已有本地数据文件夹，便于恢复或继续使用已有本地数据。
+
+### 修复
+- 🔁 **导入数据完整性**：改进本地导入合并逻辑，恢复的备忘会保留原始时间、账户归属、待同步状态、附件元数据与关系结构。
+
+---
+
 ## [2.5.6] - 2026-04-27
 
 ### Changed
