@@ -409,6 +409,7 @@ struct CommentCard: View {
 
             if memo.name.hasPrefix("local_") || memo.name.hasPrefix("local_comment_") {
                 LocalDatabase.shared.deletePendingOutboxTasks(forMemoId: memo.name)
+                DropboxSyncService.shared.recordLocalDeletion(memoName: memo.name)
                 LocalDatabase.shared.deleteMemo(memo)
                 try context.save()
                 onCommentChanged()
@@ -416,6 +417,7 @@ struct CommentCard: View {
             }
 
             if appState.isLocalMode {
+                DropboxSyncService.shared.recordLocalDeletion(memoName: memo.name)
                 LocalDatabase.shared.deleteMemo(memo)
                 try context.save()
                 onCommentChanged()

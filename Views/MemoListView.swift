@@ -26,6 +26,7 @@ struct MemoListView: View {
     @State private var isQuickUploading = false
     @FocusState private var isQuickCaptureEditorFocused: Bool
     @AppStorage("enableAIFeatures") private var enableAIFeatures = true
+    @State private var aiAvailabilityState: AIAssistantAvailabilityState = .checking
     
     @Query(sort: \Memo.createdAt, order: .reverse) private var allMemos: [Memo]
     
@@ -218,7 +219,7 @@ struct MemoListView: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 HStack(spacing: 12) {
-                    if enableAIFeatures {
+                    if enableAIFeatures && aiAvailabilityState.isAvailable {
                         Button {
                             showAIAssistant.toggle()
                         } label: {
@@ -232,14 +233,10 @@ struct MemoListView: View {
                         .help(String(localized: "AI Assistant", comment: "Help text for AI assistant button"))
                         .popover(isPresented: $showAIAssistant) {
                             if let memo = appState.selectedMemoForDetail ?? appState.selectedMemo ?? computeFilteredMemos().first {
-                                if #available(macOS 26.0, *) {
+                                if #available(macOS 26.0, *), aiAvailabilityState.isAvailable {
                                     AIAssistantView(memo: memo)
                                 } else {
-                                    Text(
-                                        String(
-                                            localized: "AI Assistant requires macOS 26.0 or newer",
-                                            comment: "AI assistant availability fallback")
-                                    )
+                                    Text(aiAvailabilityState.localizedDescription)
                                     .padding()
                                 }
                             } else {
@@ -300,6 +297,9 @@ struct MemoListView: View {
         }
         .sheet(isPresented: $showComposeSheet) {
             ComposeMemoView()
+        }
+        .task {
+            aiAvailabilityState = await AIAssistantAvailabilityState.current()
         }
     }
 
@@ -1341,12 +1341,14 @@ struct MemoCard: View {
             if memo.name.hasPrefix("local_") {
                 // Local-only memo: cancel queued tasks and remove it locally.
                 LocalDatabase.shared.deletePendingOutboxTasks(forMemoId: memo.name)
+                DropboxSyncService.shared.recordLocalDeletion(memoName: memo.name)
                 LocalDatabase.shared.deleteMemo(memo)
                 try LocalDatabase.shared.context.save()
                 return
             }
 
             if appState.isLocalMode {
+                DropboxSyncService.shared.recordLocalDeletion(memoName: memo.name)
                 LocalDatabase.shared.deleteMemo(memo)
                 try LocalDatabase.shared.context.save()
                 return

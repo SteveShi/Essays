@@ -4,6 +4,28 @@ All notable changes to this project will be documented in this file.
 
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.7.0] - 2026-05-15
+
+### Added
+- 🔁 **Dropbox API Sync for Local Mode**: Added an optional Dropbox API sync path for local mode. Essays stores each memo as an individual JSON record in Dropbox and tracks local deletions with tombstone records, avoiding direct SwiftData database file syncing.
+- 🗂️ **Dropbox Local Folder Shortcut**: Added a Dropbox local folder shortcut to the local mode login flow and Settings, while keeping the existing manual local folder selection.
+
+### Fixed
+- 🧠 **Apple Intelligence Availability**: AI features now check the real Foundation Models availability state instead of only checking the user toggle or macOS version, correctly handling Apple Intelligence being disabled, unsupported devices, or models that are not ready.
+
+---
+
+### Chinese
+
+### 新增
+- 🔁 **本地模式 Dropbox API 同步**：为本地模式新增可选的 Dropbox API 同步路径。Essays 会将每条便签作为独立 JSON 记录保存到 Dropbox，并用 tombstone 记录本地删除，避免直接同步 SwiftData 数据库文件。
+- 🗂️ **Dropbox 本地文件夹快捷入口**：在本地模式登录流程与设置中新增 Dropbox 本地文件夹快捷入口，同时保留已有的手动本地文件夹选择。
+
+### 修复
+- 🧠 **Apple 智能可用性判断**：AI 功能现在会检查 Foundation Models 的真实可用状态，不再只看用户开关或 macOS 版本，可正确处理 Apple 智能未启用、设备不支持或模型尚未就绪等情况。
+
+---
+
 ## [2.6.0] - 2026-05-14
 
 ### Added

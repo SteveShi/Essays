@@ -51,6 +51,15 @@ struct EssaysApp: App {
                 .onReceive(NotificationCenter.default.publisher(for: .databaseContainerDidChange)) { _ in
                     databaseReloadToken = UUID()
                 }
+                .onAppear {
+                    if AccountManager.shared.isLocalMode,
+                       DropboxSyncService.shared.isEnabled,
+                       DropboxSyncService.shared.isAuthorized {
+                        Task {
+                            await DropboxSyncService.shared.syncNow()
+                        }
+                    }
+                }
         }
 #if os(macOS)
         .windowToolbarStyle(.unified(showsTitle: true))

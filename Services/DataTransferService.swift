@@ -36,7 +36,7 @@ enum DataTransferService {
     }
 }
 
-private struct EssaysDataArchive: Codable {
+struct EssaysDataArchive: Codable {
     let formatVersion: Int
     let metadata: Metadata
     let memos: [MemoRecord]

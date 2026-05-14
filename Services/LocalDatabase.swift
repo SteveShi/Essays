@@ -524,6 +524,16 @@ final class LocalDatabase {
         context.delete(memo)
         try? context.save()
     }
+
+    func deleteMemo(named memoName: String) {
+        let descriptor = FetchDescriptor<Memo>(
+            predicate: #Predicate<Memo> { memo in
+                memo.name == memoName
+            }
+        )
+        guard let memo = try? context.fetch(descriptor).first else { return }
+        deleteMemo(memo)
+    }
     
     // MARK: - Outbox Tasks
     
