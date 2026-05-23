@@ -4,6 +4,28 @@ All notable changes to this project will be documented in this file.
 
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.7.1] - 2026-05-23
+
+### Changed
+- 🧹 **Internal Cleanup**: Removed unused imports and dead code (`Collection.chunked`, `SwiftData`/`Observation` imports in API clients), consolidated the duplicated `upsertMemos` persistence pattern in `MemosAPIClient` into a single helper, merged the near-identical `truncatedContent` / `relationPreviewContent` truncation logic in `Memo`, and simplified attachment URL deduplication.
+- ⚡ **Markdown Render Path**: Pre-compiled the tag / Markdown-link / whitespace regexes in `MemoUtility` as static constants to avoid recompiling on every list row evaluation, and removed redundant `.textSelection(.enabled)` modifiers that were already applied inside the `MemoMarkdownContent` wrapper.
+- 📄 **File Rename**: Renamed `Views/Components/MarkdownView.swift` to `MemoMarkdownContent.swift` to remove the naming collision with the SPM dependency.
+
+Pure internal refactor — no user-facing behavior change.
+
+---
+
+### Chinese
+
+### 修改
+- 🧹 **内部清理**：删除未使用的导入与死代码（`Collection.chunked`、API 客户端中无用的 `SwiftData` / `Observation` 导入），将 `MemosAPIClient` 中重复 6 次的 `upsertMemos` 持久化模式抽取为单一 helper，合并 `Memo` 中几乎完全相同的 `truncatedContent` / `relationPreviewContent` 截断逻辑，并简化附件 URL 去重写法。
+- ⚡ **Markdown 渲染路径**：将 `MemoUtility` 中的标签、Markdown 链接、空格折叠正则预编译为静态常量，避免列表行每次重算时重新编译；移除调用方多余的 `.textSelection(.enabled)` 修饰符（`MemoMarkdownContent` 包装器内部已应用）。
+- 📄 **文件重命名**：将 `Views/Components/MarkdownView.swift` 重命名为 `MemoMarkdownContent.swift`，消除与 SPM 依赖的命名歧义。
+
+纯内部重构——无用户可见行为变化。
+
+---
+
 ## [2.7.0] - 2026-05-15
 
 ### Added

@@ -869,7 +869,6 @@ struct MemoCard: View {
             if !memo.content.isEmpty {
                 // Truncated content safe access
                 MemoMarkdownContent(content: memo.truncatedContent)
-                    .textSelection(.enabled)
             }
 
             // Defensive access to collections

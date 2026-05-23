@@ -114,8 +114,7 @@ struct MemoDetailView: View {
                     }
 
                     MemoMarkdownContent(content: memo.contentWithoutTags)
-                        .textSelection(.enabled)
-                    
+
                     let tags = memo.tags
                     if !tags.isEmpty {
                         FlowLayout(spacing: 6) {
@@ -327,7 +326,6 @@ struct CommentCard: View {
             }
             
             MemoMarkdownContent(content: memo.contentWithoutTags)
-                .textSelection(.enabled)
 
             if !nonCommentRelations.isEmpty {
                 commentRelationsView

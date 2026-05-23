@@ -1,6 +1,4 @@
 import Foundation
-import SwiftData
-import Observation
 import OSLog
 
 struct MemosAPIV027: MemosAPIProtocol {

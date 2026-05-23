@@ -110,28 +110,21 @@ extension Memo {
     }
 
     var truncatedContent: String {
-        let strippedContent = contentWithoutTags
-        let lines = strippedContent.components(separatedBy: "\n")
-        let limitedLines = lines.prefix(10)
-        let joined = limitedLines.joined(separator: "\n")
-        if joined.count > 500 {
-            return String(joined.prefix(500)) + "…"
-        }
-        if lines.count > 10 {
-            return joined + "\n…"
-        }
-        return joined
+        Self.truncate(contentWithoutTags)
     }
 
     var relationPreviewContent: String {
-        let plainContent = MemoUtility.stripMarkdownLinks(from: contentWithoutTags)
-        let lines = plainContent.components(separatedBy: "\n")
-        let limitedLines = lines.prefix(10)
-        let joined = limitedLines.joined(separator: "\n")
-        if joined.count > 500 {
-            return String(joined.prefix(500)) + "…"
+        Self.truncate(MemoUtility.stripMarkdownLinks(from: contentWithoutTags))
+    }
+
+    /// Truncates content to at most `lineLimit` lines and `charLimit` characters, appending an ellipsis when clipped.
+    private static func truncate(_ input: String, lineLimit: Int = 10, charLimit: Int = 500) -> String {
+        let lines = input.components(separatedBy: "\n")
+        let joined = lines.prefix(lineLimit).joined(separator: "\n")
+        if joined.count > charLimit {
+            return String(joined.prefix(charLimit)) + "…"
         }
-        if lines.count > 10 {
+        if lines.count > lineLimit {
             return joined + "\n…"
         }
         return joined
@@ -298,15 +291,8 @@ final class Attachment: Identifiable {
             candidates.append(url)
         }
 
-        var deduped: [URL] = []
         var seen: Set<String> = []
-        for url in candidates {
-            if !seen.contains(url.absoluteString) {
-                seen.insert(url.absoluteString)
-                deduped.append(url)
-            }
-        }
-        return deduped
+        return candidates.filter { seen.insert($0.absoluteString).inserted }
     }
 
     func resolvedURL(serverURL: String) -> URL? {
