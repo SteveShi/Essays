@@ -4,6 +4,36 @@ All notable changes to this project will be documented in this file.
 
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.7.2] - 2026-05-30
+
+### Added
+- 🌐 **AI Translation**: Added dynamic AI Translation action in the AI Assistant menu using the user-configured target translation language.
+
+### Fixed
+- ⚙️ **Settings Integration**: Wired up previously unused settings to their actual behaviors:
+  - `editorFontSize` is now fully applied in the text editor and Quick Capture view.
+  - `autoSave` is active in the compose editor with a 3-second debounce to auto-save changes.
+  - `targetTranslationLanguage` is fully connected.
+  - Fixed account statistics displaying placeholder `--` values to show actual live memo and tag counts.
+- 🧹 **Removed Obsolete Settings**: Cleaned up the unused `showLineNumbers` toggle.
+
+---
+
+### Chinese
+
+### 新增
+- 🌐 **AI 翻译**：在 AI 助手菜单中新增了基于用户目标翻译语言的“翻译” AI 操作。
+
+### 修复
+- ⚙️ **设置项联动**：将之前未生效的设置项连接到实际功能：
+  - `editorFontSize`（编辑器字号）现已完全应用于文本编辑器和快速捕获视图。
+  - `autoSave`（自动保存）在编辑模式下生效，带有 3 秒防抖自动保存机制。
+  - `targetTranslationLanguage`（目标翻译语言）已完全打通。
+  - 修复了账户设置中统计信息显示占位符 `--` 的问题，现在可实时显示真实的便签和标签总数。
+- 🧹 **移除废弃设置**：删除了不再使用的 `showLineNumbers` 开关。
+
+---
+
 ## [2.7.1] - 2026-05-23
 
 ### Changed

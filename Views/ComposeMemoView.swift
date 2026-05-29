@@ -8,6 +8,8 @@ import AppKit
 struct ComposeMemoView: View {
     @Environment(AppState.self) var appState: AppState
     @Environment(\.dismiss) private var dismiss
+    @AppStorage("editorFontSize") private var editorFontSize: Double = 14
+    @AppStorage("autoSave") private var autoSave = true
     
     var editingMemo: Memo? = nil
     var isCommentEditor = false
@@ -35,6 +37,7 @@ struct ComposeMemoView: View {
 
     @State private var showMemoPicker = false
     @State private var showCamera = false
+    @State private var autoSaveTask: Task<Void, Never>?
     
     var body: some View {
         VStack(spacing: 0) {
@@ -69,6 +72,14 @@ struct ComposeMemoView: View {
         }
         .onChange(of: content, initial: false) { _, newValue in
             updateSuggestedTags(from: newValue)
+            if autoSave && editingMemo != nil {
+                autoSaveTask?.cancel()
+                autoSaveTask = Task {
+                    try? await Task.sleep(for: .seconds(3))
+                    guard !Task.isCancelled else { return }
+                    saveMemo()
+                }
+            }
         }
         .sheet(isPresented: $showCamera) {
             CameraCaptureView { data in
@@ -81,6 +92,7 @@ struct ComposeMemoView: View {
             }
         }
         .onDisappear {
+            autoSaveTask?.cancel()
             locationManager.clear()
         }
     }
@@ -147,7 +159,7 @@ struct ComposeMemoView: View {
     private var contentView: some View {
         VStack(alignment: .leading, spacing: 12) {
             TextEditor(text: $content)
-                .font(LiquidGlassTheme.typography.body)
+                .font(.system(size: editorFontSize))
                 .focused($isContentFocused)
                 .scrollContentBackground(.hidden)
                 .background(Color.clear)
@@ -157,7 +169,7 @@ struct ComposeMemoView: View {
                             VStack {
                                 HStack {
                                     Text(String(localized: "What's on your mind...", comment: "Placeholder for memo content editor"))
-                                        .font(LiquidGlassTheme.typography.body)
+                                        .font(.system(size: editorFontSize))
                                         .foregroundColor(LiquidGlassTheme.colors.tertiaryText)
                                     Spacer()
                                 }

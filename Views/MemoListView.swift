@@ -26,6 +26,7 @@ struct MemoListView: View {
     @State private var isQuickUploading = false
     @FocusState private var isQuickCaptureEditorFocused: Bool
     @AppStorage("enableAIFeatures") private var enableAIFeatures = true
+    @AppStorage("editorFontSize") private var editorFontSize: Double = 14
     @State private var aiAvailabilityState: AIAssistantAvailabilityState = .checking
     
     @Query(sort: \Memo.createdAt, order: .reverse) private var allMemos: [Memo]
@@ -312,7 +313,7 @@ struct MemoListView: View {
             VStack(spacing: 10) {
                 ZStack(alignment: .topLeading) {
                     TextEditor(text: $quickCaptureText)
-                        .font(LiquidGlassTheme.typography.body)
+                        .font(.system(size: editorFontSize))
                         .scrollContentBackground(.hidden)
                         .background(Color.clear)
                         .frame(minHeight: 110, maxHeight: 110)
@@ -320,7 +321,7 @@ struct MemoListView: View {
 
                     if quickCaptureText.isEmpty && !isQuickCaptureEditorFocused {
                         Text(String(localized: "Write a thought, press ⌘S to save...", comment: "Placeholder for quick capture text field"))
-                            .font(LiquidGlassTheme.typography.body)
+                            .font(.system(size: editorFontSize))
                             .foregroundColor(LiquidGlassTheme.colors.tertiaryText)
                             .padding(.top, 0)
                             .padding(.leading, 5)

@@ -14,6 +14,7 @@ struct AIAssistantView: View {
         case expand
         case generateTags
         case relatedIdeas
+        case translate
         
         var title: String {
             switch self {
@@ -22,6 +23,7 @@ struct AIAssistantView: View {
             case .expand: return String(localized: "Expand", comment: "AI action: expand memo")
             case .generateTags: return String(localized: "Generate Tags", comment: "AI action: generate tags")
             case .relatedIdeas: return String(localized: "Related Ideas", comment: "AI action: related ideas")
+            case .translate: return String(localized: "Translate", comment: "AI action: translate memo")
             }
         }
         
@@ -32,6 +34,7 @@ struct AIAssistantView: View {
             case .expand: return "text.append"
             case .generateTags: return "tag"
             case .relatedIdeas: return "lightbulb"
+            case .translate: return "globe"
             }
         }
         
@@ -42,6 +45,7 @@ struct AIAssistantView: View {
             case .expand: return String(localized: "Add more details and examples", comment: "AI action description")
             case .generateTags: return String(localized: "Suggest relevant tags", comment: "AI action description")
             case .relatedIdeas: return String(localized: "Discover related topics", comment: "AI action description")
+            case .translate: return String(localized: "Translate to another language", comment: "AI action description")
             }
         }
     }
@@ -152,6 +156,7 @@ struct AIAssistantDetailView: View {
     @State private var resultTags: [String] = []
     @State private var isProcessing = true
     @State private var errorMessage: String?
+    @AppStorage("targetTranslationLanguage") private var targetTranslationLanguage = "auto"
     
     var body: some View {
         ScrollView {
@@ -249,6 +254,8 @@ struct AIAssistantDetailView: View {
                 case .relatedIdeas:
                     let ideas = try await MemosAIAssistant.shared.generateRelatedIdeas(for: memo.content)
                     result = ideas.enumerated().map { "\($0.offset + 1). \($0.element)" }.joined(separator: "\n")
+                case .translate:
+                    result = try await MemosAIAssistant.shared.translate(memo.content, to: targetTranslationLanguage)
                 }
             } catch {
                 errorMessage = error.localizedDescription

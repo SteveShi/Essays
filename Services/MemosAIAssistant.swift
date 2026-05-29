@@ -148,6 +148,48 @@ actor MemosAIAssistant {
         return response.content
     }
 
+    func translate(_ content: String, to language: String) async throws -> String {
+        let session = try activeSession()
+
+        let languageName = Self.languageDisplayName(for: language)
+        let prompt: String
+        if language == "auto" {
+            prompt = """
+            Translate the following text to a different language.
+            If the text is in Chinese, translate it to English.
+            If the text is in English, translate it to Chinese.
+            For other languages, translate to English.
+            Return only the translated text without any explanation.
+
+            Text:
+            \(content)
+            """
+        } else {
+            prompt = """
+            Translate the following text to \(languageName).
+            Return only the translated text without any explanation.
+
+            Text:
+            \(content)
+            """
+        }
+
+        let response = try await session.respond(to: prompt)
+        return response.content
+    }
+
+    private static func languageDisplayName(for code: String) -> String {
+        switch code {
+        case "en": return "English"
+        case "zh-Hans": return "Simplified Chinese"
+        case "zh-Hant": return "Traditional Chinese"
+        case "ja": return "Japanese"
+        case "es": return "Spanish"
+        case "fr": return "French"
+        default: return "English"
+        }
+    }
+
     private func activeSession() throws -> LanguageModelSession {
         let state = availabilityState()
         guard state.isAvailable else {
@@ -195,6 +237,7 @@ actor MemosAIAssistant {
     func expand(_ content: String) async throws -> String { return "" }
     func generateRelatedIdeas(for content: String) async throws -> [String] { return [] }
     func answerQuestion(_ question: String, context: [String]) async throws -> String { return "" }
+    func translate(_ content: String, to language: String) async throws -> String { return "" }
 }
 #endif
 

@@ -82,6 +82,7 @@ class QuickInputPanel: NSPanel {
 
 struct QuickInputWindowView: View {
     @AppStorage("theme") private var theme = "system"
+    @AppStorage("editorFontSize") private var editorFontSize: Double = 14
     @State private var text: String = ""
     @State private var visibility: MemoVisibility = .private
     @State private var isSaving = false
@@ -138,12 +139,12 @@ struct QuickInputWindowView: View {
     var body: some View {
         VStack(spacing: 12) {
             ZStack(alignment: .topLeading) {
-                QuickInputTextView(text: $text, shouldFocus: $shouldFocusEditor, isFocused: $isEditorFocused)
+                QuickInputTextView(text: $text, shouldFocus: $shouldFocusEditor, isFocused: $isEditorFocused, fontSize: editorFontSize)
                     .frame(minHeight: 96, maxHeight: 96)
 
                 if text.isEmpty && !isEditorFocused {
                     Text(String(localized: "Capture a thought... (Press Esc to cancel)", comment: "Placeholder for quick thought capture"))
-                        .font(.system(size: 16))
+                        .font(.system(size: editorFontSize))
                         .foregroundColor(.secondary)
                         .padding(.top, 8)
                         .padding(.leading, 5)
@@ -328,6 +329,7 @@ private struct QuickInputTextView: NSViewRepresentable {
     @Binding var text: String
     @Binding var shouldFocus: Bool
     @Binding var isFocused: Bool
+    var fontSize: Double
 
     func makeCoordinator() -> Coordinator {
         Coordinator(parent: self)
@@ -353,7 +355,7 @@ private struct QuickInputTextView: NSViewRepresentable {
         textView.isAutomaticLinkDetectionEnabled = false
         textView.usesAdaptiveColorMappingForDarkAppearance = true
         textView.drawsBackground = false
-        textView.font = .systemFont(ofSize: 16)
+        textView.font = .systemFont(ofSize: CGFloat(fontSize))
         textView.minSize = NSSize(width: 0, height: 0)
         textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
         textView.frame = NSRect(x: 0, y: 0, width: 0, height: scrollView.contentSize.height)
@@ -372,6 +374,10 @@ private struct QuickInputTextView: NSViewRepresentable {
 
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
         guard let textView = scrollView.documentView as? NSTextView else { return }
+        let expectedFont = NSFont.systemFont(ofSize: CGFloat(fontSize))
+        if textView.font != expectedFont {
+            textView.font = expectedFont
+        }
         let isEditorFocused = (textView.window?.firstResponder === textView)
         if isFocused != isEditorFocused {
             DispatchQueue.main.async {

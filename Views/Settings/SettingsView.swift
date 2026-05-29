@@ -10,7 +10,6 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     
     @AppStorage("editorFontSize") private var editorFontSize: Double = 14
-    @AppStorage("showLineNumbers") private var showLineNumbers = false
     @AppStorage("autoSave") private var autoSave = true
     @AppStorage("theme") private var theme = "system"
     @AppStorage("enableAIFeatures") private var enableAIFeatures = true
@@ -141,7 +140,6 @@ struct SettingsView: View {
                     }
                 }
                 
-                Toggle(String(localized: "Show line numbers", comment: "Toggle for line numbers"), isOn: $showLineNumbers)
             } header: {
                 Text(String(localized: "Editor Settings", comment: "Editor settings section header"))
                     .font(LiquidGlassTheme.typography.headline)
@@ -292,11 +290,11 @@ struct SettingsView: View {
                 
                 LabeledContent(
                     String(localized: "Total Memos", comment: "Memos count label"),
-                    value: "--")
+                    value: "\(appState.memos.count)")
                 
                 LabeledContent(
                     String(localized: "Total Tags", comment: "Tags count label"),
-                    value: "--")
+                    value: "\(appState.tags.count)")
             } header: {
                 Text(String(localized: "Statistics", comment: "Statistics section header"))
                     .font(LiquidGlassTheme.typography.headline)
