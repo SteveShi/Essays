@@ -50,6 +50,123 @@ struct LoginView: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
+        #if os(iOS)
+        NavigationView {
+            Form {
+                Section {
+                    Picker("Mode", selection: $selectedMode) {
+                        ForEach(ServiceMode.allCases, id: \.self) { mode in
+                            Text(mode.displayName).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                } header: {
+                    Text("Service Mode")
+                }
+
+                switch selectedMode {
+                case .local:
+                    Section {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Label("Offline-First Storage", systemImage: "internaldrive")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                            Text("Memos will be stored locally on your device. No network connection required.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(.vertical, 4)
+                    } header: {
+                        Text("Local Mode")
+                    }
+
+                case .remote:
+                    Section {
+                        TextField("Server URL", text: $serverURL)
+                            .textContentType(.URL)
+                            .keyboardType(.URL)
+                            .autocapitalization(.none)
+                            .autocorrectionDisabled()
+
+                        Picker("API Version", selection: $selectedAPIVersion) {
+                            ForEach(MemosAPIVersion.allCases, id: \.self) { version in
+                                Text(version.rawValue).tag(version)
+                            }
+                        }
+                    } header: {
+                        Text("Server")
+                    }
+
+                    Section {
+                        Picker("Auth Method", selection: $remoteAuthTab) {
+                            ForEach(RemoteAuthTab.allCases, id: \.self) { tab in
+                                Text(tab.displayName).tag(tab)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+
+                        switch remoteAuthTab {
+                        case .token:
+                            TextField("Access Token", text: $accessToken)
+                                .textContentType(.password)
+                                .autocapitalization(.none)
+                                .autocorrectionDisabled()
+                        case .credentials:
+                            TextField("Username", text: $username)
+                                .textContentType(.username)
+                                .autocapitalization(.none)
+                                .autocorrectionDisabled()
+
+                            SecureField("Password", text: $password)
+                                .textContentType(.password)
+                        }
+                    } header: {
+                        Text("Authentication")
+                    }
+                }
+
+                if let error = errorMessage {
+                    Section {
+                        Label(error, systemImage: "exclamationmark.triangle.fill")
+                            .foregroundColor(.red)
+                            .font(.callout)
+                    }
+                }
+
+                Section {
+                    Button {
+                        Task {
+                            await signIn()
+                        }
+                    } label: {
+                        HStack {
+                            if isLoading {
+                                ProgressView()
+                            }
+                            Text(signInButtonTitle)
+                                .frame(maxWidth: .infinity)
+                        }
+                    }
+                    .disabled(!canSignIn)
+                }
+            }
+            .navigationTitle("Essays")
+            .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                if appState.isLoggedIn {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") {
+                            dismiss()
+                        }
+                    }
+                }
+            }
+        }
+        .onAppear {
+            serverURL = appState.serverURL
+            accessToken = appState.accessToken
+        }
+        #else
         VStack(spacing: 0) {
             Spacer()
 
@@ -101,6 +218,7 @@ struct LoginView: View {
                 localDataDirectoryPath = account.dataDirectoryPath ?? ""
             }
         }
+        #endif
     }
 
     // MARK: - Header
@@ -409,7 +527,12 @@ struct LoginView: View {
 
         switch selectedMode {
         case .local:
+            #if os(macOS)
             return !localDataDirectoryPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            #else
+            // iOS: 不需要选择文件夹，直接允许登录
+            return true
+            #endif
         case .remote:
             let normalizedServerURL = serverURL.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !normalizedServerURL.isEmpty else { return false }
