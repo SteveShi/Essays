@@ -1,8 +1,8 @@
 import SwiftUI
 import SwiftData
 
-#if os(macOS)
-@available(macOS 26.0, *)
+#if canImport(FoundationModels)
+@available(macOS 26.0, iOS 26.0, *)
 #endif
 struct AIAssistantView: View {
     let memo: Memo
@@ -145,8 +145,8 @@ struct AIAssistantView: View {
     }
 }
 
-#if os(macOS)
-@available(macOS 26.0, *)
+#if canImport(FoundationModels)
+@available(macOS 26.0, iOS 26.0, *)
 #endif
 struct AIAssistantDetailView: View {
     let memo: Memo

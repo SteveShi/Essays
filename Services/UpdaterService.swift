@@ -1,7 +1,10 @@
 import Foundation
+#if os(macOS)
 import Sparkle
+#endif
 import Observation
 
+#if os(macOS)
 @MainActor
 @Observable
 final class UpdaterViewModel {
@@ -37,3 +40,19 @@ final class UpdaterViewModel {
         controller.updater.checkForUpdatesInBackground()
     }
 }
+#else
+@MainActor
+@Observable
+final class UpdaterViewModel {
+    static let shared = UpdaterViewModel()
+
+    var canCheckForUpdates: Bool { false }
+    var automaticallyChecksForUpdates: Bool {
+        get { false }
+        set { }
+    }
+
+    func checkForUpdates() { }
+    func checkForUpdatesInBackground() { }
+}
+#endif

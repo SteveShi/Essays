@@ -137,13 +137,7 @@ struct LoginView: View {
             // 根据模式显示不同的表单
             switch selectedMode {
             case .local:
-                #if os(macOS)
                 localModeForm
-                #else
-                Text(String(localized: "Local mode is not available on this device", comment: "iOS local mode unavailable message"))
-                    .font(LiquidGlassTheme.typography.callout)
-                    .foregroundColor(LiquidGlassTheme.colors.tertiaryText)
-                #endif
             case .remote:
                 remoteModeForm
             }
@@ -201,6 +195,7 @@ struct LoginView: View {
                 .font(LiquidGlassTheme.typography.footnote)
                 .foregroundColor(LiquidGlassTheme.colors.tertiaryText)
 
+            #if os(macOS)
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 8) {
                     Text(localDataDirectoryPath.isEmpty
@@ -242,6 +237,23 @@ struct LoginView: View {
                 .buttonStyle(.bordered)
                 .controlSize(.small)
             }
+            #else
+            // iOS: 使用应用的Documents目录
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    Image(systemName: "folder.fill")
+                        .foregroundColor(LiquidGlassTheme.colors.accent)
+                    Text(String(localized: "Data will be stored in app's local storage", comment: "iOS local mode storage info"))
+                        .font(LiquidGlassTheme.typography.footnote)
+                        .foregroundColor(LiquidGlassTheme.colors.secondaryText)
+                }
+                .padding(12)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(LiquidGlassTheme.colors.accent.opacity(0.1))
+                )
+            }
+            #endif
         }
     }
 
@@ -434,14 +446,21 @@ struct LoginView: View {
     }
 
     private func signInLocal() async {
+        #if os(macOS)
         let selectedFolder = localDataDirectoryPath.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !selectedFolder.isEmpty else {
             errorMessage = String(localized: "Please choose a local data folder first.", comment: "Error when local data folder is missing")
             return
         }
+        let dataPath = selectedFolder
+        #else
+        // iOS: 使用应用的Documents目录
+        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.path ?? ""
+        let dataPath = documentsPath
+        #endif
 
         // 创建并保存本地账户
-        let account = Account.localAccount(dataDirectoryPath: selectedFolder)
+        let account = Account.localAccount(dataDirectoryPath: dataPath)
         let resolvedAccount = LocalDatabase.shared.activateStore(for: account) ?? account
         AccountManager.shared.setActiveAccount(resolvedAccount)
 

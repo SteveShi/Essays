@@ -42,8 +42,8 @@ struct EssaysApp: App {
                     #if os(macOS)
                     HotkeyManager.shared.start()
                     #endif
-                    #if os(macOS)
-                    if #available(macOS 26.0, *) {
+                    #if canImport(FoundationModels)
+                    if #available(macOS 26.0, iOS 26.0, *) {
                         await MemosAIAssistant.shared.initialize()
                     }
                     #endif
@@ -199,6 +199,23 @@ private struct MainWindowAutosaveConfigurator: NSViewRepresentable {
 class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
         return true
+    }
+
+    func application(_ application: UIApplication, configurationForConnecting connectingSceneSession: UISceneSession, options: UIScene.ConnectionOptions) -> UISceneConfiguration {
+        if let shortcutItem = options.shortcutItem {
+            QuickActionService.shared.handleShortcutItem(shortcutItem)
+        }
+
+        let configuration = UISceneConfiguration(name: nil, sessionRole: connectingSceneSession.role)
+        configuration.delegateClass = SceneDelegate.self
+        return configuration
+    }
+}
+
+class SceneDelegate: NSObject, UIWindowSceneDelegate {
+    func windowScene(_ windowScene: UIWindowScene, performActionFor shortcutItem: UIApplicationShortcutItem, completionHandler: @escaping (Bool) -> Void) {
+        QuickActionService.shared.handleShortcutItem(shortcutItem)
+        completionHandler(true)
     }
 }
 #endif

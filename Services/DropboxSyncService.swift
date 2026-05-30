@@ -149,12 +149,20 @@ final class DropboxSyncService: NSObject {
     }
 
     func preferredDropboxEssaysFolder() -> URL? {
+        #if os(macOS)
         let home = FileManager.default.homeDirectoryForCurrentUser
         let candidates = [
             home.appendingPathComponent("Library/CloudStorage/Dropbox/Essays", isDirectory: true),
             home.appendingPathComponent("Dropbox/Essays", isDirectory: true)
         ]
         return candidates.first { FileManager.default.fileExists(atPath: $0.deletingLastPathComponent().path) }
+        #else
+        // iOS: 使用Documents目录
+        guard let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            return nil
+        }
+        return documentsURL.appendingPathComponent("Dropbox/Essays", isDirectory: true)
+        #endif
     }
 
     private func requestAuthorizationCode(appKey: String) async throws -> String {

@@ -22,6 +22,13 @@ struct SettingsView: View {
     #if os(macOS)
     @State private var updaterViewModel = UpdaterViewModel.shared
     #endif
+    #if os(iOS)
+    @State private var showExportPicker = false
+    @State private var showImportPicker = false
+    @State private var exportData: Data?
+    @State private var showShareSheet = false
+    @State private var shareItems: [Any] = []
+    #endif
     
     var body: some View {
         TabView {
@@ -307,6 +314,33 @@ struct SettingsView: View {
                 )
 
                 HStack {
+                    #if os(iOS)
+                    Menu {
+                        Button {
+                            exportDataArchive()
+                        } label: {
+                            Label(
+                                String(localized: "Save to Files", comment: "Export to Files app"),
+                                systemImage: "folder"
+                            )
+                        }
+
+                        Button {
+                            shareDataArchive()
+                        } label: {
+                            Label(
+                                String(localized: "Share (AirDrop, etc.)", comment: "Share via system share sheet"),
+                                systemImage: "square.and.arrow.up"
+                            )
+                        }
+                    } label: {
+                        Label(
+                            String(localized: "Export Data", comment: "Button to export all app data"),
+                            systemImage: "square.and.arrow.up"
+                        )
+                    }
+                    .disabled(isDataTransferRunning)
+                    #else
                     Button {
                         exportDataArchive()
                     } label: {
@@ -316,6 +350,7 @@ struct SettingsView: View {
                         )
                     }
                     .disabled(isDataTransferRunning)
+                    #endif
 
                     Button {
                         importDataArchive()
@@ -469,21 +504,107 @@ struct SettingsView: View {
             Section {
                 HStack {
                     Spacer()
-                    
+
                     Button(String(localized: "Sign Out", comment: "Sign out button text")) {
                         appState.clearCredentials()
                         dismiss()
                     }
                     .buttonStyle(.bordered)
                     .foregroundColor(LiquidGlassTheme.colors.error)
-                    
+
                     Spacer()
                 }
             }
         }
         .formStyle(.grouped)
         .padding()
+        #if os(iOS)
+        .fileExporter(
+            isPresented: $showExportPicker,
+            document: JSONDocument(data: exportData ?? Data()),
+            contentType: .json,
+            defaultFilename: "Essays Archive.\(DataTransferService.archiveFileExtension)"
+        ) { result in
+            switch result {
+            case .success:
+                dataTransferStatus = String(localized: "Data export completed.", comment: "Status after data export succeeds")
+            case .failure(let error):
+                dataTransferStatus = String(
+                    format: String(localized: "Data export failed: %@", comment: "Status after data export fails"),
+                    error.localizedDescription
+                )
+            }
+        }
+        .fileImporter(
+            isPresented: $showImportPicker,
+            allowedContentTypes: [.json],
+            allowsMultipleSelection: false
+        ) { result in
+            switch result {
+            case .success(let urls):
+                guard let url = urls.first else { return }
+                isDataTransferRunning = true
+                defer { isDataTransferRunning = false }
+
+                do {
+                    let _ = url.startAccessingSecurityScopedResource()
+                    defer { url.stopAccessingSecurityScopedResource() }
+
+                    let data = try Data(contentsOf: url)
+                    let importedCount = try DataTransferService.importArchive(
+                        from: data,
+                        intoAccountID: appState.activeAccountID,
+                        replaceExisting: replaceExistingOnImport
+                    )
+                    appState.loadLocalCachedMemos()
+                    NotificationCenter.default.post(name: .syncCompleted, object: nil)
+                    dataTransferStatus = String(
+                        format: String(localized: "Data import completed: %lld memos.", comment: "Status after data import succeeds"),
+                        Int64(importedCount)
+                    )
+                } catch {
+                    dataTransferStatus = String(
+                        format: String(localized: "Data import failed: %@", comment: "Status after data import fails"),
+                        error.localizedDescription
+                    )
+                }
+            case .failure(let error):
+                dataTransferStatus = String(
+                    format: String(localized: "Data import failed: %@", comment: "Status after data import fails"),
+                    error.localizedDescription
+                )
+            }
+        }
+        .sheet(isPresented: $showShareSheet) {
+            if !shareItems.isEmpty {
+                ShareSheet(items: shareItems)
+            }
+        }
+        #endif
     }
+
+    #if os(iOS)
+    private func shareDataArchive() {
+        do {
+            let data = try DataTransferService.exportArchive(forAccountID: appState.activeAccountID)
+
+            // 创建临时文件
+            let tempDir = FileManager.default.temporaryDirectory
+            let filename = "Essays Archive \(Date().formatted(date: .numeric, time: .omitted)).\(DataTransferService.archiveFileExtension)"
+            let fileURL = tempDir.appendingPathComponent(filename)
+
+            try data.write(to: fileURL, options: .atomic)
+
+            shareItems = [fileURL]
+            showShareSheet = true
+        } catch {
+            dataTransferStatus = String(
+                format: String(localized: "Data export failed: %@", comment: "Status after data export fails"),
+                error.localizedDescription
+            )
+        }
+    }
+    #endif
 
     private func exportDataArchive() {
         #if os(macOS)
@@ -512,7 +633,15 @@ struct SettingsView: View {
             )
         }
         #else
-        dataTransferStatus = String(localized: "Data transfer is not available on this device.", comment: "Status when data transfer is unavailable")
+        do {
+            exportData = try DataTransferService.exportArchive(forAccountID: appState.activeAccountID)
+            showExportPicker = true
+        } catch {
+            dataTransferStatus = String(
+                format: String(localized: "Data export failed: %@", comment: "Status after data export fails"),
+                error.localizedDescription
+            )
+        }
         #endif
     }
 
@@ -551,7 +680,7 @@ struct SettingsView: View {
             )
         }
         #else
-        dataTransferStatus = String(localized: "Data transfer is not available on this device.", comment: "Status when data transfer is unavailable")
+        showImportPicker = true
         #endif
     }
 
@@ -599,6 +728,45 @@ struct SettingsView: View {
         dataTransferStatus = String(localized: "Local folder selection is not available on this device.", comment: "Status when local folder selection is unavailable")
         #endif
     }
-    
+
 
 }
+
+#if os(iOS)
+import UniformTypeIdentifiers
+
+struct JSONDocument: FileDocument {
+    static var readableContentTypes: [UTType] { [.json] }
+
+    var data: Data
+
+    init(data: Data) {
+        self.data = data
+    }
+
+    init(configuration: ReadConfiguration) throws {
+        guard let data = configuration.file.regularFileContents else {
+            throw CocoaError(.fileReadCorruptFile)
+        }
+        self.data = data
+    }
+
+    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
+        return FileWrapper(regularFileWithContents: data)
+    }
+}
+
+struct ShareSheet: UIViewControllerRepresentable {
+    let items: [Any]
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        let controller = UIActivityViewController(activityItems: items, applicationActivities: nil)
+        return controller
+    }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {
+        // No update needed
+    }
+}
+#endif
+

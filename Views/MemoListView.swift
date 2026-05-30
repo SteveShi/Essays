@@ -234,7 +234,7 @@ struct MemoListView: View {
                         .help(String(localized: "AI Assistant", comment: "Help text for AI assistant button"))
                         .popover(isPresented: $showAIAssistant) {
                             if let memo = appState.selectedMemoForDetail ?? appState.selectedMemo ?? computeFilteredMemos().first {
-                                if #available(macOS 26.0, *), aiAvailabilityState.isAvailable {
+                                if #available(macOS 26.0, iOS 26.0, *), aiAvailabilityState.isAvailable {
                                     AIAssistantView(memo: memo)
                                 } else {
                                     Text(aiAvailabilityState.localizedDescription)

@@ -90,6 +90,9 @@ targets:
         product: MarkdownView
       - package: KeyboardShortcuts
         product: KeyboardShortcuts
+      - target: EssaysWidget
+        embed: true
+        codeSign: true
 
   EssaysTests:
     type: bundle.unit-test
@@ -103,6 +106,24 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.essays.app.tests
         PRODUCT_NAME: EssaysTests
         GENERATE_INFOPLIST_FILE: true
+
+  EssaysWidget:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: EssaysWidget
+    settings:
+      base:
+        SWIFT_VERSION: "6.0"
+        SWIFT_STRICT_CONCURRENCY: complete
+        INFOPLIST_FILE: EssaysWidget/Info.plist
+        PRODUCT_BUNDLE_IDENTIFIER: com.essays.app.ios.widget
+        PRODUCT_NAME: EssaysWidget
+        TARGETED_DEVICE_FAMILY: "1,2"
+        SDKROOT: iphoneos
+        SUPPORTED_PLATFORMS: "iphoneos iphonesimulator"
+        IPHONEOS_DEPLOYMENT_TARGET: 17.0
+        SKIP_INSTALL: true
 
 packages:
   MarkdownView:

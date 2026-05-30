@@ -1,10 +1,10 @@
 import Foundation
-#if os(macOS)
+#if canImport(FoundationModels)
 import FoundationModels
 #endif
 
-#if os(macOS)
-@available(macOS 26.0, *)
+#if canImport(FoundationModels)
+@available(macOS 26.0, iOS 26.0, *)
 actor MemosAIAssistant {
     static let shared = MemosAIAssistant()
 
@@ -303,7 +303,7 @@ enum AIAssistantAvailabilityState: Equatable, Sendable {
         case .deviceNotEligible:
             return String(localized: "This device does not support Apple Intelligence.", comment: "AI availability description")
         case .unsupportedOS:
-            return String(localized: "AI Assistant requires macOS 26.0 or newer", comment: "AI assistant availability fallback")
+            return String(localized: "AI Assistant requires macOS 26.0+ or iOS 26.0+", comment: "AI assistant availability fallback")
         case .unavailable:
             return String(localized: "Apple Intelligence is not available right now.", comment: "AI availability description")
         }
@@ -311,8 +311,8 @@ enum AIAssistantAvailabilityState: Equatable, Sendable {
 
     @MainActor
     static func current() async -> AIAssistantAvailabilityState {
-        #if os(macOS)
-        if #available(macOS 26.0, *) {
+        #if canImport(FoundationModels)
+        if #available(macOS 26.0, iOS 26.0, *) {
             return await MemosAIAssistant.shared.availabilityState()
         }
         return .unsupportedOS

@@ -4,6 +4,9 @@ struct ContentView: View {
     @Environment(AppState.self) var appState: AppState
     @State private var showComposeSheet = false
     @AppStorage("theme") private var theme = "system"
+    #if os(iOS)
+    @StateObject private var quickActionService = QuickActionService.shared
+    #endif
 
     private var preferredColorScheme: ColorScheme? {
         switch theme {
@@ -28,6 +31,13 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .syncCompleted)) { _ in
             appState.loadLocalCachedMemos()
         }
+        #if os(iOS)
+        .onChange(of: quickActionService.pendingAction) { _, action in
+            guard let action = action else { return }
+            handleQuickAction(action)
+            quickActionService.clearPendingAction()
+        }
+        #endif
         .environment(appState)
         .sheet(isPresented: $showComposeSheet) {
             ComposeMemoView()
@@ -125,4 +135,19 @@ struct ContentView: View {
             appState.errorMessage = error.localizedDescription
         }
     }
+
+    #if os(iOS)
+    private func handleQuickAction(_ action: QuickActionService.QuickAction) {
+        switch action {
+        case .newMemo:
+            showComposeSheet = true
+        case .search:
+            NotificationCenter.default.post(name: .focusSearch, object: nil)
+        case .quickCapture:
+            // Quick capture is already visible in MemoListView, just focus it
+            // Could add additional logic here if needed
+            break
+        }
+    }
+    #endif
 }
