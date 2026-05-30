@@ -404,12 +404,12 @@ class AppState {
             switch account.mode {
             case .local:
                 serverURL = ""
-                accessToken = account.accessToken ?? ""
+                accessToken = (try? KeychainManager.getToken(for: account.id)) ?? ""
                 currentUser = User.localUser(displayName: account.displayName)
                 isLoggedIn = true
             case .remote:
                 serverURL = account.serverURL ?? ""
-                accessToken = account.accessToken ?? ""
+                accessToken = (try? KeychainManager.getToken(for: account.id)) ?? ""
                 if !serverURL.isEmpty, !accessToken.isEmpty {
                     currentUser = User(
                         name: "users/\(account.id.uuidString)",
@@ -433,7 +433,7 @@ class AppState {
             // 向后兼容：从旧的 UserDefaults 键加载
             serverURL = userDefaults.string(forKey: serverURLKey) ?? ""
             accessToken = userDefaults.string(forKey: accessTokenKey) ?? ""
-            
+
             if let userData = userDefaults.data(forKey: currentUserKey),
                 let user = try? JSONDecoder().decode(User.self, from: userData) as User,
                !serverURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
@@ -492,9 +492,10 @@ class AppState {
         selectedMemoForDetail = nil
         loadSavedCredentials()
         if resolvedAccount.mode == .remote {
+            let token = (try? KeychainManager.getToken(for: resolvedAccount.id)) ?? ""
             MemosAPIClient.shared.configure(
                 serverURL: resolvedAccount.serverURL ?? "",
-                accessToken: resolvedAccount.accessToken ?? "",
+                accessToken: token,
                 apiVersion: resolvedAccount.apiVersion ?? .v027
             )
         }

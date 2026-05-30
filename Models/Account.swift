@@ -16,7 +16,7 @@ struct Account: Codable, Identifiable, Hashable, Sendable {
 
     // MARK: - 远程模式字段
     var serverURL: String?
-    var accessToken: String?
+    // 注意：accessToken 已移至 Keychain 存储，使用 KeychainManager 访问
     var username: String?
     var apiVersion: MemosAPIVersion?
 
@@ -43,7 +43,6 @@ struct Account: Codable, Identifiable, Hashable, Sendable {
         displayName: String,
         serverURL: String,
         apiVersion: MemosAPIVersion = .v027,
-        accessToken: String? = nil,
         username: String? = nil,
         dataDirectoryPath: String? = nil
     ) -> Account {
@@ -53,7 +52,6 @@ struct Account: Codable, Identifiable, Hashable, Sendable {
             mode: .remote,
             dataDirectoryPath: dataDirectoryPath,
             serverURL: serverURL,
-            accessToken: accessToken,
             username: username,
             apiVersion: apiVersion
         )

@@ -112,7 +112,20 @@ final class LocalDatabase {
         if let account {
             let trimmed = account.dataDirectoryPath?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             if !trimmed.isEmpty {
-                return URL(fileURLWithPath: trimmed, isDirectory: true)
+                let url = URL(fileURLWithPath: trimmed, isDirectory: true)
+
+                // 安全验证：路径必须在应用沙盒内
+                let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+                let canonical = url.standardized.path
+                let allowedPrefix = appSupport.standardized.path
+
+                guard canonical.hasPrefix(allowedPrefix) else {
+                    print("⚠️ Security: Rejected unsafe database path: \(canonical)")
+                    print("   Only paths under \(allowedPrefix) are allowed")
+                    return defaultDirectory(for: account)
+                }
+
+                return url
             }
             return defaultDirectory(for: account)
         }

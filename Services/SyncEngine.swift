@@ -12,19 +12,21 @@ class SyncEngine {
     )
 
     static let shared = SyncEngine()
-    
+
     var isSyncing = false
     var lastSyncTime: Date?
     var pendingTasksCount: Int = 0
     var errorTasksCount: Int = 0
-    
+
     private var syncTask: Task<Void, Never>?
-    
+    private let syncLock = NSLock()
+
     private init() {
         // Observe network changes to trigger sync
         NetworkMonitor.shared.onConnectedChange = { [weak self] isConnected in
+            guard let self = self else { return }
             if isConnected {
-                Task { @MainActor in
+                Task { @MainActor [weak self] in
                     self?.triggerSync()
                 }
             }
@@ -34,12 +36,16 @@ class SyncEngine {
     /// Trigger an outbox sync process
     func triggerSync() {
         if AccountManager.shared.isLocalMode { return }
-        guard !isSyncing else { return }
         guard NetworkMonitor.shared.isConnected else { return }
-        
-        // Prevent concurrent syncs
+
+        syncLock.lock()
+        defer { syncLock.unlock() }
+
+        guard !isSyncing else { return }
+
+        // Cancel previous task if exists
         syncTask?.cancel()
-        
+
         syncTask = Task {
             await performSync()
         }
@@ -56,7 +62,7 @@ class SyncEngine {
             self.pendingTasksCount = scopedTasks.filter { $0.state == .pending || $0.state == .retry }.count
             self.errorTasksCount = scopedTasks.filter { $0.state == .error }.count
         } catch {
-            Self.logger.error("Failed to fetch outbox stats: \(error.localizedDescription, privacy: .public)")
+            Self.logger.error("Failed to fetch outbox stats: \(error.localizedDescription, privacy: .private)")
         }
     }
     
@@ -70,9 +76,10 @@ class SyncEngine {
         
         do {
             if let account = AccountManager.shared.activeAccount, account.mode == .remote {
+                let token = (try? KeychainManager.getToken(for: account.id)) ?? ""
                 MemosAPIClient.shared.configure(
                     serverURL: account.serverURL ?? "",
-                    accessToken: account.accessToken ?? "",
+                    accessToken: token,
                     apiVersion: account.apiVersion ?? .v027
                 )
             }
@@ -87,7 +94,7 @@ class SyncEngine {
             await pullLatestMemos()
             
         } catch {
-            Self.logger.error("Sync failed: \(error.localizedDescription, privacy: .public)")
+            Self.logger.error("Sync failed: \(error.localizedDescription, privacy: .private)")
         }
     }
     

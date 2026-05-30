@@ -1,5 +1,17 @@
 import Foundation
 
+/// 配置好的 URLSession，带有超时控制
+extension URLSession {
+    static let memosAPI: URLSession = {
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 30 // 30秒请求超时
+        config.timeoutIntervalForResource = 60 // 60秒资源超时
+        config.waitsForConnectivity = true
+        config.requestCachePolicy = .reloadIgnoringLocalCacheData
+        return URLSession(configuration: config)
+    }()
+}
+
 /// 标准的 Memos API 错误
 enum MemosAPIError: Error, LocalizedError {
     case invalidURL

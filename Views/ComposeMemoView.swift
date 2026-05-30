@@ -19,7 +19,15 @@ struct ComposeMemoView: View {
         self.isCommentEditor = isCommentEditor
     }
     
-    @State private var content: String = ""
+    @State private var content: String = "" {
+        didSet {
+            // 限制内容最大长度为 100,000 字符
+            if content.count > 100_000 {
+                content = String(content.prefix(100_000))
+                errorMessage = String(localized: "Content exceeds maximum length (100,000 characters)", comment: "Error message for content too long")
+            }
+        }
+    }
     @State private var visibility: MemoVisibility = .private
     @State private var isSaving = false
     @State private var errorMessage: String?
@@ -40,23 +48,72 @@ struct ComposeMemoView: View {
     @State private var autoSaveTask: Task<Void, Never>?
     
     var body: some View {
-        VStack(spacing: 0) {
-            headerView
-            
-            Divider()
-            
-            contentView
-            
-            Divider()
-            
-            if currentLocation != nil || !uploadedAttachments.isEmpty {
-                uploadPreview
-                Divider()
-            }
+        Group {
+            #if os(iOS)
+            NavigationView {
+                VStack(spacing: 0) {
+                    contentView
 
-            footerView
+                    Divider()
+
+                    if currentLocation != nil || !uploadedAttachments.isEmpty {
+                        uploadPreview
+                        Divider()
+                    }
+
+                    footerView
+                }
+                .navigationTitle(
+                    editingMemo == nil
+                        ? String(localized: "New Memo", comment: "Header title for new memo")
+                        : (
+                            isCommentEditor
+                                ? String(localized: "Edit Comment", comment: "Header title for editing comment")
+                                : String(localized: "Edit Memo", comment: "Header title for editing memo")
+                        )
+                )
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button(String(localized: "Cancel", comment: "Cancel button text")) {
+                            dismiss()
+                        }
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button {
+                            saveMemo()
+                        } label: {
+                            if isSaving {
+                                ProgressView()
+                            } else {
+                                Text(String(localized: "Save", comment: "Save button text"))
+                                    .fontWeight(.semibold)
+                            }
+                        }
+                        .disabled(content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSaving)
+                    }
+                }
+            }
+            #else
+            VStack(spacing: 0) {
+                headerView
+
+                Divider()
+
+                contentView
+
+                Divider()
+
+                if currentLocation != nil || !uploadedAttachments.isEmpty {
+                    uploadPreview
+                    Divider()
+                }
+
+                footerView
+            }
+            .frame(width: 560, height: 480)
+            #endif
         }
-        .frame(width: 560, height: 480)
         .onAppear {
             if let memo = editingMemo {
                 content = memo.content
@@ -96,7 +153,8 @@ struct ComposeMemoView: View {
             locationManager.clear()
         }
     }
-    
+
+    #if os(macOS)
     private var headerView: some View {
         HStack {
             Button(String(localized: "Cancel", comment: "Cancel button text")) {
@@ -155,7 +213,8 @@ struct ComposeMemoView: View {
         }
         .padding(16)
     }
-    
+    #endif
+
     private var contentView: some View {
         VStack(alignment: .leading, spacing: 12) {
             TextEditor(text: $content)
@@ -221,11 +280,32 @@ struct ComposeMemoView: View {
     
     private var footerView: some View {
         HStack(spacing: 16) {
+            #if os(iOS)
+            HStack(spacing: 4) {
+                Image(systemName: visibility.icon)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(.secondary)
+
+                Menu {
+                    ForEach(MemoVisibility.allCases, id: \.self) { vis in
+                        Button {
+                            visibility = vis
+                        } label: {
+                            Label(vis.displayName, systemImage: vis.icon)
+                        }
+                    }
+                } label: {
+                    Text(visibility.displayName)
+                        .font(.callout)
+                        .foregroundColor(.secondary)
+                }
+            }
+            #else
             HStack(spacing: 4) {
                 Image(systemName: visibility.icon)
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(LiquidGlassTheme.colors.secondaryText)
-                
+
                 Menu {
                     ForEach(MemoVisibility.allCases, id: \.self) { vis in
                         Button {
@@ -242,9 +322,10 @@ struct ComposeMemoView: View {
                 .menuStyle(.borderlessButton)
                 .menuIndicator(.hidden)
             }
-            
+            #endif
+
             Spacer()
-            
+
             HStack(spacing: 12) {
                 if !isCommentEditor {
                     Button {
@@ -254,10 +335,14 @@ struct ComposeMemoView: View {
                             .font(.system(size: 14, weight: .medium))
                     }
                     .buttonStyle(.plain)
+                    #if os(iOS)
+                    .foregroundColor(.secondary)
+                    #else
                     .foregroundColor(LiquidGlassTheme.colors.secondaryText)
                     .help(String(localized: "Insert Tag", comment: "Help tooltip for tag button"))
+                    #endif
                 }
-                
+
                 Button {
                     content += "**bold**"
                 } label: {
@@ -265,9 +350,13 @@ struct ComposeMemoView: View {
                         .font(.system(size: 14, weight: .medium))
                 }
                 .buttonStyle(.plain)
+                #if os(iOS)
+                .foregroundColor(.secondary)
+                #else
                 .foregroundColor(LiquidGlassTheme.colors.secondaryText)
                 .help(String(localized: "Bold", comment: "Help tooltip for bold button"))
-                
+                #endif
+
                 Button {
                     content += "`code`"
                 } label: {
@@ -275,9 +364,13 @@ struct ComposeMemoView: View {
                         .font(.system(size: 12, weight: .medium))
                 }
                 .buttonStyle(.plain)
+                #if os(iOS)
+                .foregroundColor(.secondary)
+                #else
                 .foregroundColor(LiquidGlassTheme.colors.secondaryText)
                 .help(String(localized: "Inline Code", comment: "Help tooltip for inline code button"))
-                
+                #endif
+
                 Button {
                     content += "\n```\n\n```\n"
                 } label: {
@@ -285,9 +378,13 @@ struct ComposeMemoView: View {
                         .font(.system(size: 12, weight: .medium))
                 }
                 .buttonStyle(.plain)
+                #if os(iOS)
+                .foregroundColor(.secondary)
+                #else
                 .foregroundColor(LiquidGlassTheme.colors.secondaryText)
                 .help(String(localized: "Code Block", comment: "Help tooltip for code block button"))
-                
+                #endif
+
                 Button {
                     showMemoPicker = true
                 } label: {
@@ -295,18 +392,26 @@ struct ComposeMemoView: View {
                         .font(.system(size: 14, weight: .medium))
                 }
                 .buttonStyle(.plain)
+                #if os(iOS)
+                .foregroundColor(.secondary)
+                #else
                 .foregroundColor(LiquidGlassTheme.colors.secondaryText)
                 .help(
                     String(
                         localized: "Link to Memo", comment: "Help tooltip for memo linking button")
                 )
+                #endif
                 .popover(isPresented: $showMemoPicker) {
                     MemoPicker(onSelect: { memo in
                         content +=
                             " [\(String(localized: "Memo", comment: "Label for linked memo reference"))](\(memo.name))"
                         showMemoPicker = false
                     })
+                    #if os(iOS)
                     .frame(width: 300, height: 400)
+                    #else
+                    .frame(width: 300, height: 400)
+                    #endif
                 }
 
                 Button {
@@ -329,12 +434,19 @@ struct ComposeMemoView: View {
                         errorMessage = newError
                     }
                 }
+                #if os(iOS)
+                .foregroundColor(
+                    currentLocation != nil
+                        ? .accentColor : .secondary
+                )
+                #else
                 .foregroundColor(
                     currentLocation != nil
                         ? LiquidGlassTheme.colors.accent : LiquidGlassTheme.colors.secondaryText
                 )
                 .help(
                     String(localized: "Add Location", comment: "Help tooltip for location button"))
+                #endif
 
                 Button {
                     showCamera = true
@@ -343,8 +455,12 @@ struct ComposeMemoView: View {
                         .font(.system(size: 14, weight: .medium))
                 }
                 .buttonStyle(.plain)
+                #if os(iOS)
+                .foregroundColor(.secondary)
+                #else
                 .foregroundColor(LiquidGlassTheme.colors.secondaryText)
                 .help(String(localized: "Take Photo", comment: "Help tooltip for camera button"))
+                #endif
 
                 Button {
                     selectImages()
@@ -361,15 +477,24 @@ struct ComposeMemoView: View {
                     }
                 }
                 .buttonStyle(.plain)
+                #if os(iOS)
+                .foregroundColor(.secondary)
+                .disabled(isUploading)
+                #else
                 .foregroundColor(LiquidGlassTheme.colors.secondaryText)
                 .disabled(isUploading)
                 .help(
                     String(
                         localized: "Upload Image", comment: "Help tooltip for image upload button"))
+                #endif
             }
         }
         .padding(16)
+        #if os(iOS)
+        .background(Color(uiColor: .systemGroupedBackground))
+        #else
         .background(LiquidGlassTheme.colors.secondaryBackground)
+        #endif
     }
     
     private func updateSuggestedTags(from text: String) {
@@ -493,12 +618,23 @@ struct ComposeMemoView: View {
     }
     
     private func handleSelectedURLs(_ urls: [URL]) {
+        let maxFileSize = 10 * 1024 * 1024 // 10MB
+
         if appState.isLocalMode {
             let localAttachments = urls.compactMap { url -> Attachment? in
                 let _ = url.startAccessingSecurityScopedResource()
                 defer { url.stopAccessingSecurityScopedResource() }
 
                 guard let data = try? Data(contentsOf: url) else { return nil }
+
+                // 检查文件大小
+                guard data.count <= maxFileSize else {
+                    DispatchQueue.main.async {
+                        self.errorMessage = String(localized: "File size exceeds limit (10MB)", comment: "Error message for file too large")
+                    }
+                    return nil
+                }
+
                 let ext = url.pathExtension.lowercased()
                 let mimeType =
                     (ext == "jpg" || ext == "jpeg")
@@ -526,9 +662,18 @@ struct ComposeMemoView: View {
                 // For iOS security scoped resources
                 let _ = url.startAccessingSecurityScopedResource()
                 defer { url.stopAccessingSecurityScopedResource() }
-                
+
                 do {
                     let data = try Data(contentsOf: url)
+
+                    // 检查文件大小
+                    guard data.count <= maxFileSize else {
+                        await MainActor.run {
+                            self.errorMessage = String(localized: "File size exceeds limit (10MB)", comment: "Error message for file too large")
+                        }
+                        continue
+                    }
+
                     let filename = url.lastPathComponent
                     let ext = url.pathExtension.lowercased()
                     let mimeType =

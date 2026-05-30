@@ -28,16 +28,35 @@ struct MemoListView: View {
     @AppStorage("enableAIFeatures") private var enableAIFeatures = true
     @AppStorage("editorFontSize") private var editorFontSize: Double = 14
     @State private var aiAvailabilityState: AIAssistantAvailabilityState = .checking
-    
+
     @Query(sort: \Memo.createdAt, order: .reverse) private var allMemos: [Memo]
-    
+
+    // 分页相关
+    @State private var displayedMemoCount: Int = 50 // 初始显示 50 条
+    private let pageSize: Int = 50 // 每页 50 条
+    private let maxDisplayCount: Int = 500 // 最多显示 500 条，防止内存溢出
+
     private var locationManager = LocationManager.shared
-    
+
     private func computeFilteredMemos() -> [Memo] {
         let base = baseMemosForActiveAccount()
         let sidebarFiltered = applySidebarSelectionFilter(base, selection: appState.sidebarSelection)
         let keywordTerms = keywordTerms(from: appState.searchText)
-        return applyKeywordFilter(sidebarFiltered, terms: keywordTerms)
+        let filtered = applyKeywordFilter(sidebarFiltered, terms: keywordTerms)
+
+        // 应用分页限制
+        return Array(filtered.prefix(displayedMemoCount))
+    }
+
+    /// 加载更多 memos
+    private func loadMoreMemosIfNeeded(currentMemo memo: Memo, allFilteredMemos: [Memo]) {
+        guard displayedMemoCount < maxDisplayCount else { return }
+
+        // 当滚动到倒数第 10 条时，加载更多
+        if let index = allFilteredMemos.firstIndex(where: { $0.id == memo.id }),
+           index >= allFilteredMemos.count - 10 {
+            displayedMemoCount = min(displayedMemoCount + pageSize, maxDisplayCount)
+        }
     }
 
     private func baseMemosForActiveAccount() -> [Memo] {
@@ -587,19 +606,45 @@ struct MemoListView: View {
                             }
                             .buttonStyle(.plain)
                             .id(memo.name)
+                            .onAppear {
+                                // 触发分页加载
+                                loadMoreMemosIfNeeded(currentMemo: memo, allFilteredMemos: memos)
+                            }
                         }
                     }
                 }
             }
+
+            // 显示加载更多提示
+            if memos.count >= displayedMemoCount && displayedMemoCount < maxDisplayCount {
+                HStack {
+                    Spacer()
+                    Text(String(localized: "Scroll to load more...", comment: "Hint for loading more memos"))
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                }
+                .padding(.top, 8)
+            } else if displayedMemoCount >= maxDisplayCount {
+                HStack {
+                    Spacer()
+                    Text(String(localized: "Showing first 500 memos. Use search to narrow results.", comment: "Hint when max memos reached"))
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                }
+                .padding(.top, 8)
+            }
         }
     }
 
+    @MainActor
     private func quickCaptureMemo() {
         let trimmed = quickCaptureText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
 
         isQuickCaptureSaving = true
-        
+
         let extractedTags = MemoUtility.extractTags(from: trimmed)
         let attachmentNames = quickCaptureAttachments.map { $0.name }
 
@@ -623,7 +668,7 @@ struct MemoListView: View {
             )
             LocalDatabase.shared.context.insert(newMemo)
             LocalDatabase.shared.syncReferenceRelations(for: newMemo, content: trimmed)
-            
+
             // 2. Enqueue OutboxTask
             if !appState.isLocalMode {
                 let payload = MemoPayload(
@@ -642,15 +687,15 @@ struct MemoListView: View {
                 LocalDatabase.shared.context.insert(task)
             }
             try LocalDatabase.shared.context.save()
-            
+
             // Trigger background sync
             SyncEngine.shared.triggerSync()
-            
+
             #if os(iOS)
             let generator = UIImpactFeedbackGenerator(style: .medium)
             generator.impactOccurred()
             #endif
-            
+
             // UI cleanup
             quickCaptureText = ""
             quickCaptureAttachments = []

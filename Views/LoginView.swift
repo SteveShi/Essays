@@ -68,16 +68,16 @@ struct LoginView: View {
                 case .local:
                     Section {
                         VStack(alignment: .leading, spacing: 8) {
-                            Label("Offline-First Storage", systemImage: "internaldrive")
+                            Label(String(localized: "Offline-First Storage", comment: "Local mode storage label"), systemImage: "internaldrive")
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
-                            Text("Memos will be stored locally on your device. No network connection required.")
+                            Text(String(localized: "Memos will be stored locally on your device. No network connection required.", comment: "Local mode description"))
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
                         .padding(.vertical, 4)
                     } header: {
-                        Text("Local Mode")
+                        Text(String(localized: "Local Mode", comment: "Local mode section header"))
                     }
 
                 case .remote:
@@ -632,10 +632,10 @@ struct LoginView: View {
                 displayName: user.displayNameResolved,
                 serverURL: normalizedServerURL,
                 apiVersion: selectedAPIVersion,
-                accessToken: token,
                 username: normalizedUsername
             )
             let resolvedAccount = LocalDatabase.shared.activateStore(for: account) ?? account
+            AccountManager.shared.addAccount(resolvedAccount, accessToken: token)
             AccountManager.shared.setActiveAccount(resolvedAccount)
 
             appState.serverURL = normalizedServerURL
@@ -662,10 +662,10 @@ struct LoginView: View {
             let account = Account.remoteAccount(
                 displayName: user.displayNameResolved,
                 serverURL: normalizedServerURL,
-                apiVersion: selectedAPIVersion,
-                accessToken: normalizedAccessToken
+                apiVersion: selectedAPIVersion
             )
             let resolvedAccount = LocalDatabase.shared.activateStore(for: account) ?? account
+            AccountManager.shared.addAccount(resolvedAccount, accessToken: normalizedAccessToken)
             AccountManager.shared.setActiveAccount(resolvedAccount)
 
             appState.serverURL = normalizedServerURL

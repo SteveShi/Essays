@@ -65,7 +65,7 @@ struct SmallWidgetView: View {
                 Spacer()
             }
 
-            Text("Essays")
+            Text(String(localized: "Essays", comment: "Widget app name"))
                 .font(.system(size: 16, weight: .bold))
 
             Spacer()
@@ -73,7 +73,7 @@ struct SmallWidgetView: View {
             HStack {
                 Text("\(entry.memoCount)")
                     .font(.system(size: 28, weight: .bold))
-                Text("memos")
+                Text(String(localized: "memos", comment: "Widget memo count label"))
                     .font(.system(size: 14))
                     .foregroundStyle(.secondary)
             }
@@ -92,7 +92,7 @@ struct MediumWidgetView: View {
                 Image(systemName: "note.text")
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(.blue)
-                Text("Recent Memos")
+                Text(String(localized: "Recent Memos", comment: "Widget section title"))
                     .font(.system(size: 16, weight: .bold))
                 Spacer()
                 Text("\(entry.memoCount)")
@@ -105,7 +105,7 @@ struct MediumWidgetView: View {
                     Image(systemName: "square.and.pencil")
                         .font(.system(size: 24))
                         .foregroundStyle(.secondary)
-                    Text("No memos yet")
+                    Text(String(localized: "No memos yet", comment: "Widget empty state"))
                         .font(.system(size: 13))
                         .foregroundStyle(.secondary)
                 }
@@ -142,10 +142,10 @@ struct LargeWidgetView: View {
                 Image(systemName: "note.text")
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(.blue)
-                Text("Recent Memos")
+                Text(String(localized: "Recent Memos", comment: "Widget section title"))
                     .font(.system(size: 16, weight: .bold))
                 Spacer()
-                Text("\(entry.memoCount) total")
+                Text(String(localized: "\(entry.memoCount) total", comment: "Widget total count"))
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(.secondary)
             }
@@ -155,10 +155,10 @@ struct LargeWidgetView: View {
                     Image(systemName: "square.and.pencil")
                         .font(.system(size: 32))
                         .foregroundStyle(.secondary)
-                    Text("No memos yet")
+                    Text(String(localized: "No memos yet", comment: "Widget empty state"))
                         .font(.system(size: 15))
                         .foregroundStyle(.secondary)
-                    Text("Open Essays to create your first memo")
+                    Text(String(localized: "Open Essays to create your first memo", comment: "Widget empty state hint"))
                         .font(.system(size: 13))
                         .foregroundStyle(.tertiary)
                         .multilineTextAlignment(.center)
@@ -197,8 +197,8 @@ struct EssaysWidget: Widget {
         StaticConfiguration(kind: kind, provider: Provider()) { entry in
             EssaysWidgetEntryView(entry: entry)
         }
-        .configurationDisplayName("Essays")
-        .description("View your recent memos at a glance.")
+        .configurationDisplayName(String(localized: "Essays", comment: "Widget display name"))
+        .description(String(localized: "View your recent memos at a glance.", comment: "Widget description"))
         .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
     }
 }

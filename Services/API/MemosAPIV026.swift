@@ -9,8 +9,7 @@ struct MemosAPIV026: MemosAPIProtocol {
 
     private let baseURL: String
     private let accessToken: String
-    private let session: URLSession
-    
+
     init(baseURL: String, accessToken: String) {
         var normalizedURL = baseURL.trimmingCharacters(in: .whitespacesAndNewlines)
         if !normalizedURL.isEmpty {
@@ -27,11 +26,6 @@ struct MemosAPIV026: MemosAPIProtocol {
         }
         self.baseURL = normalizedURL
         self.accessToken = accessToken
-        
-        let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 30
-        config.waitsForConnectivity = true
-        self.session = URLSession(configuration: config)
     }
     
     private func buildURL(_ path: String) -> URL? {
@@ -51,7 +45,7 @@ struct MemosAPIV026: MemosAPIProtocol {
 
 
     private func performRequest<T: Decodable>(_ request: URLRequest) async throws -> T {
-        let (data, response) = try await session.data(for: request)
+        let (data, response) = try await URLSession.memosAPI.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw MemosAPIError.invalidResponse
@@ -66,13 +60,13 @@ struct MemosAPIV026: MemosAPIProtocol {
             }
             throw MemosAPIError.httpError(httpResponse.statusCode)
         }
-        
+
         do {
             return try MemosAPIDecoder.shared.decode(T.self, from: data)
         } catch {
-            Self.logger.error("Decoding error: \(error.localizedDescription, privacy: .public)")
+            Self.logger.error("Decoding error: \(error.localizedDescription, privacy: .private)")
             if let jsonString = String(data: data, encoding: .utf8) {
-                Self.logger.debug("Decoding payload: \(jsonString, privacy: .public)")
+                Self.logger.debug("Decoding payload: \(jsonString, privacy: .private)")
             }
             throw MemosAPIError.decodingError(error)
         }
@@ -220,7 +214,7 @@ struct MemosAPIV026: MemosAPIProtocol {
             url: url, method: "POST", body: try? JSONSerialization.data(withJSONObject: body))
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         
-        let (data, response) = try await session.data(for: request)
+        let (data, response) = try await URLSession.memosAPI.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
             throw MemosAPIError.invalidResponse
@@ -314,7 +308,7 @@ struct MemosAPIV026: MemosAPIProtocol {
             guard let url = urlComponents.url else { throw MemosAPIError.invalidURL }
             let request = buildRequest(url: url)
             
-            let (data, response) = try await session.data(for: request)
+            let (data, response) = try await URLSession.memosAPI.data(for: request)
             guard let httpResponse = response as? HTTPURLResponse,
                   (200...299).contains(httpResponse.statusCode) else {
                 throw MemosAPIError.invalidResponse
@@ -563,7 +557,7 @@ struct MemosAPIV026: MemosAPIProtocol {
         }
         let request = buildRequest(url: url, method: "DELETE")
         
-        let (_, response) = try await session.data(for: request)
+        let (_, response) = try await URLSession.memosAPI.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse,
               (200...299).contains(httpResponse.statusCode) else {
@@ -679,7 +673,7 @@ struct MemosAPIV026: MemosAPIProtocol {
             guard let url = urlComponents.url else { throw MemosAPIError.invalidURL }
             let request = buildRequest(url: url)
             
-            let (data, response) = try await session.data(for: request)
+            let (data, response) = try await URLSession.memosAPI.data(for: request)
             guard let httpResponse = response as? HTTPURLResponse,
                   (200...299).contains(httpResponse.statusCode) else {
                 throw MemosAPIError.invalidResponse

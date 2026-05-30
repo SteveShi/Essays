@@ -18,6 +18,12 @@ final class AccountManager {
         return accounts.first { $0.id == id }
     }
 
+    /// 获取活跃账户的访问令牌（从 Keychain 读取）
+    var activeAccessToken: String? {
+        guard let id = activeAccountID else { return nil }
+        return try? KeychainManager.getToken(for: id)
+    }
+
     var isLocalMode: Bool {
         activeAccount?.mode == .local
     }
@@ -57,6 +63,16 @@ final class AccountManager {
         saveAccounts()
     }
 
+    /// 添加账户并保存访问令牌到 Keychain
+    func addAccount(_ account: Account, accessToken: String?) {
+        accounts.append(account)
+        saveAccounts()
+
+        if let token = accessToken {
+            try? KeychainManager.saveToken(token, for: account.id)
+        }
+    }
+
     func removeAccount(_ account: Account) {
         accounts.removeAll { $0.id == account.id }
         if activeAccountID == account.id {
@@ -64,12 +80,27 @@ final class AccountManager {
             saveActiveID()
         }
         saveAccounts()
+
+        // 从 Keychain 删除令牌
+        try? KeychainManager.deleteToken(for: account.id)
     }
 
     func updateAccount(_ account: Account) {
         if let index = accounts.firstIndex(where: { $0.id == account.id }) {
             accounts[index] = account
             saveAccounts()
+        }
+    }
+
+    /// 更新账户并保存访问令牌到 Keychain
+    func updateAccount(_ account: Account, accessToken: String?) {
+        if let index = accounts.firstIndex(where: { $0.id == account.id }) {
+            accounts[index] = account
+            saveAccounts()
+
+            if let token = accessToken {
+                try? KeychainManager.saveToken(token, for: account.id)
+            }
         }
     }
 
@@ -97,6 +128,8 @@ final class AccountManager {
         if let id = activeAccountID {
             accounts.removeAll { $0.id == id }
             saveAccounts()
+            // 从 Keychain 删除令牌
+            try? KeychainManager.deleteToken(for: id)
         }
         activeAccountID = nil
         saveActiveID()
@@ -108,5 +141,7 @@ final class AccountManager {
         activeAccountID = nil
         saveAccounts()
         saveActiveID()
+        // 清除所有 Keychain 令牌
+        try? KeychainManager.deleteAllTokens()
     }
 }
