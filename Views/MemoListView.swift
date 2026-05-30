@@ -639,7 +639,7 @@ struct MemoListView: View {
             } else if displayedMemoCount >= maxDisplayCount {
                 HStack {
                     Spacer()
-                    Text(String(localized: "Showing first \(maxDisplayCount) memos. Use search to narrow results.", comment: "Hint when max memos reached"))
+                    Text(String(format: String(localized: "Showing first %lld memos. Use search to narrow results.", comment: "Hint when max memos reached"), maxDisplayCount))
                         .font(.caption)
                         .foregroundColor(.secondary)
                     Spacer()

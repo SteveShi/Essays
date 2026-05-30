@@ -4887,20 +4887,20 @@
         }
       }
     },
-    "Showing first 500 memos. Use search to narrow results.": {
+    "Showing first %lld memos. Use search to narrow results.": {
       "comment": "Hint when max memos reached",
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Showing first 500 memos. Use search to narrow results."
+            "value": "Showing first %lld memos. Use search to narrow results."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "仅显示前 500 条闪念。使用搜索缩小结果范围。"
+            "value": "仅显示前 %lld 条闪念。使用搜索缩小结果范围。"
           }
         }
       }
