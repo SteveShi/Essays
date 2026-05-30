@@ -67,5 +67,9 @@ skills-lock.json
 /.agents
 .vercel
 /.claude
+
+# Code audit and fix reports
 CODE_AUDIT_REPORT.md
 FIXES_APPLIED.md
+FINAL_REPORT.md
+PAGINATION_IMPLEMENTATION.md
