@@ -114,15 +114,25 @@ final class LocalDatabase {
             if !trimmed.isEmpty {
                 let url = URL(fileURLWithPath: trimmed, isDirectory: true)
 
-                // 安全验证：路径必须在应用沙盒内
-                let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+                // 安全验证：阻止明显危险的系统路径
                 let canonical = url.standardized.path
-                let allowedPrefix = appSupport.standardized.path
+                let dangerousPaths = [
+                    "/System",
+                    "/Library/System",
+                    "/private/var/db",
+                    "/private/var/root",
+                    "/bin",
+                    "/sbin",
+                    "/usr/bin",
+                    "/usr/sbin"
+                ]
 
-                guard canonical.hasPrefix(allowedPrefix) else {
-                    print("⚠️ Security: Rejected unsafe database path: \(canonical)")
-                    print("   Only paths under \(allowedPrefix) are allowed")
-                    return defaultDirectory(for: account)
+                for dangerousPath in dangerousPaths {
+                    if canonical.hasPrefix(dangerousPath) {
+                        print("⚠️ Security: Rejected dangerous system path: \(canonical)")
+                        print("   System directories are not allowed for database storage")
+                        return defaultDirectory(for: account)
+                    }
                 }
 
                 return url
