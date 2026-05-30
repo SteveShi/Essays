@@ -31,10 +31,11 @@ struct MemoListView: View {
 
     @Query(sort: \Memo.createdAt, order: .reverse) private var allMemos: [Memo]
 
-    // 分页相关
-    @State private var displayedMemoCount: Int = 50 // 初始显示 50 条
-    private let pageSize: Int = 50 // 每页 50 条
-    private let maxDisplayCount: Int = 500 // 最多显示 500 条，防止内存溢出
+    // 智能分页相关
+    @State private var displayedMemoCount: Int = 0 // 将在 onAppear 中初始化
+    private var pageSize: Int { DevicePerformance.recommendedPageSize() }
+    private var maxDisplayCount: Int { DevicePerformance.recommendedMaxDisplay() }
+    private var preloadThreshold: Int { DevicePerformance.recommendedPreloadThreshold() }
 
     private var locationManager = LocationManager.shared
 
@@ -48,14 +49,17 @@ struct MemoListView: View {
         return Array(filtered.prefix(displayedMemoCount))
     }
 
-    /// 加载更多 memos
+    /// 加载更多 memos（预加载优化）
     private func loadMoreMemosIfNeeded(currentMemo memo: Memo, allFilteredMemos: [Memo]) {
         guard displayedMemoCount < maxDisplayCount else { return }
 
-        // 当滚动到倒数第 10 条时，加载更多
+        // 当滚动到倒数 N 条时，预加载下一页（N 根据设备性能动态调整）
         if let index = allFilteredMemos.firstIndex(where: { $0.id == memo.id }),
-           index >= allFilteredMemos.count - 10 {
-            displayedMemoCount = min(displayedMemoCount + pageSize, maxDisplayCount)
+           index >= allFilteredMemos.count - preloadThreshold {
+            let newCount = min(displayedMemoCount + pageSize, maxDisplayCount)
+            if newCount > displayedMemoCount {
+                displayedMemoCount = newCount
+            }
         }
     }
 
@@ -320,6 +324,13 @@ struct MemoListView: View {
         }
         .task {
             aiAvailabilityState = await AIAssistantAvailabilityState.current()
+        }
+        .onAppear {
+            // 初始化智能分页
+            if displayedMemoCount == 0 {
+                displayedMemoCount = DevicePerformance.recommendedInitialLoad()
+                print(DevicePerformance.deviceInfo())
+            }
         }
     }
 
@@ -628,7 +639,7 @@ struct MemoListView: View {
             } else if displayedMemoCount >= maxDisplayCount {
                 HStack {
                     Spacer()
-                    Text(String(localized: "Showing first 500 memos. Use search to narrow results.", comment: "Hint when max memos reached"))
+                    Text(String(localized: "Showing first \(maxDisplayCount) memos. Use search to narrow results.", comment: "Hint when max memos reached"))
                         .font(.caption)
                         .foregroundColor(.secondary)
                     Spacer()
