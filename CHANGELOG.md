@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.8.2] - 2026-06-02
+
+### Changed
+- 🔌 **Memos v0.29 Support**: Added support for Memos server v0.29.0. The new version can now be selected in the login screen's API version picker, and is the default for new accounts.
+
+---
+
+### Chinese
+
+### 变更
+- 🔌 **Memos v0.29 适配**：新增对 Memos 服务端 v0.29.0 的支持。登录界面的 API 版本选择器中现已出现 v0.29 选项，并作为新账户的默认版本。
+
+---
+
 ## [2.8.1] - 2026-05-31
 
 ### Performance
