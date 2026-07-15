@@ -358,6 +358,34 @@ struct ComposeMemoView: View {
                 #endif
 
                 Button {
+                    content += "*italic*"
+                } label: {
+                    Image(systemName: "italic")
+                        .font(.system(size: 14, weight: .medium))
+                }
+                .buttonStyle(.plain)
+                #if os(iOS)
+                .foregroundColor(.secondary)
+                #else
+                .foregroundColor(LiquidGlassTheme.colors.secondaryText)
+                .help(String(localized: "Italic", comment: "Help tooltip for italic button"))
+                #endif
+
+                Button {
+                    content += "~~strikethrough~~"
+                } label: {
+                    Image(systemName: "strikethrough")
+                        .font(.system(size: 14, weight: .medium))
+                }
+                .buttonStyle(.plain)
+                #if os(iOS)
+                .foregroundColor(.secondary)
+                #else
+                .foregroundColor(LiquidGlassTheme.colors.secondaryText)
+                .help(String(localized: "Strikethrough", comment: "Help tooltip for strikethrough button"))
+                #endif
+
+                Button {
                     content += "`code`"
                 } label: {
                     Image(systemName: "chevron.left.forwardslash.chevron.right")
@@ -383,6 +411,62 @@ struct ComposeMemoView: View {
                 #else
                 .foregroundColor(LiquidGlassTheme.colors.secondaryText)
                 .help(String(localized: "Code Block", comment: "Help tooltip for code block button"))
+                #endif
+
+                Button {
+                    content += "\n- "
+                } label: {
+                    Image(systemName: "list.bullet")
+                        .font(.system(size: 14, weight: .medium))
+                }
+                .buttonStyle(.plain)
+                #if os(iOS)
+                .foregroundColor(.secondary)
+                #else
+                .foregroundColor(LiquidGlassTheme.colors.secondaryText)
+                .help(String(localized: "Unordered List", comment: "Help tooltip for unordered list button"))
+                #endif
+
+                Button {
+                    content += "\n1. "
+                } label: {
+                    Image(systemName: "list.number")
+                        .font(.system(size: 14, weight: .medium))
+                }
+                .buttonStyle(.plain)
+                #if os(iOS)
+                .foregroundColor(.secondary)
+                #else
+                .foregroundColor(LiquidGlassTheme.colors.secondaryText)
+                .help(String(localized: "Ordered List", comment: "Help tooltip for ordered list button"))
+                #endif
+
+                Button {
+                    content += "\n- [ ] "
+                } label: {
+                    Image(systemName: "checkmark.square")
+                        .font(.system(size: 14, weight: .medium))
+                }
+                .buttonStyle(.plain)
+                #if os(iOS)
+                .foregroundColor(.secondary)
+                #else
+                .foregroundColor(LiquidGlassTheme.colors.secondaryText)
+                .help(String(localized: "Task List", comment: "Help tooltip for task list button"))
+                #endif
+
+                Button {
+                    content += "\n### "
+                } label: {
+                    Image(systemName: "textformat.size")
+                        .font(.system(size: 14, weight: .medium))
+                }
+                .buttonStyle(.plain)
+                #if os(iOS)
+                .foregroundColor(.secondary)
+                #else
+                .foregroundColor(LiquidGlassTheme.colors.secondaryText)
+                .help(String(localized: "Heading", comment: "Help tooltip for heading button"))
                 #endif
 
                 Button {

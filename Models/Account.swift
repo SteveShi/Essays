@@ -2,6 +2,7 @@ import Foundation
 
 /// 表示使用的 Memos API 版本
 enum MemosAPIVersion: String, Codable, Sendable, CaseIterable {
+    case v030 = "v0.30"
     case v029 = "v0.29"
     case v027 = "v0.27"
     case v026 = "v0.26"

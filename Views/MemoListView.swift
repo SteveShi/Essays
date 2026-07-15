@@ -306,6 +306,7 @@ struct MemoListView: View {
                     .disabled(appState.isLoading)
                     .help(String(localized: "Refresh", comment: "Help text for refresh button"))
 
+
                     Button {
                         showComposeSheet = true
                     } label: {

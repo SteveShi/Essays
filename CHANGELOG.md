@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.8.3] - 2026-07-15
+
+### Added
+- 🔌 **Memos v0.30 Support**: Added support for Memos server v0.30.0. Added a compatibility layer `MemosAPIV030` and updated the login version selector.
+- ✍️ **Editor Formatting Toolbar**: Expanded Markdown editor shortcuts with Italic, Strikethrough, Unordered List, Ordered List, Task List, and Heading styles.
+
+---
+
+### Chinese
+
+### 新增
+- 🔌 **Memos v0.30 适配**：新增对 Memos 服务端 v0.30.0 的官方兼容。新增了 `MemosAPIV030` 适配层，并更新了登录时的 API 版本选择器。
+- ✍️ **编辑器格式化工具栏**：为闪念编辑器快捷栏新增了“斜体”、“删除线”、“无序列表”、“有序列表”、“任务列表”和“标题”一键输入功能。
+
+---
+
 ## [2.8.2] - 2026-06-02
 
 ### Changed

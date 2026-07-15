@@ -12,11 +12,13 @@ class MemosAPIClient {
 
     private init() {}
 
-    func configure(serverURL: String, accessToken: String, apiVersion: MemosAPIVersion = .v029) {
+    func configure(serverURL: String, accessToken: String, apiVersion: MemosAPIVersion = .v030) {
         self.serverURL = serverURL
         self.accessToken = accessToken
 
         switch apiVersion {
+        case .v030:
+            self.strategy = MemosAPIV030(baseURL: serverURL, accessToken: accessToken)
         case .v029:
             self.strategy = MemosAPIV029(baseURL: serverURL, accessToken: accessToken)
         case .v027:
