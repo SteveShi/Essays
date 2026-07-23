@@ -42,7 +42,7 @@ struct LoginView: View {
     @State private var accessToken: String = ""
     @State private var username: String = ""
     @State private var password: String = ""
-    @State private var selectedAPIVersion: MemosAPIVersion = .v027
+    @State private var selectedAPIVersion: MemosAPIVersion = .v1
     @State private var localDataDirectoryPath: String = ""
 
     @State private var isLoading = false
@@ -339,17 +339,6 @@ struct LoginView: View {
                     Label(
                         String(localized: "Use Existing Local Folder", comment: "Button to select an existing local data folder"),
                         systemImage: "folder"
-                    )
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-
-                Button {
-                    useDropboxLocalFolder()
-                } label: {
-                    Label(
-                        String(localized: "Use Dropbox Local Folder", comment: "Button to use local Dropbox folder for local data"),
-                        systemImage: "externaldrive.connected.to.line.below"
                     )
                 }
                 .buttonStyle(.bordered)
@@ -703,19 +692,6 @@ struct LoginView: View {
         if panel.runModal() == .OK, let url = panel.url {
             localDataDirectoryPath = url.path
         }
-    }
-
-    private func useDropboxLocalFolder() {
-        if let folderURL = DropboxSyncService.shared.preferredDropboxEssaysFolder() {
-            try? FileManager.default.createDirectory(at: folderURL, withIntermediateDirectories: true)
-            localDataDirectoryPath = folderURL.path
-            return
-        }
-
-        chooseLocalDataFolder(
-            canCreateDirectories: true,
-            message: String(localized: "Choose your Dropbox Essays folder.", comment: "Message for choosing Dropbox local folder")
-        )
     }
     #endif
 

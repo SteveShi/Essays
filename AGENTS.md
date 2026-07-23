@@ -1,70 +1,82 @@
-# AGENTS.md - Essays Agent Playbook
+# AGENTS.md - Essays Agent Playbook & Guidelines
 
-面向在 `Essays` 仓库执行任务的代理。目标是高质量交付、最小风险改动、可验证结果。
+This playbook provides definitive guidelines and technical constraints for AI agents working in the `Essays` codebase.
 
-## Quick Reference
+---
 
-- 代码语言：Swift 6.0+
-- 工程来源：`project.yml`（先 `xcodegen generate` 再用 `Essays.xcodeproj`）
-- 核心约束：
-  - 只要是用户可见文本，必须走 `Resources/Localizable.xcstrings`
-  - 禁止硬编码文案
-  - 禁止无必要实体膨胀（Entities should not be multiplied without necessity）
-  - no legacy fallback
-  - Bundle Identifier 格式：`com.steveshi.appname`
-- 默认沟通语言：中文
+## 1. Overview & Core Principles
 
-## Workflow Rules
+- **Project Description**: `Essays` is a native multiplatform (macOS 15+ / iOS 17+) SwiftUI client for the self-hosted [Memos](https://usememos.com) note-taking service. Built in Swift 6 with strict concurrency.
+- **Author**: Steve Shi / 轩楝 (`com.steveshi.appname` bundle ID naming convention).
+- **Default User Communication Language**: Chinese (zh-Hans).
+- **Core Architectural Principles**:
+  - **Zero Hardcoded Visible Strings**: All user-facing text MUST be localized via `Resources/Localizable.xcstrings`. Use `String(localized: "…", comment: "…")`.
+  - **No Entity Proliferation**: Entities, protocols, and interfaces must not be multiplied without necessity. Reuse existing structures wherever possible.
+  - **No Legacy Fallbacks**: Target current authoritative API shapes rather than maintaining dual obsolete fallback code paths "just in case".
+  - **Minimal Scope**: Keep modifications minimal, self-contained, and tightly focused on the target task.
 
-1. 先读代码与真实上下文，再改动；优先复用现有 API，不重复造接口。
-2. 改动保持最小闭环，只碰任务相关文件。
-3. 若改动涉及 `project.yml`，必须执行：
-   - `xcodegen generate`
-4. 完成修改后执行构建验证（代码改动场景必须）：
-   - `xcodebuild -project Essays.xcodeproj -scheme Essays -configuration Debug -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build`
-5. 清理本次临时产物（`*.log` / `*.txt`），不要留下任务噪音文件。
+---
 
-## Repository Map
+## 2. Workflow & Verification Commands
 
-- App 入口：`EssaysApp.swift`
-- 状态与数据模型：`Models/`
-- 同步与 API：`Services/`
-  - `Services/SyncEngine.swift`
-  - `Services/MemosAPIClient.swift`
-- 视图层：`Views/`
-- 本地化：`Resources/Localizable.xcstrings`
-- 版本与构建定义：`project.yml`
-- 发布记录：`CHANGELOG.md`
-- API 经验文档：`Documentation/MEMOS_API_KNOWLEDGE.md`
+1. **Inspect Before Modifying**: Read the code and real execution context first. Reuse existing APIs instead of recreating parallel interfaces.
+2. **Project Regeneration Guardrail**: If `project.yml` is modified, you MUST run XcodeGen before building:
+   ```bash
+   xcodegen generate
+   ```
+3. **Compilation & Test Verification** (Mandatory for code changes):
+   - **Build macOS App**:
+     ```bash
+     xcodebuild -project Essays.xcodeproj -scheme Essays -configuration Debug \
+       -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build
+     ```
+   - **Run macOS Test Suite**:
+     ```bash
+     xcodebuild -project Essays.xcodeproj -scheme Essays -configuration Debug \
+       -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO test
+     ```
+     *(To run a single test: append `-only-testing:EssaysTests/<ClassName>/<testMethod>`)*
+4. **Artifact Cleanup**: Clean up temporary `*.log` / `*.txt` task artifacts created during execution.
 
-## Coding Conventions
+---
 
-- 所有可见字符串必须本地化；不要直接写死在 SwiftUI 视图或服务层。
-- 遵守 Apple 平台编码规范，按功能分目录组织代码。
-- 优先兼容当前服务端真实返回结构，谨慎处理 API 字段漂移。
-- 修改时避免引入无关重构，不做“顺手大改”。
+## 3. Repository Map & Key Architecture
 
-## Build & Release Guardrails
+- **App Entry (`EssaysApp.swift`)**: Sets up `AppState` (environment), `LocalDatabase.shared.container` (SwiftData), `HotkeyManager` (macOS global shortcuts), `UpdaterViewModel` (Sparkle updates), status bar item (`NSStatusItem`), and window frame persistence.
+- **State & Data Models (`Models/`)**: SwiftData entities (`Memo`, `Tag`, `User`, `Account`, `Location`, `ServerInfo`), queued mutations (`OutboxTask`), and `AppState`.
+- **Database & Sync Engine (`Services/`)**:
+  - `Services/LocalDatabase.swift`: SwiftData persistent store, single source of truth for UI.
+  - `Services/SyncEngine.swift`: Reconciles queued local mutations (`OutboxTask`) with Memos server state. Handles temporary ID rewrites (`local_…` → `memos/…`) when locally created memos receive server IDs.
+- **API Layer (`Services/API/`)**:
+  - `MemosAPIV1.swift`: Unified gRPC-gateway REST client for all Memos v0.23+ servers. **Do NOT create separate client files for minor community versions (e.g. v0.31+)**.
+  - `MemosAPIDecoder.shared`: Shared JSONDecoder configured for ISO-8601 multi-format date parsing. Must be used for all API date deserialization.
+  - `MemosAPIClient.swift`: `@MainActor` API entry point; enforces active account ID validation on concurrent requests to prevent cross-account state leaks.
+- **Account & Security (`Services/AccountManager.swift` & `KeychainManager.swift`)**: Secure token storage in Keychain for multi-account management.
+- **Shortcuts & Capture (`Services/HotkeyManager.swift` & `Views/QuickInputPanel.swift`)**: macOS global shortcut trigger for floating instant memo capture panel.
+- **Update Engine (`Services/UpdaterService.swift`)**: Sparkle 2.x integration (macOS). Feed URL and Ed25519 public key configured in `project.yml`.
+- **UI Layer (`Views/`)**: Three-pane `NavigationSplitView` (`SidebarView` → `MemoListView` → `MemoDetailView`) plus `ContentView`, `ComposeMemoView`, `AttachmentsGridView`, `SyncQueueView`, `LoginView`, `Settings/SettingsView`. Cross-platform code gated via `#if os(macOS)`.
+- **Theme (`Theme/LiquidGlassTheme.swift`)**: Unified design system tokens and materials.
 
-- 版本更新必须同步更新：
-  - `project.yml` 里的版本字段
-  - `CHANGELOG.md` 的中英文发布说明
-- `CHANGELOG.md` 格式要求（Sparkle 友好）：
-  - 英文在前
-  - 使用 `---` 分隔
-  - 中文在后
-- 严禁修改 `MDWriter/.github/workflows/release.yml` 中已验证有效的以下逻辑：
-  - `Extract Version`
-  - `Extract Release Notes`
-- Sparkle 2.x 发布签名链路保持现状：
-  1. 私钥清洗：`tr -dc A-Za-z0-9+/=`
-  2. 设置 `DYLD_FRAMEWORK_PATH` 到 Sparkle tools 目录
-  3. stdin 签名：`echo "$KEY" | generate_appcast --ed-key-file -`
+---
 
-## Definition of Done
+## 4. Build & Release Guardrails
 
-- 改动满足需求且范围受控。
-- 代码改动场景下构建通过。
-- 无新增硬编码可见文案。
-- 无新增临时日志垃圾文件。
-- 说明清楚“改了什么、为什么、如何验证”。
+1. **Version Bumps**: Synchronize `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` in `project.yml` and regenerate the Xcode project.
+2. **Release Notes (`CHANGELOG.md`)**:
+   - Follow Sparkle-compatible structure: **English section first, followed by `---`, then Simplified Chinese (`zh-Hans`)**.
+3. **CI Pipeline Protection (`.github/workflows/release.yml`)**:
+   - **DO NOT MODIFY** the `Extract Version` or `Extract Release Notes` steps in the release workflow.
+4. **Sparkle 2.x Signing Pipeline**:
+   - Clean private key: `tr -dc A-Za-z0-9+/=`
+   - Set `DYLD_FRAMEWORK_PATH` to Sparkle tools directory.
+   - Non-interactive stdin signing: `echo "$KEY" | generate_appcast --ed-key-file -`
+
+---
+
+## 5. Definition of Done (DoD)
+
+- Task requirement fulfilled within a clean, tightly scoped diff.
+- Code modifications pass macOS build verification (`xcodebuild`).
+- Zero hardcoded user-visible strings introduced.
+- Workspace clean of temporary log/text files.
+- Summary clearly states what was changed, why, and how it was verified.

@@ -124,7 +124,7 @@ struct ContentView: View {
             MemosAPIClient.shared.configure(
                 serverURL: appState.serverURL,
                 accessToken: appState.accessToken,
-                apiVersion: appState.activeAccount?.apiVersion ?? .v027
+                apiVersion: appState.activeAccount?.apiVersion ?? .v1
             )
 
             _ = try await MemosAPIClient.shared.fetchMemos()

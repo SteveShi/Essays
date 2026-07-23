@@ -42,23 +42,9 @@ struct EssaysApp: App {
                     #if os(macOS)
                     HotkeyManager.shared.start()
                     #endif
-                    #if canImport(FoundationModels)
-                    if #available(macOS 26.0, iOS 26.0, *) {
-                        await MemosAIAssistant.shared.initialize()
-                    }
-                    #endif
                 }
                 .onReceive(NotificationCenter.default.publisher(for: .databaseContainerDidChange)) { _ in
                     databaseReloadToken = UUID()
-                }
-                .onAppear {
-                    if AccountManager.shared.isLocalMode,
-                       DropboxSyncService.shared.isEnabled,
-                       DropboxSyncService.shared.isAuthorized {
-                        Task {
-                            await DropboxSyncService.shared.syncNow()
-                        }
-                    }
                 }
         }
 #if os(macOS)

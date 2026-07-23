@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.9.0] - 2026-07-23
+
+### Changed
+- 🚀 **Unified Memos API V1 Architecture**: Refactored Memos REST client into a unified `MemosAPIV1` strategy. Automatically compatible with all Memos v0.23+ releases (including future v0.31+ versions) without manual version updates.
+- 🧹 **Code Over-Engineering Cleanup**: Removed redundant API client wrappers, obsolete Dropbox sync engine, speculative AI assistant actors, and unnecessary performance heuristics, removing ~3,300 lines of over-engineered code.
+- 📖 **Playbook & Guideline Consolidation**: Merged all agent instructions and architecture specifications into a single, comprehensive `AGENTS.md`.
+
+---
+
+### Chinese
+
+### 变更
+- 🚀 **统一 Memos API V1 架构**：重构 API 客户端层为统一的 `MemosAPIV1` 策略。无需版本配置控制，无缝自动兼容所有 Memos v0.23+（包含未来 v0.31+）服务端升级。
+- 🧹 **精简过度设计代码**：清理冗余小版本 API 包装类、废弃的 Dropbox 同步引擎、未上线的 AI 助手模块以及硬编码参数检测逻辑，累计精简 ~3,300 行冗余代码。
+- 📖 **Playbook 规范收敛**：将全套 Agent 规则、项目架构与规范指引统一收敛合并至 `AGENTS.md`。
+
+---
+
 ## [2.8.3] - 2026-07-15
 
 ### Added

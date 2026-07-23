@@ -1,11 +1,19 @@
 import Foundation
 
-/// 表示使用的 Memos API 版本
+/// 表示使用的 Memos API 规范版本
 enum MemosAPIVersion: String, Codable, Sendable, CaseIterable {
-    case v030 = "v0.30"
-    case v029 = "v0.29"
-    case v027 = "v0.27"
-    case v026 = "v0.26"
+    case v1 = "v1"
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let rawValue = try container.decode(String.self)
+        if let version = MemosAPIVersion(rawValue: rawValue) {
+            self = version
+        } else {
+            // 兼容历史版本字符串 (v0.26 / v0.27 / v0.30 等) 统一归纳为 v1 规范
+            self = .v1
+        }
+    }
 }
 
 /// 表示一个已保存的账户（本地模式或远程模式）
@@ -44,7 +52,7 @@ struct Account: Codable, Identifiable, Hashable, Sendable {
     static func remoteAccount(
         displayName: String,
         serverURL: String,
-        apiVersion: MemosAPIVersion = .v029,
+        apiVersion: MemosAPIVersion = .v1,
         username: String? = nil,
         dataDirectoryPath: String? = nil
     ) -> Account {

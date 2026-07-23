@@ -31,7 +31,7 @@ struct MemoIntent: AppIntent {
         MemosAPIClient.shared.configure(
             serverURL: serverURL,
             accessToken: accessToken,
-            apiVersion: AccountManager.shared.activeAccount?.apiVersion ?? .v027
+            apiVersion: AccountManager.shared.activeAccount?.apiVersion ?? .v1
         )
         
         if let tags = tags, !tags.isEmpty {

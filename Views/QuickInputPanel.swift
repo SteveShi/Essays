@@ -302,13 +302,6 @@ struct QuickInputWindowView: View {
                 }
                 try LocalDatabase.shared.context.save()
                 SyncEngine.shared.triggerSync()
-                if isLocalMode,
-                   DropboxSyncService.shared.isEnabled,
-                   DropboxSyncService.shared.isAuthorized {
-                    Task {
-                        await DropboxSyncService.shared.syncNow()
-                    }
-                }
                 
                 await MainActor.run {
                     self.text = ""

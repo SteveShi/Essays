@@ -1,10 +1,10 @@
 import Foundation
 import OSLog
 
-struct MemosAPIV027: MemosAPIProtocol {
+struct MemosAPIV1: MemosAPIProtocol {
     private static let logger = Logger(
         subsystem: Bundle.main.bundleIdentifier ?? "com.steveshi.essays",
-        category: "MemosAPIV027"
+        category: "MemosAPIV1"
     )
 
     private let baseURL: String

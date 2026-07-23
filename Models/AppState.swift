@@ -275,7 +275,7 @@ class AppState {
                 MemosAPIClient.shared.configure(
                     serverURL: serverURL,
                     accessToken: accessToken,
-                    apiVersion: activeAccount?.apiVersion ?? .v027
+                    apiVersion: activeAccount?.apiVersion ?? .v1
                 )
                 _ = try await MemosAPIClient.shared.checkServerStatus()
                 await MainActor.run {
@@ -496,7 +496,7 @@ class AppState {
             MemosAPIClient.shared.configure(
                 serverURL: resolvedAccount.serverURL ?? "",
                 accessToken: token,
-                apiVersion: resolvedAccount.apiVersion ?? .v027
+                apiVersion: resolvedAccount.apiVersion ?? .v1
             )
         }
         loadLocalCachedMemos()

@@ -13,7 +13,6 @@ struct MemoListView: View {
     @State private var showComposeSheet = false
     @State private var showSyncQueue = false
     @State private var memoToEdit: Memo?
-    @State private var showAIAssistant = false
 
     @State private var quickCaptureText: String = ""
     @State private var quickCaptureVisibility: MemoVisibility = .private
@@ -25,17 +24,15 @@ struct MemoListView: View {
     @State private var showQuickCamera = false
     @State private var isQuickUploading = false
     @FocusState private var isQuickCaptureEditorFocused: Bool
-    @AppStorage("enableAIFeatures") private var enableAIFeatures = true
     @AppStorage("editorFontSize") private var editorFontSize: Double = 14
-    @State private var aiAvailabilityState: AIAssistantAvailabilityState = .checking
 
     @Query(sort: \Memo.createdAt, order: .reverse) private var allMemos: [Memo]
 
-    // 智能分页相关
+    // 分页相关
     @State private var displayedMemoCount: Int = 0 // 将在 onAppear 中初始化
-    private var pageSize: Int { DevicePerformance.recommendedPageSize() }
-    private var maxDisplayCount: Int { DevicePerformance.recommendedMaxDisplay() }
-    private var preloadThreshold: Int { DevicePerformance.recommendedPreloadThreshold() }
+    private let pageSize: Int = 50
+    private let maxDisplayCount: Int = 500
+    private let preloadThreshold: Int = 20
 
     private var locationManager = LocationManager.shared
 
@@ -243,39 +240,6 @@ struct MemoListView: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 HStack(spacing: 12) {
-                    if enableAIFeatures && aiAvailabilityState.isAvailable {
-                        Button {
-                            showAIAssistant.toggle()
-                        } label: {
-                            Image(systemName: "wand.and.stars")
-                                .foregroundStyle(.linearGradient(
-                                    colors: [.purple, .blue, .cyan],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                ))
-                        }
-                        .help(String(localized: "AI Assistant", comment: "Help text for AI assistant button"))
-                        .popover(isPresented: $showAIAssistant) {
-                            if let memo = appState.selectedMemoForDetail ?? appState.selectedMemo ?? computeFilteredMemos().first {
-                                if #available(macOS 26.0, iOS 26.0, *), aiAvailabilityState.isAvailable {
-                                    AIAssistantView(memo: memo)
-                                } else {
-                                    Text(aiAvailabilityState.localizedDescription)
-                                    .padding()
-                                }
-                            } else {
-                                VStack(spacing: 8) {
-                                    Image(systemName: "doc.text")
-                                        .font(.system(size: 24))
-                                        .foregroundColor(.secondary)
-                                    Text(String(localized: "No memo selected", comment: "AI assistant empty state"))
-                                        .font(.system(size: 13))
-                                        .foregroundColor(.secondary)
-                                }
-                                .frame(width: 200, height: 100)
-                            }
-                        }
-                    }
                     
                     Button {
                         showSyncQueue.toggle()
@@ -323,14 +287,9 @@ struct MemoListView: View {
         .sheet(isPresented: $showComposeSheet) {
             ComposeMemoView()
         }
-        .task {
-            aiAvailabilityState = await AIAssistantAvailabilityState.current()
-        }
         .onAppear {
-            // 初始化智能分页
             if displayedMemoCount == 0 {
-                displayedMemoCount = DevicePerformance.recommendedInitialLoad()
-                print(DevicePerformance.deviceInfo())
+                displayedMemoCount = 50
             }
         }
     }
@@ -829,7 +788,7 @@ struct MemoListView: View {
             MemosAPIClient.shared.configure(
                 serverURL: appState.serverURL,
                 accessToken: appState.accessToken,
-                apiVersion: appState.activeAccount?.apiVersion ?? .v027
+                apiVersion: appState.activeAccount?.apiVersion ?? .v1
             )
             
             _ = try await MemosAPIClient.shared.fetchMemos()
@@ -1398,14 +1357,12 @@ struct MemoCard: View {
             if memo.name.hasPrefix("local_") {
                 // Local-only memo: cancel queued tasks and remove it locally.
                 LocalDatabase.shared.deletePendingOutboxTasks(forMemoId: memo.name)
-                DropboxSyncService.shared.recordLocalDeletion(memoName: memo.name)
                 LocalDatabase.shared.deleteMemo(memo)
                 try LocalDatabase.shared.context.save()
                 return
             }
 
             if appState.isLocalMode {
-                DropboxSyncService.shared.recordLocalDeletion(memoName: memo.name)
                 LocalDatabase.shared.deleteMemo(memo)
                 try LocalDatabase.shared.context.save()
                 return

@@ -917,13 +917,6 @@ struct ComposeMemoView: View {
             
             // Trigger background sync
             SyncEngine.shared.triggerSync()
-            if appState.isLocalMode,
-               DropboxSyncService.shared.isEnabled,
-               DropboxSyncService.shared.isAuthorized {
-                Task {
-                    await DropboxSyncService.shared.syncNow()
-                }
-            }
             
             dismiss()
         } catch {

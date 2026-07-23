@@ -80,7 +80,7 @@ class SyncEngine {
                 MemosAPIClient.shared.configure(
                     serverURL: account.serverURL ?? "",
                     accessToken: token,
-                    apiVersion: account.apiVersion ?? .v027
+                    apiVersion: account.apiVersion ?? .v1
                 )
             }
 

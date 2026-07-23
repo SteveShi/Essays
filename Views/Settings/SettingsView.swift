@@ -17,8 +17,6 @@ struct SettingsView: View {
     @State private var replaceExistingOnImport = true
     @State private var dataTransferStatus: String?
     @State private var isDataTransferRunning = false
-    @State private var dropboxSyncService = DropboxSyncService.shared
-    @State private var aiAvailabilityState: AIAssistantAvailabilityState = .checking
     #if os(macOS)
     @State private var updaterViewModel = UpdaterViewModel.shared
     #endif
@@ -203,42 +201,10 @@ struct SettingsView: View {
                 }
             } header: {
                 Label(String(localized: "Translation", comment: "Translation header"), systemImage: "globe")
-                    .font(LiquidGlassTheme.typography.headline)
-            }
-            
-            Section {
-                LabeledContent {
-                    HStack(spacing: 6) {
-                        Circle()
-                            .fill(aiAvailabilityState.isAvailable ? Color.green : Color.orange)
-                            .frame(width: 8, height: 8)
-                        Text(aiAvailabilityState.localizedTitle)
-                            .foregroundColor(.secondary)
-                    }
-                } label: {
-                    Text(String(localized: "Apple Intelligence", comment: "AI status label"))
-                }
-
-                if !aiAvailabilityState.isAvailable {
-                    Text(aiAvailabilityState.localizedDescription)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-            } header: {
-                Label(String(localized: "Status", comment: "Status header"), systemImage: "info.circle")
-                    .font(LiquidGlassTheme.typography.headline)
             }
         }
         .formStyle(.grouped)
         .padding()
-        .task {
-            await refreshAIAvailability()
-        }
-    }
-
-    @MainActor
-    private func refreshAIAvailability() async {
-        aiAvailabilityState = await AIAssistantAvailabilityState.current()
     }
     
     private var accountTab: some View {
@@ -373,16 +339,6 @@ struct SettingsView: View {
                         )
                     }
                     .disabled(isDataTransferRunning)
-
-                    Button {
-                        useDropboxLocalFolder()
-                    } label: {
-                        Label(
-                            String(localized: "Use Dropbox Local Folder", comment: "Button to use local Dropbox folder for local data"),
-                            systemImage: "externaldrive.connected.to.line.below"
-                        )
-                    }
-                    .disabled(isDataTransferRunning)
                 }
 
                 if let dataTransferStatus {
@@ -396,82 +352,6 @@ struct SettingsView: View {
                     .font(LiquidGlassTheme.typography.headline)
             } footer: {
                 Text(String(localized: "Archives include text, images, references, comments, locations, tags, visibility, and archive state.", comment: "Data transfer archive contents footer"))
-            }
-
-            if appState.isLocalMode {
-                Section {
-                    TextField(
-                        String(localized: "Dropbox App Key", comment: "Dropbox app key field placeholder"),
-                        text: $dropboxSyncService.appKey
-                    )
-                    .textFieldStyle(.roundedBorder)
-                    .autocorrectionDisabled()
-
-                    Toggle(
-                        String(localized: "Enable Dropbox API sync", comment: "Toggle for Dropbox API sync"),
-                        isOn: $dropboxSyncService.isEnabled
-                    )
-                    .disabled(!dropboxSyncService.isAuthorized)
-
-                    HStack {
-                        Button {
-                            Task {
-                                await dropboxSyncService.authorize()
-                            }
-                        } label: {
-                            Label(
-                                dropboxSyncService.isAuthorized
-                                    ? String(localized: "Reconnect Dropbox", comment: "Button to reconnect Dropbox")
-                                    : String(localized: "Connect Dropbox", comment: "Button to connect Dropbox"),
-                                systemImage: "link"
-                            )
-                        }
-                        .disabled(dropboxSyncService.isSyncing)
-
-                        Button {
-                            Task {
-                                await dropboxSyncService.syncNow()
-                            }
-                        } label: {
-                            Label(
-                                dropboxSyncService.isSyncing
-                                    ? String(localized: "Syncing Dropbox...", comment: "Button state while Dropbox sync is running")
-                                    : String(localized: "Sync Dropbox Now", comment: "Button to sync Dropbox now"),
-                                systemImage: "arrow.triangle.2.circlepath"
-                            )
-                        }
-                        .disabled(!dropboxSyncService.isAuthorized || !dropboxSyncService.isEnabled || dropboxSyncService.isSyncing)
-
-                        Button {
-                            dropboxSyncService.disconnect()
-                        } label: {
-                            Label(
-                                String(localized: "Disconnect", comment: "Button to disconnect Dropbox"),
-                                systemImage: "xmark.circle"
-                            )
-                        }
-                        .disabled(!dropboxSyncService.isAuthorized || dropboxSyncService.isSyncing)
-                    }
-
-                    if let status = dropboxSyncService.lastStatusMessage {
-                        Text(status)
-                            .font(.caption)
-                            .foregroundColor(LiquidGlassTheme.colors.secondaryText)
-                            .textSelection(.enabled)
-                    }
-
-                    if let error = dropboxSyncService.lastErrorMessage {
-                        Text(error)
-                            .font(.caption)
-                            .foregroundColor(LiquidGlassTheme.colors.error)
-                            .textSelection(.enabled)
-                    }
-                } header: {
-                    Text(String(localized: "Dropbox Sync", comment: "Dropbox sync settings section header"))
-                        .font(LiquidGlassTheme.typography.headline)
-                } footer: {
-                    Text(String(localized: "Dropbox API sync is only used for local mode and stores each memo as a separate JSON record.", comment: "Dropbox sync settings footer"))
-                }
             }
             
             // 已保存的账户列表
@@ -702,34 +582,6 @@ struct SettingsView: View {
         dataTransferStatus = String(localized: "Local folder selection is not available on this device.", comment: "Status when local folder selection is unavailable")
         #endif
     }
-
-    private func useDropboxLocalFolder() {
-        #if os(macOS)
-        if let folderURL = dropboxSyncService.preferredDropboxEssaysFolder() {
-            try? FileManager.default.createDirectory(at: folderURL, withIntermediateDirectories: true)
-            appState.updateLocalDataFolder(folderURL)
-            dataTransferStatus = String(localized: "Dropbox local folder selected.", comment: "Status after selecting Dropbox local folder")
-            return
-        }
-
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = false
-        panel.canChooseDirectories = true
-        panel.allowsMultipleSelection = false
-        panel.canCreateDirectories = true
-        panel.prompt = String(localized: "Select", comment: "Confirm button for folder picker")
-        panel.message = String(localized: "Choose your Dropbox Essays folder.", comment: "Message for choosing Dropbox local folder")
-
-        if panel.runModal() == .OK, let url = panel.url {
-            appState.updateLocalDataFolder(url)
-            dataTransferStatus = String(localized: "Dropbox local folder selected.", comment: "Status after selecting Dropbox local folder")
-        }
-        #else
-        dataTransferStatus = String(localized: "Local folder selection is not available on this device.", comment: "Status when local folder selection is unavailable")
-        #endif
-    }
-
-
 }
 
 #if os(iOS)
