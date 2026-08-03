@@ -66,4 +66,32 @@ struct Account: Codable, Identifiable, Hashable, Sendable {
             apiVersion: apiVersion
         )
     }
+
+    /// 标准化服务器 URL（去除首尾空白及末尾斜杠，并转为小写）
+    var normalizedServerURL: String? {
+        guard let url = serverURL?.trimmingCharacters(in: .whitespacesAndNewlines), !url.isEmpty else { return nil }
+        var result = url.lowercased()
+        while result.hasSuffix("/") {
+            result.removeLast()
+        }
+        return result
+    }
+
+    /// 判断两个账户是否为同一个逻辑账户
+    func isSameAccount(as other: Account) -> Bool {
+        if mode != other.mode { return false }
+        switch mode {
+        case .local:
+            return true
+        case .remote:
+            guard let url1 = normalizedServerURL, let url2 = other.normalizedServerURL else {
+                return false
+            }
+            if url1 != url2 { return false }
+            let user1 = username?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
+            let user2 = other.username?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
+            return user1 == user2
+        }
+    }
 }
+

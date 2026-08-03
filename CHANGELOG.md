@@ -4,7 +4,24 @@ All notable changes to this project will be documented in this file.
 
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.9.1] - 2026-08-03
+
+### Fixed
+- 👥 **Account Switcher Duplicates**: Fixed an issue where switching or re-authenticating accounts generated duplicate entries in the account switcher menu. Account identities are now deduplicated and cleaned up automatically.
+- 🔒 **Local Account Input Downloads Prompt**: Fixed a privacy permission prompt issue where typing in local mode incorrectly triggered a system prompt requesting access to read downloaded files. Replaced temporary download session file IO with in-memory sandbox cache storage.
+
+---
+
+### Chinese
+
+### 修复
+- 👥 **切换账户重复项**: 修复了切换账户或重存凭据时导致账户菜单中出现重复条目的问题。账户识别机制现支持根据模式与核心属性自动去重与合并。
+- 🔒 **本地账户键入触发下载权限弹窗**: 修复了在本地模式输入字符时误触发 macOS“申请读取/访问下载文件”系统权限弹窗的问题。将 `URLSession.download` 替换为应用自身 Sandbox Cache 内的内存写盘操作，彻底消除 TCC 权限弹窗干扰。
+
+---
+
 ## [2.9.0] - 2026-07-23
+
 
 ### Changed
 - 🚀 **Unified Memos API V1 Architecture**: Refactored Memos REST client into a unified `MemosAPIV1` strategy. Automatically compatible with all Memos v0.23+ releases (including future v0.31+ versions) without manual version updates.

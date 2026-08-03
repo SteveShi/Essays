@@ -44,6 +44,41 @@ final class AccountManager {
            let id = UUID(uuidString: idString) {
             activeAccountID = id
         }
+
+        sanitizeAccounts()
+    }
+
+    private func sanitizeAccounts() {
+        var uniqueAccounts: [Account] = []
+        var removedIDs: [UUID] = []
+
+        for acc in accounts {
+            if let existingIndex = uniqueAccounts.firstIndex(where: { $0.isSameAccount(as: acc) }) {
+                var preserved = uniqueAccounts[existingIndex]
+                if preserved.displayName.isEmpty && !acc.displayName.isEmpty {
+                    preserved.displayName = acc.displayName
+                }
+                if (preserved.dataDirectoryPath?.isEmpty ?? true) && !(acc.dataDirectoryPath?.isEmpty ?? true) {
+                    preserved.dataDirectoryPath = acc.dataDirectoryPath
+                }
+                uniqueAccounts[existingIndex] = preserved
+                removedIDs.append(acc.id)
+            } else {
+                uniqueAccounts.append(acc)
+            }
+        }
+
+        if !removedIDs.isEmpty || uniqueAccounts.count != accounts.count {
+            accounts = uniqueAccounts
+            saveAccounts()
+            for id in removedIDs {
+                try? KeychainManager.deleteToken(for: id)
+            }
+            if let activeID = activeAccountID, removedIDs.contains(activeID) {
+                activeAccountID = accounts.first(where: { $0.id != activeID })?.id ?? accounts.first?.id
+                saveActiveID()
+            }
+        }
     }
 
     private func saveAccounts() {
@@ -58,18 +93,39 @@ final class AccountManager {
 
     // MARK: - CRUD
 
-    func addAccount(_ account: Account) {
-        accounts.append(account)
-        saveAccounts()
-    }
+    /// 添加或更新账户（依据 UUID 或账户核心属性自动判重去重）
+    @discardableResult
+    func addAccount(_ account: Account, accessToken: String? = nil) -> Account {
+        if let index = accounts.firstIndex(where: { $0.id == account.id || $0.isSameAccount(as: account) }) {
+            var existing = accounts[index]
+            existing.displayName = account.displayName
+            if let dataDir = account.dataDirectoryPath, !dataDir.isEmpty {
+                existing.dataDirectoryPath = dataDir
+            }
+            if let serverURL = account.serverURL, !serverURL.isEmpty {
+                existing.serverURL = serverURL
+            }
+            if let username = account.username, !username.isEmpty {
+                existing.username = username
+            }
+            if let apiVersion = account.apiVersion {
+                existing.apiVersion = apiVersion
+            }
+            accounts[index] = existing
+            saveAccounts()
 
-    /// 添加账户并保存访问令牌到 Keychain
-    func addAccount(_ account: Account, accessToken: String?) {
-        accounts.append(account)
-        saveAccounts()
+            if let token = accessToken {
+                try? KeychainManager.saveToken(token, for: existing.id)
+            }
+            return existing
+        } else {
+            accounts.append(account)
+            saveAccounts()
 
-        if let token = accessToken {
-            try? KeychainManager.saveToken(token, for: account.id)
+            if let token = accessToken {
+                try? KeychainManager.saveToken(token, for: account.id)
+            }
+            return account
         }
     }
 
@@ -89,6 +145,8 @@ final class AccountManager {
         if let index = accounts.firstIndex(where: { $0.id == account.id }) {
             accounts[index] = account
             saveAccounts()
+        } else {
+            _ = addAccount(account)
         }
     }
 
@@ -101,6 +159,8 @@ final class AccountManager {
             if let token = accessToken {
                 try? KeychainManager.saveToken(token, for: account.id)
             }
+        } else {
+            _ = addAccount(account, accessToken: accessToken)
         }
     }
 
@@ -108,13 +168,9 @@ final class AccountManager {
 
     /// 设置活跃账户并触发配置刷新
     func setActiveAccount(_ account: Account) {
-        activeAccountID = account.id
+        let targetAccount = addAccount(account)
+        activeAccountID = targetAccount.id
         saveActiveID()
-
-        // 确保账户已保存
-        if !accounts.contains(where: { $0.id == account.id }) {
-            addAccount(account)
-        }
     }
 
     /// 退出当前活跃账户（不删除，仅解除活跃状态）
@@ -145,3 +201,4 @@ final class AccountManager {
         try? KeychainManager.deleteAllTokens()
     }
 }
+

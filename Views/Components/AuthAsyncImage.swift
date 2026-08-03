@@ -108,6 +108,11 @@ actor ImageStorageHelper {
             // 如果已经是本地文件
             if url.isFileURL { return url }
 
+            // 只处理标准的 http / https 网络连接，忽略非法 URL 或相对路径
+            guard let scheme = url.scheme?.lowercased(), (scheme == "http" || scheme == "https") else {
+                continue
+            }
+
             // 检查磁盘缓存
             let ext = url.pathExtension.isEmpty ? "png" : url.pathExtension
             let safeName = "\(abs(url.absoluteString.hashValue)).\(ext)"
@@ -117,7 +122,7 @@ actor ImageStorageHelper {
                 return localFile
             }
 
-            // 下载逻辑
+            // 下载逻辑（使用 data 方法直接在内存获取，规避 nsurlsessiond 触发 Downloads 目录权限弹窗）
             var request = URLRequest(url: url)
             request.timeoutInterval = 10
 
@@ -128,18 +133,14 @@ actor ImageStorageHelper {
             }
 
             do {
-                let (tempURL, response) = try await URLSession.shared.download(for: request)
+                let (data, response) = try await URLSession.shared.data(for: request)
                 guard let httpResponse = response as? HTTPURLResponse,
                     (200...299).contains(httpResponse.statusCode)
                 else {
-                    try? FileManager.default.removeItem(at: tempURL)
                     continue
                 }
 
-                if FileManager.default.fileExists(atPath: localFile.path) {
-                    try? FileManager.default.removeItem(at: localFile)
-                }
-                try FileManager.default.moveItem(at: tempURL, to: localFile)
+                try data.write(to: localFile, options: .atomic)
                 return localFile
             } catch {
                 continue
@@ -147,4 +148,5 @@ actor ImageStorageHelper {
         }
         return nil
     }
+
 }

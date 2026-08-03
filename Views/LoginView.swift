@@ -573,7 +573,8 @@ struct LoginView: View {
 
         // 创建并保存本地账户
         let account = Account.localAccount(dataDirectoryPath: dataPath)
-        let resolvedAccount = LocalDatabase.shared.activateStore(for: account) ?? account
+        let savedAccount = AccountManager.shared.addAccount(account)
+        let resolvedAccount = LocalDatabase.shared.activateStore(for: savedAccount) ?? savedAccount
         AccountManager.shared.setActiveAccount(resolvedAccount)
 
         appState.currentUser = User.localUser
@@ -623,8 +624,8 @@ struct LoginView: View {
                 apiVersion: selectedAPIVersion,
                 username: normalizedUsername
             )
-            let resolvedAccount = LocalDatabase.shared.activateStore(for: account) ?? account
-            AccountManager.shared.addAccount(resolvedAccount, accessToken: token)
+            let savedAccount = AccountManager.shared.addAccount(account, accessToken: token)
+            let resolvedAccount = LocalDatabase.shared.activateStore(for: savedAccount) ?? savedAccount
             AccountManager.shared.setActiveAccount(resolvedAccount)
 
             appState.serverURL = normalizedServerURL
@@ -653,9 +654,10 @@ struct LoginView: View {
                 serverURL: normalizedServerURL,
                 apiVersion: selectedAPIVersion
             )
-            let resolvedAccount = LocalDatabase.shared.activateStore(for: account) ?? account
-            AccountManager.shared.addAccount(resolvedAccount, accessToken: normalizedAccessToken)
+            let savedAccount = AccountManager.shared.addAccount(account, accessToken: normalizedAccessToken)
+            let resolvedAccount = LocalDatabase.shared.activateStore(for: savedAccount) ?? savedAccount
             AccountManager.shared.setActiveAccount(resolvedAccount)
+
 
             appState.serverURL = normalizedServerURL
             appState.accessToken = normalizedAccessToken
