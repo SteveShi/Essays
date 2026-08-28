@@ -119,30 +119,70 @@ jobs:
           fi
           echo "Info.plist versions OK: CFBundleShortVersionString=$SHORT_VERSION, CFBundleVersion=$BUNDLE_VERSION"
 
-      - name: Package App (ZIP and DMG)
+      - name: Package App (Universal and arm64)
         run: |
-          rm -rf dmg_root deploy
+          rm -rf dmg_root deploy Build/Universal Build/arm64
           APP_PATH=$(find build/Build/Products/Release -name "Essays.app" -type d | head -n 1)
           if [ -z "$APP_PATH" ]; then
             echo "CRITICAL ERROR: Essays.app not found!"
             exit 1
           fi
-          APP_NAME=$(basename "$APP_PATH")
-          APP_DIR=$(dirname "$APP_PATH")
           VERSION_CLEAN=${{ env.VERSION }}
-          ZIP_NAME="Essays-${VERSION_CLEAN}-Universal.zip"
-          DMG_NAME="Essays-${VERSION_CLEAN}-Universal.dmg"
           
-          cd "$APP_DIR"
-          zip -r "$GITHUB_WORKSPACE/$ZIP_NAME" "$APP_NAME"
-          cd -
+          mkdir -p Build/Universal Build/arm64
+          cp -R "$APP_PATH" Build/Universal/
           
-          mkdir -p dmg_root
-          cp -R "$APP_PATH" dmg_root/
-          hdiutil create -volname "Essays" -srcfolder dmg_root -ov -format UDZO "$DMG_NAME"
+          # Universal Code Signing
+          if [ -d "Build/Universal/Essays.app/Contents/Frameworks/Sparkle.framework" ]; then
+            codesign --force --sign - --options=runtime "Build/Universal/Essays.app/Contents/Frameworks/Sparkle.framework/Versions/B/Resources/Autoupdate.app" 2>/dev/null || true
+            codesign --force --sign - --options=runtime "Build/Universal/Essays.app/Contents/Frameworks/Sparkle.framework/Versions/B/Helpers/Updater.app" 2>/dev/null || true
+            codesign --force --sign - --options=runtime "Build/Universal/Essays.app/Contents/Frameworks/Sparkle.framework/Versions/B" 2>/dev/null || true
+          fi
+          if [ -f "Resources/Essays.entitlements" ]; then
+            codesign --force --deep --sign - --options=runtime --entitlements Resources/Essays.entitlements Build/Universal/Essays.app
+          else
+            codesign --force --deep --sign - --options=runtime Build/Universal/Essays.app
+          fi
           
-          echo "ZIP_NAME=$ZIP_NAME" >> $GITHUB_ENV
-          echo "DMG_NAME=$DMG_NAME" >> $GITHUB_ENV
+          # 1. Universal ZIP & DMG
+          cd Build/Universal
+          zip -qy -r "$GITHUB_WORKSPACE/Essays-${VERSION_CLEAN}-universal.zip" "Essays.app"
+          cd "$GITHUB_WORKSPACE"
+          
+          mkdir -p dmg_root_universal
+          cp -R Build/Universal/Essays.app dmg_root_universal/
+          hdiutil create -volname "Essays" -srcfolder dmg_root_universal -ov -format UDZO "Essays-${VERSION_CLEAN}-universal.dmg"
+          rm -rf dmg_root_universal
+
+          # 2. arm64 Thinning & Signing
+          cp -R Build/Universal/Essays.app Build/arm64/
+          lipo -thin arm64 Build/arm64/Essays.app/Contents/MacOS/Essays -output Build/arm64/Essays.app/Contents/MacOS/Essays
+          if [ -d "Build/arm64/Essays.app/Contents/Frameworks/Sparkle.framework" ]; then
+            if lipo -info Build/arm64/Essays.app/Contents/Frameworks/Sparkle.framework/Versions/B/Sparkle 2>/dev/null | grep -q 'x86_64'; then
+              lipo -thin arm64 Build/arm64/Essays.app/Contents/Frameworks/Sparkle.framework/Versions/B/Sparkle -output Build/arm64/Essays.app/Contents/Frameworks/Sparkle.framework/Versions/B/Sparkle 2>/dev/null || true
+            fi
+            codesign --force --sign - --options=runtime "Build/arm64/Essays.app/Contents/Frameworks/Sparkle.framework/Versions/B/Resources/Autoupdate.app" 2>/dev/null || true
+            codesign --force --sign - --options=runtime "Build/arm64/Essays.app/Contents/Frameworks/Sparkle.framework/Versions/B/Helpers/Updater.app" 2>/dev/null || true
+            codesign --force --sign - --options=runtime "Build/arm64/Essays.app/Contents/Frameworks/Sparkle.framework/Versions/B" 2>/dev/null || true
+          fi
+          if [ -f "Resources/Essays.entitlements" ]; then
+            codesign --force --deep --sign - --options=runtime --entitlements Resources/Essays.entitlements Build/arm64/Essays.app
+          else
+            codesign --force --deep --sign - --options=runtime Build/arm64/Essays.app
+          fi
+
+          # arm64 ZIP & DMG
+          cd Build/arm64
+          zip -qy -r "$GITHUB_WORKSPACE/Essays-${VERSION_CLEAN}-arm64.zip" "Essays.app"
+          cd "$GITHUB_WORKSPACE"
+          
+          mkdir -p dmg_root_arm64
+          cp -R Build/arm64/Essays.app dmg_root_arm64/
+          hdiutil create -volname "Essays" -srcfolder dmg_root_arm64 -ov -format UDZO "Essays-${VERSION_CLEAN}-arm64.dmg"
+          rm -rf dmg_root_arm64
+
+          echo "ZIP_NAME=Essays-${VERSION_CLEAN}-universal.zip" >> $GITHUB_ENV
+          echo "DMG_NAME=Essays-${VERSION_CLEAN}-universal.dmg" >> $GITHUB_ENV
 
       - name: Extract Release Notes (en & zh)
         run: |
@@ -178,7 +218,8 @@ jobs:
           fi
 
           mkdir -p deploy
-          cp "${{ env.ZIP_NAME }}" deploy/
+          cp "$GITHUB_WORKSPACE/Essays-${VERSION_CLEAN}-universal.zip" deploy/
+          cp "$GITHUB_WORKSPACE/Essays-${VERSION_CLEAN}-arm64.zip" deploy/
           cp release_notes_en.md "deploy/release_notes_en.md"
           cp release_notes_zh.md "deploy/release_notes_zh.md"
           cp release_notes_en.md "deploy/release_notes.md"
@@ -214,8 +255,10 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           files: |
-            ${{ env.ZIP_NAME }}
-            ${{ env.DMG_NAME }}
+            Essays-*-universal.zip
+            Essays-*-universal.dmg
+            Essays-*-arm64.zip
+            Essays-*-arm64.dmg
             release_notes_en.md
             release_notes_zh.md
             appcast.xml
