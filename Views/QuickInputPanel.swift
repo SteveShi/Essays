@@ -187,7 +187,7 @@ struct QuickInputWindowView: View {
             
             HStack {
                 Menu {
-                    ForEach(MemoVisibility.allCases, id: \.self) { vis in
+                    ForEach(MemoVisibility.creatableCases, id: \.self) { vis in
                         Button {
                             visibility = vis
                         } label: {

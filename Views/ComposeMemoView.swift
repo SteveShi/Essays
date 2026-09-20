@@ -287,7 +287,7 @@ struct ComposeMemoView: View {
                     .foregroundColor(.secondary)
 
                 Menu {
-                    ForEach(MemoVisibility.allCases, id: \.self) { vis in
+                    ForEach(MemoVisibility.creatableCases, id: \.self) { vis in
                         Button {
                             visibility = vis
                         } label: {
@@ -307,7 +307,7 @@ struct ComposeMemoView: View {
                     .foregroundColor(LiquidGlassTheme.colors.secondaryText)
 
                 Menu {
-                    ForEach(MemoVisibility.allCases, id: \.self) { vis in
+                    ForEach(MemoVisibility.creatableCases, id: \.self) { vis in
                         Button {
                             visibility = vis
                         } label: {

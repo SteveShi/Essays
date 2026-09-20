@@ -4,6 +4,28 @@ All notable changes to this project will be documented in this file.
 
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.9.2] - 2026-09-20
+
+### Added
+- 🪐 **Memos v0.31.0 Space Compatibility**: Added full compatibility for Memos server v0.31.0 Spaces collaboration features. Properly decodes `SPACE` visibility and persists memo space metadata (`spaceName`).
+- 📂 **Sidebar Space Filtering**: The sidebar automatically displays the "Space" category and count under Visibility when space memos exist, enabling one-click filtering.
+
+### Fixed
+- 🛡️ **Space Memo Visibility Mapping**: Fixed an issue where memos belonging to a Space would be incorrectly mapped to private memos on Memos v0.31.0+ instances.
+
+---
+
+### Chinese
+
+### 新增
+- 🪐 **Memos v0.31.0 协作空间兼容**: 全面适配 Memos v0.31.0 服务端新特性，支持解码 `SPACE`（空间）可见性并持久化 memo 空间元数据（`spaceName`）。
+- 📂 **侧边栏空间筛选**: 当账户存在空间 memo 时，侧边栏可见性分组中将自动展示“空间”分类与数量统计，支持一键点击筛选。
+
+### 修复
+- 🛡️ **空间 Memo 可见性映射**: 修复了连接 Memos v0.31.0 服务端时，带有 Space 属性的 memo 因客户端缺少对应枚举值而被错误降级为私密 memo 的问题。
+
+---
+
 ## [2.9.1] - 2026-08-03
 
 ### Fixed

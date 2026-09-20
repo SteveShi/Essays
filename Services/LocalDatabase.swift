@@ -412,6 +412,7 @@ final class LocalDatabase {
         target.tags = source.tags
         target.accountID = source.accountID
         target.isPendingSync = source.isPendingSync
+        target.spaceName = source.spaceName
         
         // Update Location (1-to-1)
         if let incomingLoc = location {
@@ -581,6 +582,7 @@ final class LocalDatabase {
             existing.name = newMemo.name
             existing.createdAt = newMemo.createdAt
             existing.updatedAt = newMemo.updatedAt
+            existing.spaceName = newMemo.spaceName
             if existing.accountID == nil || existing.accountID?.isEmpty == true {
                 existing.accountID = AccountManager.shared.activeAccount.map {
                     AppState.accountIdentifier(for: $0)

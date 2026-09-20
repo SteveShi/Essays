@@ -15,6 +15,7 @@ struct SidebarView: View {
         let publicCount: Int
         let protectedCount: Int
         let privateCount: Int
+        let spaceCount: Int
         let tags: [Tag]
         let memoDateComponents: Set<DateComponents>
     }
@@ -33,6 +34,7 @@ struct SidebarView: View {
         var publicCount = 0
         var protectedCount = 0
         var privateCount = 0
+        var spaceCount = 0
         var tagDict: [String: Int] = [:]
         var memoDateComponents = Set<DateComponents>()
 
@@ -68,6 +70,8 @@ struct SidebarView: View {
                 protectedCount += 1
             case .private:
                 privateCount += 1
+            case .space:
+                spaceCount += 1
             }
 
             for tag in memo.tags {
@@ -96,6 +100,7 @@ struct SidebarView: View {
             publicCount: publicCount,
             protectedCount: protectedCount,
             privateCount: privateCount,
+            spaceCount: spaceCount,
             tags: tags,
             memoDateComponents: memoDateComponents
         )
@@ -126,6 +131,9 @@ struct SidebarView: View {
                 sidebarLabel(.publicMemos, icon: "globe", title: String(localized: "Public", comment: "Sidebar item for public memos"), count: metrics.publicCount)
                 sidebarLabel(.protectedMemos, icon: MemoVisibility.protected.icon, title: MemoVisibility.protected.displayName, count: metrics.protectedCount)
                 sidebarLabel(.privateMemos, icon: "lock", title: String(localized: "Private", comment: "Sidebar item for private memos"), count: metrics.privateCount)
+                if metrics.spaceCount > 0 {
+                    sidebarLabel(.spaceMemos, icon: MemoVisibility.space.icon, title: MemoVisibility.space.displayName, count: metrics.spaceCount)
+                }
             }
         }
         .listStyle(.sidebar)
@@ -314,6 +322,15 @@ struct SidebarView: View {
                     title: String(localized: "Private", comment: "Sidebar item for private memos"),
                     count: metrics.privateCount
                 )
+
+                if metrics.spaceCount > 0 {
+                    SidebarLinkItem(
+                        selection: .spaceMemos,
+                        icon: MemoVisibility.space.icon,
+                        title: MemoVisibility.space.displayName,
+                        count: metrics.spaceCount
+                    )
+                }
             }
         }
     }

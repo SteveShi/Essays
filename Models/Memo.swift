@@ -14,6 +14,7 @@ final class Memo: Identifiable {
     var stateRaw: String = "NORMAL"
     var accountID: String?
     var isPendingSync: Bool = false
+    var spaceName: String?
 
     // Relationships
     @Relationship(deleteRule: .cascade, inverse: \Attachment.parentMemo) var attachments:
@@ -47,7 +48,8 @@ final class Memo: Identifiable {
         location: Location? = nil,
         relations: [Relation] = [],
         accountID: String? = nil,
-        isPendingSync: Bool = false
+        isPendingSync: Bool = false,
+        spaceName: String? = nil
     ) {
         self.name = name.isEmpty ? "memos/pending-\(UUID().uuidString)" : name
         self.numericID = numericID
@@ -63,6 +65,7 @@ final class Memo: Identifiable {
         self.stateRaw = state.rawValue
         self.accountID = accountID
         self.isPendingSync = isPendingSync
+        self.spaceName = spaceName
     }
     
     var commentCount: Int {
@@ -181,6 +184,7 @@ enum MemoVisibility: String, Codable, CaseIterable, Sendable {
     case `public` = "PUBLIC"
     case `protected` = "PROTECTED"
     case `private` = "PRIVATE"
+    case `space` = "SPACE"
     
     var displayName: String {
         switch self {
@@ -188,6 +192,7 @@ enum MemoVisibility: String, Codable, CaseIterable, Sendable {
         case .protected:
             return String(localized: "Workspace", comment: "Visibility status: Workspace")
         case .private: return String(localized: "Private", comment: "Visibility status: Private")
+        case .space: return String(localized: "Space", comment: "Visibility status: Space")
         }
     }
     
@@ -196,7 +201,14 @@ enum MemoVisibility: String, Codable, CaseIterable, Sendable {
         case .public: return "globe"
         case .protected: return "lock.shield"
         case .private: return "lock"
+        case .space: return "person.2"
         }
+    }
+
+    /// Visibilities that can be directly chosen when capturing or composing a standalone memo.
+    /// Note: Creating a Space memo requires associating with a specific Space context.
+    static var creatableCases: [MemoVisibility] {
+        [.public, .protected, .private]
     }
 }
 

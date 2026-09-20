@@ -96,6 +96,7 @@ struct MemosAPIV1: MemosAPIProtocol {
         let location: LocationData?
         let relations: [RelationData]?
         let relationList: [RelationData]?
+        let space: String?
         
         var extractedId: String {
             return name.split(separator: "/").last.map(String.init) ?? ""
@@ -536,7 +537,8 @@ struct MemosAPIV1: MemosAPIProtocol {
             tags: data.tags ?? [],
             attachments: localAttachments,
             location: locationValue,
-            relations: localRelations
+            relations: localRelations,
+            spaceName: data.space
         )
         
         if memoModel.tags.isEmpty {
@@ -740,7 +742,8 @@ struct MemosAPIV1: MemosAPIProtocol {
             tags: data.tags ?? [],
             attachments: localAttachments,
             location: locationValue,
-            relations: localRelations
+            relations: localRelations,
+            spaceName: data.space
         )
         
         if memoModel.tags.isEmpty {

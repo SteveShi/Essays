@@ -88,6 +88,8 @@ struct MemoListView: View {
             return memos.filter { $0.state == .normal && $0.visibility == .protected }
         case .privateMemos:
             return memos.filter { $0.state == .normal && $0.visibility == .private }
+        case .spaceMemos:
+            return memos.filter { $0.state == .normal && $0.visibility == .space }
         case .tag(let tagName):
             return memos.filter { memo in
                 memo.state == .normal && memo.tags.contains(tagName)
@@ -441,7 +443,7 @@ struct MemoListView: View {
                     }
 
                     Menu {
-                        ForEach(MemoVisibility.allCases, id: \.self) { vis in
+                        ForEach(MemoVisibility.creatableCases, id: \.self) { vis in
                             Button {
                                 quickCaptureVisibility = vis
                             } label: {

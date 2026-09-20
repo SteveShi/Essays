@@ -27,6 +27,7 @@ class AppState {
         case publicMemos
         case protectedMemos
         case privateMemos
+        case spaceMemos
         case tag(String)
         case date(Date)
         case outbox
@@ -161,6 +162,7 @@ class AppState {
     var publicMemosCount: Int = 0
     var protectedMemosCount: Int = 0
     var privateMemosCount: Int = 0
+    var spaceMemosCount: Int = 0
     var archivedMemosCount: Int = 0
     var imageAttachmentMemosCount: Int = 0
 
@@ -201,6 +203,9 @@ class AppState {
             selectedTag = nil
         case .privateMemos:
             searchText = "visibility:private"
+            selectedTag = nil
+        case .spaceMemos:
+            searchText = "visibility:space"
             selectedTag = nil
         case .tag(let tagName):
             searchText = ""
@@ -392,6 +397,7 @@ class AppState {
         self.publicMemosCount = normalMemos.filter { $0.visibility == MemoVisibility.`public` }.count
         self.protectedMemosCount = normalMemos.filter { $0.visibility == MemoVisibility.protected }.count
         self.privateMemosCount = normalMemos.filter { $0.visibility == MemoVisibility.`private` }.count
+        self.spaceMemosCount = normalMemos.filter { $0.visibility == MemoVisibility.space }.count
         self.archivedMemosCount = memos.filter { $0.state == .archived }.count
         self.imageAttachmentMemosCount = memos.reduce(0) { count, memo in
             count + memo.attachments.filter { $0.isImage }.count
