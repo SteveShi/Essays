@@ -9,8 +9,8 @@ options:
   defaultConfig: Release
 settings:
   base:
-    MARKETING_VERSION: 2.9.2
-    CURRENT_PROJECT_VERSION: 36
+    MARKETING_VERSION: 2.9.3
+    CURRENT_PROJECT_VERSION: 37
 
 
 configs:
@@ -55,6 +55,7 @@ targets:
         com.apple.security.app-sandbox: false
         com.apple.security.network.client: true
         com.apple.security.personal-information.location: true
+        com.apple.security.cs.disable-library-validation: true
     dependencies:
       - package: MarkdownView
         product: MarkdownView

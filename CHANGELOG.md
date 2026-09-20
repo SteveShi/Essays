@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.9.3] - 2026-09-20
+
+### Fixed
+- 🛡️ **Hardened Runtime Framework Loading**: Fixed a crash at launch where Sparkle framework failed macOS library validation under ad-hoc code signing. Added `com.apple.security.cs.disable-library-validation` entitlement.
+
+---
+
+### Chinese
+
+### 修复
+- 🛡️ **强化运行时动态库加载**: 修复了在 Hardened Runtime 与 ad-hoc 代码签名环境下，Sparkle 框架因未能通过 macOS Library Validation 签名校验而导致应用启动即崩溃的问题。在权限配置中添加了 `com.apple.security.cs.disable-library-validation`。
+
+---
+
 ## [2.9.2] - 2026-09-20
 
 ### Added
