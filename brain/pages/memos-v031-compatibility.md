@@ -4,7 +4,7 @@ title: Support Memos v0.31.0 Space Visibility and Metadata
 category: decision
 status: active
 created: "2026-09-20T14:18:52"
-updated: "2026-09-20T14:18:57"
+updated: "2026-09-20T14:42:37"
 ---
 
 <!-- compiled_truth -->
@@ -29,4 +29,10 @@ Memos v0.31.0 introduced Spaces collaboration, which adds `SPACE` to memo visibi
   kind: decision
   summary: "Memos v0.31.0 introduced Spaces collaboration with SPACE visibility and space metadata on memos. Essays supports decoding SPACE visibility, storing spaceName, and filtering in sidebar, while restricting standalone creation to creatableCases."
   source: Memos v0.31.0 Release
+  affects: [memos-v031-compatibility]
+
+- time: 2026-09-20T14:42:37
+  kind: decision
+  summary: Add com.apple.security.cs.disable-library-validation entitlement for ad-hoc Hardened Runtime compatibility with Sparkle framework.
+  source: Crash report analysis
   affects: [memos-v031-compatibility]
