@@ -413,6 +413,8 @@ final class LocalDatabase {
         target.accountID = source.accountID
         target.isPendingSync = source.isPendingSync
         target.spaceName = source.spaceName
+        target.parentName = source.parentName
+        target.remoteCommentCount = source.remoteCommentCount
         
         // Update Location (1-to-1)
         if let incomingLoc = location {
@@ -486,6 +488,7 @@ final class LocalDatabase {
     }
 
     func syncReferenceRelations(for memo: Memo, content: String) {
+        guard memo.modelContext != nil else { return }
         let referencedMemoNames = Set(MemoUtility.extractReferencedMemoNames(from: content))
         let memoName = memo.name
         let referenceType = Relation.RelationType.reference.rawValue
@@ -583,6 +586,8 @@ final class LocalDatabase {
             existing.createdAt = newMemo.createdAt
             existing.updatedAt = newMemo.updatedAt
             existing.spaceName = newMemo.spaceName
+            existing.parentName = newMemo.parentName
+            existing.remoteCommentCount = newMemo.remoteCommentCount
             if existing.accountID == nil || existing.accountID?.isEmpty == true {
                 existing.accountID = AccountManager.shared.activeAccount.map {
                     AppState.accountIdentifier(for: $0)

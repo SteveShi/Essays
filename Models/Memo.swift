@@ -15,6 +15,8 @@ final class Memo: Identifiable {
     var accountID: String?
     var isPendingSync: Bool = false
     var spaceName: String?
+    var parentName: String?
+    var remoteCommentCount: Int = 0
 
     // Relationships
     @Relationship(deleteRule: .cascade, inverse: \Attachment.parentMemo) var attachments:
@@ -49,7 +51,9 @@ final class Memo: Identifiable {
         relations: [Relation] = [],
         accountID: String? = nil,
         isPendingSync: Bool = false,
-        spaceName: String? = nil
+        spaceName: String? = nil,
+        parentName: String? = nil,
+        remoteCommentCount: Int = 0
     ) {
         self.name = name.isEmpty ? "memos/pending-\(UUID().uuidString)" : name
         self.numericID = numericID
@@ -66,22 +70,34 @@ final class Memo: Identifiable {
         self.accountID = accountID
         self.isPendingSync = isPendingSync
         self.spaceName = spaceName
+        self.parentName = parentName
+        self.remoteCommentCount = remoteCommentCount
     }
     
     var commentCount: Int {
         // Defensive check: ensure the memo is still valid and connected to a context
-        guard let context = modelContext, !name.isEmpty else { return 0 }
+        guard let context = modelContext, !name.isEmpty else {
+            return max(0, remoteCommentCount)
+        }
         
         let memoName = self.name
         let commentType = Relation.RelationType.comment.rawValue
         
-        let descriptor = FetchDescriptor<Relation>(
+        let relationDescriptor = FetchDescriptor<Relation>(
             predicate: #Predicate<Relation> { rel in
                 rel.typeRaw == commentType && (rel.memo == memoName || rel.relatedMemo == memoName)
             }
         )
+        let relationCount = (try? context.fetchCount(relationDescriptor)) ?? 0
+
+        let parentDescriptor = FetchDescriptor<Memo>(
+            predicate: #Predicate<Memo> { candidate in
+                candidate.parentName == memoName
+            }
+        )
+        let childMemoCount = (try? context.fetchCount(parentDescriptor)) ?? 0
         
-        return (try? context.fetchCount(descriptor)) ?? 0
+        return max(remoteCommentCount, max(relationCount, childMemoCount))
     }
 
     /// A safe collection of relations that are currently valid and attached to a context
@@ -105,7 +121,7 @@ final class Memo: Identifiable {
 
 extension Memo {
     var isSystemCommentMemo: Bool {
-        name.hasPrefix("local_comment_")
+        name.hasPrefix("local_comment_") || !(parentName?.isEmpty ?? true)
     }
 
     var contentWithoutTags: String {

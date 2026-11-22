@@ -223,8 +223,13 @@ class AppState {
     private let serverURLKey = "memos_server_url"
     private let accessTokenKey = "memos_access_token"
     private let currentUserKey = "memos_current_user"
+
+    private static var isRunningUnitTests: Bool {
+        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+    }
     
     init() {
+        guard !Self.isRunningUnitTests else { return }
         loadSavedCredentials()
         let resolvedActive = LocalDatabase.shared.activateStore(for: AccountManager.shared.activeAccount)
         if let resolvedActive {

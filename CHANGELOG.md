@@ -4,6 +4,30 @@ All notable changes to this project will be documented in this file.
 
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.9.4] - 2026-11-22
+
+### Changed
+- 🔌 **Memos 26.10+ Unversioned REST API Migration**: Migrated all Memos REST endpoints from `/api/v1/...` to the new unversioned `/api/...` routes introduced in Memos 26.10.0.
+- 💬 **Memos 26.11.2 Parent-Based Comment Model**: Adapted to the Memos 26.11.2 comment architecture where comments are represented as memos with a `parent` reference and counted via `comment_count`. Top-level memo sync now filters with `parent == null`, comment listing queries `GET /api/memos?filter=parent == "memos/{id}"`, and comment creation posts directly to `POST /api/memos` with `parent`.
+
+### Fixed
+- 🛠️ **Strict `updateMask` Validation Compatibility**: Removed the output-only `tags` field from `UpdateMemo` `updateMask` parameters to prevent `400 InvalidArgument: invalid update path: tags` errors on Memos 26.10+ servers, and ensured pinned status is applied after `CreateMemo`.
+- 🗑️ **Remote Comment Deletion Ownership Check**: Fixed an issue where fetched remote comments lacked an associated `accountID`, causing comment deletion in the detail view to be skipped.
+
+---
+
+### Chinese
+
+### 变更
+- 🔌 **Memos 26.10+ 无版本号 REST 路由迁移**: 将全部 Memos REST 接口路径从 `/api/v1/...` 迁移至 Memos 26.10.0 引入的 `/api/...` 规范路径。
+- 💬 **Memos 26.11.2 父子 Memo 评论架构适配**: 全面适配 Memos 26.11.2 将评论统一为带 `parent` 属性的 Memo 并通过 `comment_count` 统计数量的架构变迁。主时间线同步默认通过 `parent == null` 过滤顶层 Memo，评论列表改为查询 `GET /api/memos?filter=parent == "memos/{id}"`，发表评论改为调用 `POST /api/memos` 并携带 `parent` 引用。
+
+### 修复
+- 🛠️ **`updateMask` 严格校验与新建置顶兼容**: 从 `UpdateMemo` 的 `updateMask` 中移除服务端只读的 `tags` 字段，避免触发 `400 InvalidArgument: invalid update path: tags` 错误；同时在新建置顶 Memo 时自动补发置顶状态更新。
+- 🗑️ **远端评论删除归属校验**: 修复了拉取远端评论时未绑定当前 `accountID` 导致详情页删除评论被账户归属校验拦截的问题。
+
+---
+
 ## [2.9.3] - 2026-09-20
 
 ### Fixed

@@ -56,7 +56,7 @@ struct MemoDetailView: View {
 
         let allMemos = LocalDatabase.shared.fetchAllMemos()
         let localComments = allMemos
-            .filter { commentNames.contains($0.name) }
+            .filter { $0.parentName == parentName || commentNames.contains($0.name) }
             .filter { appState.matchesActiveAccount(accountID: $0.accountID, memoName: $0.name) }
             .sorted { $0.createdAt < $1.createdAt }
 
@@ -219,7 +219,8 @@ struct MemoDetailView: View {
                 attachments: [],
                 location: nil,
                 relations: [],
-                accountID: appState.activeAccountID
+                accountID: appState.activeAccountID,
+                parentName: memo.name
             )
 
             let relation = Relation(

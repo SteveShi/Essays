@@ -27,25 +27,33 @@ struct EssaysApp: App {
         }
     }
     
+    private var isRunningUnitTests: Bool {
+        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+    }
+
     var body: some Scene {
         WindowGroup {
-            ContentView()
-                .id(databaseReloadToken)
-                .environment(appState)
-                .modelContainer(LocalDatabase.shared.container)
-                .preferredColorScheme(preferredColorScheme)
-                #if os(macOS)
-                .frame(minWidth: 900, minHeight: 600)
-                .background(MainWindowAutosaveConfigurator())
-                #endif
-                .task {
+            if isRunningUnitTests {
+                EmptyView()
+            } else {
+                ContentView()
+                    .id(databaseReloadToken)
+                    .environment(appState)
+                    .modelContainer(LocalDatabase.shared.container)
+                    .preferredColorScheme(preferredColorScheme)
                     #if os(macOS)
-                    HotkeyManager.shared.start()
+                    .frame(minWidth: 900, minHeight: 600)
+                    .background(MainWindowAutosaveConfigurator())
                     #endif
-                }
-                .onReceive(NotificationCenter.default.publisher(for: .databaseContainerDidChange)) { _ in
-                    databaseReloadToken = UUID()
-                }
+                    .task {
+                        #if os(macOS)
+                        HotkeyManager.shared.start()
+                        #endif
+                    }
+                    .onReceive(NotificationCenter.default.publisher(for: .databaseContainerDidChange)) { _ in
+                        databaseReloadToken = UUID()
+                    }
+            }
         }
 #if os(macOS)
         .windowToolbarStyle(.unified(showsTitle: true))
@@ -97,6 +105,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var statusItem: NSStatusItem!
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else {
+            return
+        }
         setupMenuBar()
         UpdaterViewModel.shared.checkForUpdatesInBackground()
     }

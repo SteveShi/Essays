@@ -29,7 +29,8 @@ final class UpdaterViewModel {
     init() {
         // SPUStandardUpdaterController handles identifying the app and checking for updates.
         // It uses the SUFeedURL from Info.plist (which is set in project.yml).
-        self.controller = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
+        let isRunningTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+        self.controller = SPUStandardUpdaterController(startingUpdater: !isRunningTests, updaterDelegate: nil, userDriverDelegate: nil)
     }
     
     func checkForUpdates() {

@@ -133,7 +133,12 @@ class MemosAPIClient {
 
 
     func fetchComments(parentId: String) async throws -> [Memo] {
-        return try await activeStrategy.fetchComments(parentId: parentId)
+        let requestAccountID = activeAccountID
+        let comments = try await activeStrategy.fetchComments(parentId: parentId)
+        for comment in comments {
+            comment.accountID = requestAccountID
+        }
+        return comments
     }
 
     func createComment(parentId: String, content: String, visibility: MemoVisibility = .private) async throws -> Memo {

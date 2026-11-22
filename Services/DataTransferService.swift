@@ -65,6 +65,9 @@ struct EssaysDataArchive: Codable {
         let stateRaw: String
         let accountID: String?
         let isPendingSync: Bool
+        let spaceName: String?
+        let parentName: String?
+        let remoteCommentCount: Int?
         let attachments: [AttachmentRecord]
         let location: LocationRecord?
         let relations: [RelationRecord]
@@ -81,6 +84,9 @@ struct EssaysDataArchive: Codable {
             self.stateRaw = memo.stateRaw
             self.accountID = memo.accountID
             self.isPendingSync = memo.isPendingSync
+            self.spaceName = memo.spaceName
+            self.parentName = memo.parentName
+            self.remoteCommentCount = memo.remoteCommentCount
             self.attachments = memo.attachments.map { AttachmentRecord(attachment: $0) }
             self.location = memo.location.map { LocationRecord(location: $0) }
             self.relations = memo.relations.map { RelationRecord(relation: $0) }
@@ -101,7 +107,10 @@ struct EssaysDataArchive: Codable {
                 location: nil,
                 relations: [],
                 accountID: accountID,
-                isPendingSync: false
+                isPendingSync: false,
+                spaceName: spaceName,
+                parentName: parentName,
+                remoteCommentCount: remoteCommentCount ?? 0
             )
 
             memo.attachments = attachments.map { $0.makeAttachment(parentMemo: memo) }

@@ -103,4 +103,79 @@ struct APICompatibilityTests {
         #expect(memo.visibility == .space)
         #expect(memo.spaceName == "spaces/team-alpha")
     }
+
+    @Test("Memos 26.11.2 Parent & Comment Count Compatibility")
+    func testMemos2611CommentModelCompatibility() throws {
+        // 1. Verify top-level memo with comment_count (snake_case) decodes properly
+        let topLevelJSON = """
+        {
+            "name": "memos/top-123",
+            "content": "Top level memo with comments",
+            "create_time": "2026-11-22T09:00:00Z",
+            "update_time": "2026-11-22T09:05:00Z",
+            "visibility": "PUBLIC",
+            "state": "NORMAL",
+            "pinned": false,
+            "tags": [],
+            "comment_count": 3
+        }
+        """.data(using: .utf8)!
+
+        let decodedTopLevel = try MemosAPIDecoder.shared.decode(MemosAPIV1.MemoData.self, from: topLevelJSON)
+        #expect(decodedTopLevel.name == "memos/top-123")
+        #expect(decodedTopLevel.parent == nil)
+        #expect(decodedTopLevel.commentCount == 3)
+
+        let topMemo = Memo(
+            name: decodedTopLevel.name,
+            numericID: decodedTopLevel.extractedId,
+            content: decodedTopLevel.content,
+            createdAt: decodedTopLevel.createTime,
+            updatedAt: decodedTopLevel.updateTime,
+            visibility: MemoVisibility(rawValue: decodedTopLevel.visibility) ?? .private,
+            pinned: decodedTopLevel.pinned ?? false,
+            state: MemoState(rawValue: decodedTopLevel.state ?? "NORMAL") ?? .normal,
+            tags: decodedTopLevel.tags ?? [],
+            parentName: decodedTopLevel.parent,
+            remoteCommentCount: decodedTopLevel.commentCount ?? 0
+        )
+        #expect(!topMemo.isSystemCommentMemo)
+        #expect(topMemo.commentCount == 3)
+
+        // 2. Verify comment memo with parent field decodes properly and is flagged as comment
+        let commentJSON = """
+        {
+            "name": "memos/comment-456",
+            "parent": "memos/top-123",
+            "content": "A comment represented as a memo with parent",
+            "createTime": "2026-11-22T09:10:00Z",
+            "updateTime": "2026-11-22T09:10:00Z",
+            "visibility": "PUBLIC",
+            "state": "NORMAL",
+            "pinned": false,
+            "commentCount": 0
+        }
+        """.data(using: .utf8)!
+
+        let decodedComment = try MemosAPIDecoder.shared.decode(MemosAPIV1.MemoData.self, from: commentJSON)
+        #expect(decodedComment.name == "memos/comment-456")
+        #expect(decodedComment.parent == "memos/top-123")
+        #expect(decodedComment.commentCount == 0)
+
+        let commentMemo = Memo(
+            name: decodedComment.name,
+            numericID: decodedComment.extractedId,
+            content: decodedComment.content,
+            createdAt: decodedComment.createTime,
+            updatedAt: decodedComment.updateTime,
+            visibility: MemoVisibility(rawValue: decodedComment.visibility) ?? .private,
+            pinned: decodedComment.pinned ?? false,
+            state: MemoState(rawValue: decodedComment.state ?? "NORMAL") ?? .normal,
+            tags: decodedComment.tags ?? [],
+            parentName: decodedComment.parent,
+            remoteCommentCount: decodedComment.commentCount ?? 0
+        )
+        #expect(commentMemo.parentName == "memos/top-123")
+        #expect(commentMemo.isSystemCommentMemo)
+    }
 }

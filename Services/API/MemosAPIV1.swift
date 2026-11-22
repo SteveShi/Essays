@@ -97,6 +97,8 @@ struct MemosAPIV1: MemosAPIProtocol {
         let relations: [RelationData]?
         let relationList: [RelationData]?
         let space: String?
+        let parent: String?
+        let commentCount: Int?
         
         var extractedId: String {
             return name.split(separator: "/").last.map(String.init) ?? ""
@@ -191,7 +193,7 @@ struct MemosAPIV1: MemosAPIProtocol {
     }
 
     func checkServerStatus() async throws -> String {
-        guard let url = buildURL("/api/v1/instance/profile") else {
+        guard let url = buildURL("/api/instance/profile") else {
             throw MemosAPIError.invalidURL
         }
         let request = buildRequest(url: url)
@@ -200,7 +202,7 @@ struct MemosAPIV1: MemosAPIProtocol {
     }
     
     func signIn(username: String, password: String) async throws -> (user: User, accessToken: String?) {
-        guard let url = buildURL("/api/v1/auth/signin") else {
+        guard let url = buildURL("/api/auth/signin") else {
             throw MemosAPIError.invalidURL
         }
         
@@ -252,7 +254,7 @@ struct MemosAPIV1: MemosAPIProtocol {
     
     
     func getCurrentUser() async throws -> User {
-        guard let url = buildURL("/api/v1/auth/me") else {
+        guard let url = buildURL("/api/auth/me") else {
             throw MemosAPIError.invalidURL
         }
         let request = buildRequest(url: url)
@@ -290,14 +292,14 @@ struct MemosAPIV1: MemosAPIProtocol {
         Self.logger.debug("Fetching memos with state: \(state, privacy: .public)")
         
         repeat {
-            guard var urlComponents = URLComponents(string: "\(baseURL)/api/v1/memos") else {
+            guard var urlComponents = URLComponents(string: "\(baseURL)/api/memos") else {
                 throw MemosAPIError.invalidURL
             }
             
             var queryItems = [
                 URLQueryItem(name: "state", value: state),
                 URLQueryItem(name: "pageSize", value: "200"),
-                URLQueryItem(name: "view", value: "MEMO_VIEW_FULL")
+                URLQueryItem(name: "filter", value: "parent == null")
             ]
             
             if let token = nextPageToken, !token.isEmpty {
@@ -341,7 +343,7 @@ struct MemosAPIV1: MemosAPIProtocol {
         var nextPageToken: String? = nil
         
         repeat {
-            guard var urlComponents = URLComponents(string: "\(baseURL)/api/v1/\(primaryEncodedMemoName)/attachments") else {
+            guard var urlComponents = URLComponents(string: "\(baseURL)/api/\(primaryEncodedMemoName)/attachments") else {
                 throw MemosAPIError.invalidURL
             }
             
@@ -400,7 +402,7 @@ struct MemosAPIV1: MemosAPIProtocol {
         let encodedResourceName =
             resourceName.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed)
             ?? resourceName
-        guard let url = buildURL("/api/v1/\(encodedResourceName)") else {
+        guard let url = buildURL("/api/\(encodedResourceName)") else {
             throw MemosAPIError.invalidURL
         }
         let request = buildRequest(url: url)
@@ -422,16 +424,13 @@ struct MemosAPIV1: MemosAPIProtocol {
         attachmentNames: [String]? = nil, location: LocationDTO? = nil
     ) async throws -> Memo {
 
-        guard let url = buildURL("/api/v1/memos") else {
+        guard let url = buildURL("/api/memos") else {
             throw MemosAPIError.invalidURL
         }
 
         var body: [String: Any] = ["content": content]
         if let visibility = visibility {
             body["visibility"] = visibility.rawValue
-        }
-        if let tags = tags {
-            body["tags"] = tags
         }
         if let pinned = pinned {
             body["pinned"] = pinned
@@ -451,6 +450,10 @@ struct MemosAPIV1: MemosAPIProtocol {
         let request = buildRequest(url: url, method: "POST", body: try? JSONSerialization.data(withJSONObject: body))
         
         let data: MemoData = try await performRequest(request)
+        // Memos ignores `pinned` on CreateMemo; apply it via UpdateMemo if requested.
+        if pinned == true, !(data.pinned ?? false) {
+            return try await togglePinMemo(pinned: true, memoName: data.name)
+        }
         return mapMemoDataToModel(data)
     }
     
@@ -464,7 +467,7 @@ struct MemosAPIV1: MemosAPIProtocol {
         let encodedResourceName =
             resourceName.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed)
             ?? resourceName
-        guard var urlComponents = URLComponents(string: "\(baseURL)/api/v1/\(encodedResourceName)")
+        guard var urlComponents = URLComponents(string: "\(baseURL)/api/\(encodedResourceName)")
         else {
             throw MemosAPIError.invalidURL
         }
@@ -475,10 +478,6 @@ struct MemosAPIV1: MemosAPIProtocol {
         if let visibility = visibility {
             body["visibility"] = visibility.rawValue
             updateMasks.append("visibility")
-        }
-        if let tags = tags {
-            body["tags"] = tags
-            updateMasks.append("tags")
         }
         if let pinned = pinned {
             body["pinned"] = pinned
@@ -507,45 +506,7 @@ struct MemosAPIV1: MemosAPIProtocol {
         let request = buildRequest(url: url, method: "PATCH", body: try? JSONSerialization.data(withJSONObject: body))
         
         let data: MemoData = try await performRequest(request)
-        let memoVisibility = MemoVisibility(rawValue: data.visibility) ?? .private
-        
-        let localAttachments = ((data.attachments ?? []) + (data.resources ?? [])).map {
-            Attachment(
-                name: $0.name, filename: $0.filename, type: $0.type, size: $0.sizeInt,
-                content: $0.content, externalLink: $0.externalLink, createTime: $0.createTime)
-        }
-
-        let locationValue = data.location.map {
-            Location(placeholder: $0.placeholder, latitude: $0.latitude, longitude: $0.longitude)
-        }
-
-        let localRelations = (data.relations ?? data.relationList ?? []).map {
-            Relation(
-                memo: $0.memo.value, relatedMemo: $0.relatedMemo.value,
-                type: Relation.RelationType.parse($0.type))
-        }
-
-        let memoModel = Memo(
-            name: data.name,
-            numericID: data.extractedId,
-            content: data.content,
-            createdAt: data.createTime,
-            updatedAt: data.updateTime,
-            visibility: memoVisibility,
-            pinned: data.pinned ?? false,
-            state: MemoState(rawValue: data.state ?? "NORMAL") ?? .normal,
-            tags: data.tags ?? [],
-            attachments: localAttachments,
-            location: locationValue,
-            relations: localRelations,
-            spaceName: data.space
-        )
-        
-        if memoModel.tags.isEmpty {
-            memoModel.extractTagsFromContent()
-        }
-
-        return memoModel
+        return mapMemoDataToModel(data)
     }
     
     func deleteMemo(memoId: String) async throws {
@@ -554,7 +515,7 @@ struct MemosAPIV1: MemosAPIProtocol {
         let encodedResourceName =
             resourceName.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed)
             ?? resourceName
-        guard let url = buildURL("/api/v1/\(encodedResourceName)") else {
+        guard let url = buildURL("/api/\(encodedResourceName)") else {
             throw MemosAPIError.invalidURL
         }
         let request = buildRequest(url: url, method: "DELETE")
@@ -569,7 +530,7 @@ struct MemosAPIV1: MemosAPIProtocol {
     
     func archiveMemo(memoName: String) async throws -> Memo {
         let encodedName = memoName.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? memoName
-        guard var urlComponents = URLComponents(string: "\(baseURL)/api/v1/\(encodedName)") else {
+        guard var urlComponents = URLComponents(string: "\(baseURL)/api/\(encodedName)") else {
             throw MemosAPIError.invalidURL
         }
         
@@ -587,7 +548,7 @@ struct MemosAPIV1: MemosAPIProtocol {
 
     func unarchiveMemo(memoName: String) async throws -> Memo {
         let encodedName = memoName.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? memoName
-        guard var urlComponents = URLComponents(string: "\(baseURL)/api/v1/\(encodedName)") else {
+        guard var urlComponents = URLComponents(string: "\(baseURL)/api/\(encodedName)") else {
             throw MemosAPIError.invalidURL
         }
 
@@ -606,7 +567,7 @@ struct MemosAPIV1: MemosAPIProtocol {
     func togglePinMemo(pinned: Bool, memoName: String) async throws -> Memo {
         // memoName is like "memos/123" - use it directly as the resource path
         let encodedName = memoName.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? memoName
-        guard var urlComponents = URLComponents(string: "\(baseURL)/api/v1/\(encodedName)") else {
+        guard var urlComponents = URLComponents(string: "\(baseURL)/api/\(encodedName)") else {
             throw MemosAPIError.invalidURL
         }
         
@@ -623,7 +584,6 @@ struct MemosAPIV1: MemosAPIProtocol {
     }
     
     func fetchTags() async throws -> [Tag] {
-        // v0.26 no longer has a dedicated /api/v1/tags endpoint.
         // Tags are extracted dynamically from memos in the UI.
         return []
     }
@@ -631,7 +591,7 @@ struct MemosAPIV1: MemosAPIProtocol {
     func uploadAttachment(data: Data, filename: String, mimeType: String) async throws -> Attachment
     {
 
-        guard let url = buildURL("/api/v1/attachments") else {
+        guard let url = buildURL("/api/attachments") else {
             throw MemosAPIError.invalidURL
         }
         
@@ -658,15 +618,19 @@ struct MemosAPIV1: MemosAPIProtocol {
     }
 
     func fetchComments(parentId: String) async throws -> [Memo] {
+        let parentResourceName = parentId.hasPrefix("memos/") ? parentId : "memos/\(parentId)"
         var allMemosData: [MemoData] = []
         var nextPageToken: String? = nil
         
         repeat {
-            guard var urlComponents = URLComponents(string: "\(baseURL)/api/v1/\(parentId)/comments") else {
+            guard var urlComponents = URLComponents(string: "\(baseURL)/api/memos") else {
                 throw MemosAPIError.invalidURL
             }
             
-            var queryItems = [URLQueryItem(name: "pageSize", value: "100")]
+            var queryItems = [
+                URLQueryItem(name: "filter", value: "parent == \"\(parentResourceName)\""),
+                URLQueryItem(name: "pageSize", value: "100")
+            ]
             if let token = nextPageToken, !token.isEmpty {
                 queryItems.append(URLQueryItem(name: "pageToken", value: token))
             }
@@ -697,13 +661,15 @@ struct MemosAPIV1: MemosAPIProtocol {
     }
 
     func createComment(parentId: String, content: String, visibility: MemoVisibility = .private) async throws -> Memo {
-        guard let url = buildURL("/api/v1/\(parentId)/comments") else {
+        let parentResourceName = parentId.hasPrefix("memos/") ? parentId : "memos/\(parentId)"
+        guard let url = buildURL("/api/memos") else {
             throw MemosAPIError.invalidURL
         }
         
         let body: [String: Any] = [
             "content": content,
-            "visibility": visibility.rawValue
+            "visibility": visibility.rawValue,
+            "parent": parentResourceName
         ]
         
         let request = buildRequest(url: url, method: "POST", body: try? JSONSerialization.data(withJSONObject: body))
@@ -743,7 +709,9 @@ struct MemosAPIV1: MemosAPIProtocol {
             attachments: localAttachments,
             location: locationValue,
             relations: localRelations,
-            spaceName: data.space
+            spaceName: data.space,
+            parentName: data.parent,
+            remoteCommentCount: data.commentCount ?? 0
         )
         
         if memoModel.tags.isEmpty {
